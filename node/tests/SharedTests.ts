@@ -7728,13 +7728,42 @@ export function runBaseTests(config: {
 
                 // new key
                 expect(await client.setrange(key, 0, "Hello World")).toBe(11);
+                expect(
+                    await client.setrange(key, 0, Buffer.from("Hello World")),
+                ).toBe(11);
 
                 // existing key
                 expect(await client.setrange(key, 6, "GLIDE")).toBe(11);
+                expect(
+                    await client.setrange(Buffer.from(key), 6, "GLIDE"),
+                ).toBe(11);
+                expect(
+                    await client.setrange(key, 6, Buffer.from("GLIDE")),
+                ).toBe(11);
+                expect(
+                    await client.setrange(
+                        Buffer.from(key),
+                        6,
+                        Buffer.from("GLIDE"),
+                    ),
+                ).toBe(11);
                 expect(await client.get(key)).toEqual("Hello GLIDE");
 
                 // offset > len
                 expect(await client.setrange(key, 15, "GLIDE")).toBe(20);
+                expect(
+                    await client.setrange(Buffer.from(key), 15, "GLIDE"),
+                ).toBe(20);
+                expect(
+                    await client.setrange(key, 15, Buffer.from("GLIDE")),
+                ).toBe(20);
+                expect(
+                    await client.setrange(
+                        Buffer.from(key),
+                        15,
+                        Buffer.from("GLIDE"),
+                    ),
+                ).toBe(20);
                 expect(await client.get(key)).toEqual(
                     "Hello GLIDE\0\0\0\0GLIDE",
                 );

@@ -3835,17 +3835,17 @@ export class BaseTransaction<T extends BaseTransaction<T>> {
     }
 
     /**
-     * Overwrites part of the string stored at `key`, starting at the specified `offset`,
-     * for the entire length of `value`. If the `offset` is larger than the current length of the string at `key`,
-     * the string is padded with zero bytes to make `offset` fit. Creates the `key` if it doesn't exist.
+     * Overwrites part of the GlideString stored at `key`, starting at the specified `offset`,
+     * for the entire length of `value`. If the `offset` is larger than the current length of the GlideString at `key`,
+     * the GlideString is padded with zero bytes to make `offset` fit. Creates the `key` if it doesn't exist.
      *
      * @see {@link https://valkey.io/commands/setrange/|valkey.io} for details.
      *
-     * @param key - The key of the string to update.
-     * @param offset - The position in the string where `value` should be written.
-     * @param value - The string written with `offset`.
+     * @param key - The key of the GlideString to update.
+     * @param offset - The position in the GlideString where `value` should be written.
+     * @param value - The GlideString written with `offset`.
      *
-     * Command Response - The length of the string stored at `key` after it was modified.
+     * Command Response - The length of the GlideString stored at `key` after it was modified.
      */
     public setrange(key: GlideString, offset: number, value: GlideString): T {
         return this.addAndReturn(createSetRange(key, offset, value));
