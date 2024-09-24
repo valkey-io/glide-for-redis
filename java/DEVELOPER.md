@@ -232,6 +232,12 @@ To run end-to-end tests, use the following command:
 ./gradlew :integTest:test
 ```
 
+To run integration tests for pubsub feature:
+
+```bash
+./gradlew :integTest:pubsubTest
+```
+
 To run a single test, use the following command:
 ```bash
 ./gradlew :integTest:test --tests '*.functionLoad_and_functionList' --rerun
