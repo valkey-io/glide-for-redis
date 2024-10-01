@@ -93,15 +93,21 @@ tasks.register('startStandalone') {
     }
 }
 
+tasks.register('beforeTests') {}
+tasks.register('afterTests') {}
 
-test.dependsOn 'stopAllBeforeTests'
+beforeTests.dependsOn 'stopAllBeforeTests'
 stopAllBeforeTests.finalizedBy 'clearDirs'
 clearDirs.finalizedBy 'startStandalone'
 clearDirs.finalizedBy 'startCluster'
-test.finalizedBy 'stopAllAfterTests'
-test.dependsOn ':client:buildRustRelease'
+afterTests.finalizedBy 'stopAllAfterTests'
+beforeTests.dependsOn ':client:buildRustRelease'
 
 tasks.withType(Test) {
+    useJUnitPlatform()
+    dependsOn 'beforeTests'
+    finalizedBy 'afterTests'
+
     doFirst {
         println "Cluster ports = ${clusterPorts}"
         println "Standalone ports = ${standalonePorts}"
@@ -120,5 +126,17 @@ tasks.withType(Test) {
 
     afterTest { desc, result ->
         logger.quiet "${desc.className}.${desc.name}: ${result.resultType} ${(result.getEndTime() - result.getStartTime())/1000}s"
+    }
+}
+
+test {
+    filter {
+        excludeTestsMatching 'glide.PubSubTests'
+    }
+}
+
+tasks.register('pubsubTest', Test) {
+    filter {
+        includeTestsMatching 'glide.PubSubTests'
     }
 }
