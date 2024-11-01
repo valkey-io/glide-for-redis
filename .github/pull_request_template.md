@@ -13,10 +13,13 @@ This Pull Request is linked to issue (URL): [REPLACE ME]
 
 Before submitting the PR make sure the following are checked:
 
-* [ ] This Pull Request is related to one issue.
-* [ ] Commit message has a detailed description of what changed and why.
-* [ ] Tests are added or updated.
-* [ ] CHANGELOG.md and documentation files are updated.
-* [ ] Destination branch is correct - main or release
-* [ ] Commits will be squashed upon merging.
-      
+* [ ] This Pull Request is related to one issue
+* [ ] Commit messages have a detailed description of functional changes
+* [ ] Tests are added for all changes
+* [ ] CHANGELOG.md and documentation are updated
+* [ ] Destination branch is correct - main or release-1.x
+
+Upon merging the PR:
+
+* [ ] Commits will be squashed upon merging
+* [ ] All changes to `release` branch have a separate PR to backport

@@ -17,14 +17,14 @@ reported the issue. Please try to include as much information as you can.
 ## Contributing via Pull Requests
 Contributions via pull requests are much appreciated. Before sending us a pull request, please ensure that:
 
-1. You are working against the latest source on the *main* branch.
-2. You check existing open, and recently merged, pull requests to make sure someone else hasn't addressed the problem already.
-3. You open an issue to discuss any significant changes before starting the work - we would hate for your time to be wasted.
+1. You open an issue to discuss any significant changes before starting the work - we would hate for your time to be wasted.
+2. You are working against the latest source on the *main* branch or *release-vX.Y*.
+3. You check existing open and recently merged pull requests to make sure someone else hasn't addressed the problem already.
 
 To send us a pull request, please:
 
 1. Fork the repository.
-2. Modify the source; please focus on the specific change you are contributing. If you also reformat all the code, it will be hard for us to focus on your change.
+2. Modify the source; please focus on the specific change you are contributing. e.g. If you reformat all the code in your PR, it will be hard for us to focus on your change.
 3. Ensure local tests pass.
 4. Commit to your fork using clear commit messages, merge or squash commits as necessary.
 5. Send us a pull request, answering any default questions in the pull request interface.
