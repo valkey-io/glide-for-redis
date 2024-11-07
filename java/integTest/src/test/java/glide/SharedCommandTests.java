@@ -15349,7 +15349,7 @@ public class SharedCommandTests {
 
             // ensure that commands do not time out, even if timeout > request timeout
             assertEquals(OK, testClient.set(key, "value").get());
-            assertEquals((client instanceof GlideClient ? 0 : 1), testClient.wait(1L, 1000L).get());
+            assertEquals(1, testClient.wait(1L, 1000L).get());
 
             // with 0 timeout (no timeout) wait should block indefinitely,
             // but we wrap the test with timeout to avoid test failing or being stuck forever
