@@ -202,6 +202,7 @@ public class PubSubTests {
                     unsubscribe(client, command, channels);
                 }
             }
+            client.close();
         }
         listeners.clear();
         for (var client : senders) {
