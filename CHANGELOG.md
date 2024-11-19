@@ -1,4 +1,5 @@
 #### Changes
+* Go: Adding support for replacing connection configured password ([#2687](https://github.com/valkey-io/valkey-glide/pull/2687))
 * Node, Python: Adding support for replacing connection configured password ([#2651](https://github.com/valkey-io/valkey-glide/pull/2651))
 * Node: Add FT._ALIASLIST command([#2652](https://github.com/valkey-io/valkey-glide/pull/2652))
 * Python: Python: `FT._ALIASLIST` command added([#2638](https://github.com/valkey-io/valkey-glide/pull/2638))

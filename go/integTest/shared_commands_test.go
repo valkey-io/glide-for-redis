@@ -4,6 +4,7 @@ package integTest
 
 import (
 	"math"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -1246,5 +1247,43 @@ func (suite *GlideTestSuite) TestRPush() {
 		assert.Equal(suite.T(), api.CreateNilInt64Result(), res2)
 		assert.NotNil(suite.T(), err)
 		assert.IsType(suite.T(), &api.RequestError{}, err)
+	})
+}
+
+func (suite *GlideTestSuite) TestUpdateConnectionPassword_With_Cluster_Client() {
+	suite.runWithClusterClient(func(client api.GlideClusterClient) {
+		newPass := "newpass"
+		res, err := client.UpdateConnectionPassword(&newPass, false)
+		suite.verifyOK(res, err)
+
+		key := uuid.NewString()
+		value := uuid.NewString()
+
+		set, err := client.Set(key, value)
+		suite.verifyOK(set, err)
+
+		get, err := client.Get(key)
+		suite.verifyOK(set, err)
+		assert.Equal(suite.T(), get.Value(), value)
+	})
+}
+
+func (suite *GlideTestSuite) TestUpdateConnectionPassword_No_Server_Auth_With_ClusterClient() {
+	suite.runWithClusterClient(func(client api.GlideClusterClient) {
+		newPass := "newpass"
+		res, err := client.UpdateConnectionPassword(&newPass, true)
+
+		assert.NotNil(suite.T(), err)
+		assert.IsType(suite.T(), &api.RequestError{}, err)
+		assert.Empty(suite.T(), res.Value())
+	})
+}
+
+func (suite *GlideTestSuite) TestUpdateConnectionPassword_Password_Long_With_ClusterClient() {
+	suite.runWithClusterClient(func(client api.GlideClusterClient) {
+		password := strings.Repeat("p", 1000)
+
+		res, err := client.UpdateConnectionPassword(&password, false)
+		suite.verifyOK(res, err)
 	})
 }

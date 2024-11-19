@@ -22,8 +22,8 @@ type GlideTestSuite struct {
 	standalonePorts []int
 	clusterPorts    []int
 	serverVersion   string
-	clients         []*api.GlideClient
-	clusterClients  []*api.GlideClusterClient
+	clients         []api.GlideClient
+	clusterClients  []api.GlideClusterClient
 }
 
 func (suite *GlideTestSuite) SetupSuite() {
@@ -144,14 +144,14 @@ func (suite *GlideTestSuite) getDefaultClients() []api.BaseClient {
 	return []api.BaseClient{suite.defaultClient(), suite.defaultClusterClient()}
 }
 
-func (suite *GlideTestSuite) defaultClient() *api.GlideClient {
+func (suite *GlideTestSuite) defaultClient() api.GlideClient {
 	config := api.NewGlideClientConfiguration().
 		WithAddress(&api.NodeAddress{Port: suite.standalonePorts[0]}).
 		WithRequestTimeout(5000)
 	return suite.client(config)
 }
 
-func (suite *GlideTestSuite) client(config *api.GlideClientConfiguration) *api.GlideClient {
+func (suite *GlideTestSuite) client(config *api.GlideClientConfiguration) api.GlideClient {
 	client, err := api.NewGlideClient(config)
 
 	assert.Nil(suite.T(), err)
@@ -161,14 +161,14 @@ func (suite *GlideTestSuite) client(config *api.GlideClientConfiguration) *api.G
 	return client
 }
 
-func (suite *GlideTestSuite) defaultClusterClient() *api.GlideClusterClient {
+func (suite *GlideTestSuite) defaultClusterClient() api.GlideClusterClient {
 	config := api.NewGlideClusterClientConfiguration().
 		WithAddress(&api.NodeAddress{Port: suite.clusterPorts[0]}).
 		WithRequestTimeout(5000)
 	return suite.clusterClient(config)
 }
 
-func (suite *GlideTestSuite) clusterClient(config *api.GlideClusterClientConfiguration) *api.GlideClusterClient {
+func (suite *GlideTestSuite) clusterClient(config *api.GlideClusterClientConfiguration) api.GlideClusterClient {
 	client, err := api.NewGlideClusterClient(config)
 
 	assert.Nil(suite.T(), err)
@@ -184,6 +184,48 @@ func (suite *GlideTestSuite) runWithClients(clients []api.BaseClient, test func(
 			test(client)
 		})
 	}
+}
+
+func (suite *GlideTestSuite) runWithDefaultClientAndAuth(test func(client api.GlideClient)) {
+	suite.T().Run("Testing with default client", func(t *testing.T) {
+		client := suite.defaultClient()
+		config, err := client.ConfigSet(map[string]string{"requirepass": "pass"})
+		suite.verifyOK(config, err)
+
+		auth, err := client.CustomCommand([]string{"AUTH", "pass"})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), auth.(string), api.OK)
+
+		test(client)
+
+		emptyConfig, err := client.ConfigSet(map[string]string{"requirepass": ""})
+		suite.verifyOK(emptyConfig, err)
+
+		reset, err := client.CustomCommand([]string{"RESET"})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), reset.(string), "RESET")
+	})
+}
+
+func (suite *GlideTestSuite) runWithClusterClient(test func(client api.GlideClusterClient)) {
+	suite.T().Run("Testing with cluster client", func(t *testing.T) {
+		client := suite.defaultClusterClient()
+		config, err := client.ConfigSet(map[string]string{"requirepass": "pass"})
+		suite.verifyOK(config, err)
+
+		auth, err := client.CustomCommand([]string{"AUTH", "pass"})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), auth.(string), api.OK)
+
+		test(client)
+
+		emptyConfig, err := client.ConfigSet(map[string]string{"requirepass": ""})
+		suite.verifyOK(emptyConfig, err)
+
+		reset, err := client.CustomCommand([]string{"RESET"})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), reset.(string), "RESET")
+	})
 }
 
 func (suite *GlideTestSuite) verifyOK(result api.Result[string], err error) {

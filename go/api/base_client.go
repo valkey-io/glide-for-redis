@@ -130,6 +130,32 @@ func (client *baseClient) executeCommand(requestType C.RequestType, args []strin
 	return payload.value, nil
 }
 
+func (client *baseClient) executeCommandRequest(message proto.Message) (*C.struct_CommandResponse, error) {
+	msg, err := proto.Marshal(message)
+	if err != nil {
+		return nil, err
+	}
+
+	resultChannel := make(chan payload)
+	resultChannelPtr := uintptr(unsafe.Pointer(&resultChannel))
+
+	requestBytes := C.CBytes(msg)
+	requestLen := len(msg)
+
+	C.send_command_request(
+		client.coreClient,
+		C.uintptr_t(resultChannelPtr),
+		(*C.uchar)(requestBytes),
+		C.uintptr_t(requestLen),
+	)
+	payload := <-resultChannel
+	if payload.error != nil {
+		return nil, payload.error
+	}
+
+	return payload.value, nil
+}
+
 // Zero copying conversion from go's []string into C pointers
 func toCStrings(args []string) ([]C.uintptr_t, []C.ulong) {
 	cStrings := make([]C.uintptr_t, len(args))
@@ -539,4 +565,51 @@ func (client *baseClient) PingWithMessage(message string) (string, error) {
 		return "", err
 	}
 	return response.Value(), nil
+}
+
+func (client *baseClient) ConfigGet(args []string) (map[Result[string]]Result[string], error) {
+	res, err := client.executeCommand(C.ConfigGet, args)
+	if err != nil {
+		return nil, err
+	}
+
+	return handleStringToStringMapResponse(res)
+}
+
+func (client *baseClient) ConfigSet(parameters map[string]string) (Result[string], error) {
+	result, err := client.executeCommand(C.ConfigSet, utils.MapToString(parameters))
+	if err != nil {
+		return CreateNilStringResult(), err
+	}
+
+	return handleStringResponse(result)
+}
+
+func (client *baseClient) CustomCommand(args []string) (interface{}, error) {
+	res, err := client.executeCommand(C.CustomCommand, args)
+	if err != nil {
+		return nil, err
+	}
+
+	resString, err := handleStringOrNullResponse(res)
+	if err != nil {
+		return nil, err
+	}
+
+	return resString.Value(), err
+}
+
+func (client *baseClient) UpdateConnectionPassword(password *string, reAuth bool) (Result[string], error) {
+	request := protobuf.CommandRequest{
+		Command: &protobuf.CommandRequest_UpdateConnectionPassword{
+			UpdateConnectionPassword: &protobuf.UpdateConnectionPassword{Password: password, ReAuth: reAuth},
+		},
+	}
+
+	res, err := client.executeCommandRequest(&request)
+	if err != nil {
+		return CreateNilStringResult(), err
+	}
+
+	return handleStringResponse(res)
 }

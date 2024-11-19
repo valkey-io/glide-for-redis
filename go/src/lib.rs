@@ -4,6 +4,7 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 use glide_core::client::Client as GlideClient;
+use glide_core::command_request;
 use glide_core::connection_request;
 use glide_core::errors;
 use glide_core::errors::RequestErrorType;
@@ -525,6 +526,100 @@ pub unsafe extern "C" fn command(
 
         let result: RedisResult<CommandResponse> = valkey_value_to_command_response(value);
 
+        unsafe {
+            match result {
+                Ok(message) => {
+                    (client_adapter.success_callback)(channel, Box::into_raw(Box::new(message)))
+                }
+                Err(err) => {
+                    let message = errors::error_message(&err);
+                    let error_type = errors::error_type(&err);
+
+                    let c_err_str = CString::into_raw(
+                        CString::new(message).expect("Couldn't convert error message to CString"),
+                    );
+                    (client_adapter.failure_callback)(channel, c_err_str, error_type);
+                }
+            };
+        }
+    });
+}
+
+/// Executes a command request received from Go through the FFI interface.
+///
+/// # Arguments
+///
+/// * `client_adapter_ptr` - Pointer to the ClientAdapter instance
+/// * `channel` - Channel identifier for callback routing
+/// * `request_bytes` - Pointer to protobuf-encoded command request bytes
+/// * `request_len` - Length of the request bytes array
+///
+/// # Safety
+///
+#[no_mangle]
+pub unsafe extern "C" fn send_command_request(
+    client_adapter_ptr: *const c_void,
+    channel: usize,
+    request_bytes: *const u8,
+    request_len: usize,
+) {
+    let client_adapter =
+        unsafe { Box::leak(Box::from_raw(client_adapter_ptr as *mut ClientAdapter)) };
+    // The safety of this needs to be ensured by the calling code. Cannot dispose of the pointer before
+    // all operations have completed.
+    let ptr_address = client_adapter_ptr as usize;
+
+    let request_bytes = unsafe { std::slice::from_raw_parts(request_bytes, request_len) };
+
+    let request = match command_request::CommandRequest::parse_from_bytes(request_bytes) {
+        Ok(resp) => resp,
+        Err(err) => {
+            let message = err.to_string();
+            let c_err_str = CString::into_raw(
+                CString::new(message).expect("Couldn't convert error message to CString"),
+            );
+            unsafe {
+                (client_adapter.failure_callback)(channel, c_err_str, RequestErrorType::Unspecified)
+            };
+            return;
+        }
+    };
+
+    let mut client_clone = client_adapter.client.clone();
+    client_adapter.runtime.spawn(async move {
+        let result = match request.command {
+            Some(command_request::command_request::Command::UpdateConnectionPassword(
+                update_connection_password,
+            )) => {
+                client_clone
+                    .update_connection_password(
+                        update_connection_password
+                            .password
+                            .map(|chars| chars.to_string()),
+                        update_connection_password.re_auth,
+                    )
+                    .await
+            }
+            // TODO: Add support for other return types.
+            _ => todo!(),
+        };
+
+        let client_adapter = unsafe { Box::leak(Box::from_raw(ptr_address as *mut ClientAdapter)) };
+        let value = match result {
+            Ok(value) => value,
+            Err(err) => {
+                let message = errors::error_message(&err);
+                let error_type = errors::error_type(&err);
+
+                let c_err_str = CString::into_raw(
+                    CString::new(message).expect("Couldn't convert error message to CString"),
+                );
+                unsafe { (client_adapter.failure_callback)(channel, c_err_str, error_type) };
+                return;
+            }
+        };
+
+        let result: RedisResult<CommandResponse> = valkey_value_to_command_response(value);
         unsafe {
             match result {
                 Ok(message) => {
