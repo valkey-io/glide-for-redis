@@ -7,6 +7,7 @@ use redis::{FromRedisValue, RedisResult};
 use std::{
     ffi::{c_void, CStr, CString},
     os::raw::c_char,
+    sync::Arc,
 };
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
@@ -68,7 +69,8 @@ fn create_client_internal(
     })
 }
 
-/// Creates a new client to the given address. The success callback needs to copy the given string synchronously, since it will be dropped by Rust once the callback returns. All callbacks should be offloaded to separate threads in order not to exhaust the client's thread pool.
+/// Creates a new client to the given address. The success callback needs to copy the given string synchronously, since it will be dropped by Rust once the callback returns.
+/// All callbacks should be offloaded to separate threads in order not to exhaust the client's thread pool.
 #[no_mangle]
 pub extern "C" fn create_client(
     host: *const c_char,
@@ -79,38 +81,48 @@ pub extern "C" fn create_client(
 ) -> *const c_void {
     match create_client_internal(host, port, use_tls, success_callback, failure_callback) {
         Err(_) => std::ptr::null(), // TODO - log errors
-        Ok(client) => Box::into_raw(Box::new(client)) as *const c_void,
+        Ok(client) => Arc::into_raw(Arc::new(client)) as *const c_void,
     }
 }
 
+/// # Safety
+///
+/// This function should only be called once per pointer created by [create_client]. After calling this function
+/// the `client_ptr` is not in a valid state.
 #[no_mangle]
 pub extern "C" fn close_client(client_ptr: *const c_void) {
-    let client_ptr = unsafe { Box::from_raw(client_ptr as *mut Client) };
-    let _runtime_handle = client_ptr.runtime.enter();
-    drop(client_ptr);
+    let count = Arc::strong_count(&unsafe { Arc::from_raw(client_ptr as *mut Client) });
+    assert!(count == 1, "Client is still in use.");
 }
 
 /// Expects that key and value will be kept valid until the callback is called.
+///
+/// # Safety
+///
+/// This function should only be called should with a pointer created by [create_client], before [close_client] was called with the pointer.
 #[no_mangle]
-pub extern "C" fn command(
+pub unsafe extern "C" fn command(
     client_ptr: *const c_void,
     callback_index: usize,
     request_type: RequestType,
     args: *const *mut c_char,
     arg_count: u32,
 ) {
-    let client = unsafe { Box::leak(Box::from_raw(client_ptr as *mut Client)) };
+    let client = unsafe {
+        // we increment the strong count to ensure that the client is not dropped just because we turned it into an Arc.
+        Arc::increment_strong_count(client_ptr);
+        Arc::from_raw(client_ptr as *mut Client)
+    };
+    let core_client_clone = client.clone();
 
     // The safety of these needs to be ensured by the calling code. Cannot dispose of the pointer before all operations have completed.
-    let ptr_address = client_ptr as usize;
     let args_address = args as usize;
 
     let mut client_clone = client.client.clone();
     client.runtime.spawn(async move {
         let Some(mut cmd) = request_type.get_command() else {
             unsafe {
-                let client = Box::leak(Box::from_raw(ptr_address as *mut Client));
-                (client.failure_callback)(callback_index); // TODO - report errors
+                (core_client_clone.failure_callback)(callback_index); // TODO - report errors
                 return;
             }
         };
@@ -128,11 +140,12 @@ pub extern "C" fn command(
             .await
             .and_then(Option::<CString>::from_owned_redis_value);
         unsafe {
-            let client = Box::leak(Box::from_raw(ptr_address as *mut Client));
             match result {
-                Ok(None) => (client.success_callback)(callback_index, std::ptr::null()),
-                Ok(Some(c_str)) => (client.success_callback)(callback_index, c_str.as_ptr()),
-                Err(_) => (client.failure_callback)(callback_index), // TODO - report errors
+                Ok(None) => (core_client_clone.success_callback)(callback_index, std::ptr::null()),
+                Ok(Some(c_str)) => {
+                    (core_client_clone.success_callback)(callback_index, c_str.as_ptr())
+                }
+                Err(_) => (core_client_clone.failure_callback)(callback_index), // TODO - report errors
             };
         }
     });
