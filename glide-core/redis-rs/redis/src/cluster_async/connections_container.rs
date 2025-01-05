@@ -125,9 +125,8 @@ pub(crate) struct ConnectionsMap<Connection>(pub(crate) DashMap<String, ClusterN
 
 pub(crate) struct RefreshState<Connection> {
     pub handle: JoinHandle<()>, // The currect running refresh task
-    pub node_conn: Option<ClusterNode<Connection>> // The refreshed connection after the task is done
+    pub node_conn: Option<ClusterNode<Connection>>, // The refreshed connection after the task is done
 }
-
 
 impl<Connection> std::fmt::Display for ConnectionsMap<Connection> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -148,7 +147,6 @@ pub(crate) struct ConnectionsContainer<Connection> {
     read_from_replica_strategy: ReadFromReplicaStrategy,
     topology_hash: TopologyHash,
 
-    
     // Holds all the failed addresses that started a refresh task.
     pub(crate) refresh_addresses_started: DashSet<String>,
     // Follow the refresh ops on the connections
