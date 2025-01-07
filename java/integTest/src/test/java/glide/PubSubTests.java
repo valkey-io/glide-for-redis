@@ -147,6 +147,23 @@ public class PubSubTests {
 
     private static final int MESSAGE_DELIVERY_DELAY = 500; // ms
 
+    private void unsubscribe(BaseClient client, String command, GlideString[] channels) {
+        for (var channel : channels) {
+            try {
+                if (client instanceof GlideClusterClient) {
+                    ((GlideClusterClient) client)
+                            .customCommand(new GlideString[] {gs(command), channel})
+                            .get();
+                } else {
+                    ((GlideClient) client).customCommand(new GlideString[] {gs(command), channel}).get();
+                }
+            } catch (Exception ignored) {
+                // valkey 8 may report an error - ignoring
+                // https://github.com/valkey-io/valkey/issues/1228
+            }
+        }
+    }
+
     @AfterEach
     @SneakyThrows
     public void cleanup() {
@@ -156,43 +173,36 @@ public class PubSubTests {
             if (client instanceof GlideClusterClient) {
                 for (var subscription : subscriptionTypes.entrySet()) {
                     var channels = subscription.getValue().toArray(GlideString[]::new);
-                    for (GlideString channel : channels) {
-                        switch ((PubSubClusterChannelMode) subscription.getKey()) {
-                            case EXACT:
-                                ((GlideClusterClient) client)
-                                        .customCommand(new GlideString[] {gs("unsubscribe"), channel})
-                                        .get();
-                                break;
-                            case PATTERN:
-                                ((GlideClusterClient) client)
-                                        .customCommand(new GlideString[] {gs("punsubscribe"), channel})
-                                        .get();
-                                break;
-                            case SHARDED:
-                                ((GlideClusterClient) client)
-                                        .customCommand(new GlideString[] {gs("sunsubscribe"), channel})
-                                        .get();
-                                break;
-                        }
+                    String command = "";
+                    switch ((PubSubClusterChannelMode) subscription.getKey()) {
+                        case EXACT:
+                            command = "unsubscribe";
+                            break;
+                        case PATTERN:
+                            command = "punsubscribe";
+                            break;
+                        case SHARDED:
+                            command = "sunsubscribe";
+                            break;
                     }
+                    unsubscribe(client, command, channels);
                 }
             } else {
                 for (var subscription : subscriptionTypes.entrySet()) {
                     var channels = subscription.getValue().toArray(GlideString[]::new);
+                    String command = "";
                     switch ((PubSubChannelMode) subscription.getKey()) {
                         case EXACT:
-                            ((GlideClient) client)
-                                    .customCommand(ArrayUtils.addFirst(channels, gs("unsubscribe")))
-                                    .get();
+                            command = "unsubscribe";
                             break;
                         case PATTERN:
-                            ((GlideClient) client)
-                                    .customCommand(ArrayUtils.addFirst(channels, gs("punsubscribe")))
-                                    .get();
+                            command = "punsubscribe";
                             break;
                     }
+                    unsubscribe(client, command, channels);
                 }
             }
+            client.close();
         }
         listeners.clear();
         for (var client : senders) {
