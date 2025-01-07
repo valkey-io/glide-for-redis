@@ -225,6 +225,22 @@ async def glide_client(
 
 
 @pytest.fixture(scope="function")
+async def glide_client(
+    request,
+    cluster_mode: bool,
+    protocol: ProtocolVersion,
+    request_timeout: int,
+) -> AsyncGenerator[TGlideClient, None]:
+    "Get async socket client for tests"
+    client = await create_client(
+        request, cluster_mode, protocol=protocol, request_timeout=request_timeout
+    )
+    yield client
+    await test_teardown(request, cluster_mode, protocol)
+    await client.close()
+
+
+@pytest.fixture(scope="function")
 async def management_client(
     request,
     cluster_mode: bool,
@@ -232,6 +248,22 @@ async def management_client(
 ) -> AsyncGenerator[TGlideClient, None]:
     "Get async socket client for tests, used to manage the state when tests are on the client ability to connect"
     client = await create_client(request, cluster_mode, protocol=protocol)
+    yield client
+    await test_teardown(request, cluster_mode, protocol)
+    await client.close()
+
+
+@pytest.fixture(scope="function")
+async def management_client(
+    request,
+    cluster_mode: bool,
+    protocol: ProtocolVersion,
+    request_timeout: int,
+) -> AsyncGenerator[TGlideClient, None]:
+    "Get async socket client for tests, used to manage the state when tests are on the client ability to connect"
+    client = await create_client(
+        request, cluster_mode, protocol=protocol, request_timeout=request_timeout
+    )
     yield client
     await test_teardown(request, cluster_mode, protocol)
     await client.close()
