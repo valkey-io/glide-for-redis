@@ -1284,6 +1284,13 @@ where
             }
         };
         Box::pin(async move {
+            // Remove all refresh_connection data, to have a new clear state
+            inner
+                .conn_lock
+                .write()
+                .expect(MUTEX_WRITE_ERR)
+                .clear_refresh_state();
+
             let connection_map = match Self::create_initial_connections(
                 &inner.initial_nodes,
                 &cluster_params,

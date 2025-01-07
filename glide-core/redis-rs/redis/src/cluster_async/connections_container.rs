@@ -10,6 +10,8 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use telemetrylib::Telemetry;
 
+use tracing::debug;
+
 use tokio::task::JoinHandle;
 
 /// Count the number of connections in a connections_map object
@@ -213,6 +215,31 @@ where
             .nodes_map()
             .iter()
             .map(|item| (item.key().clone(), item.value().clone()))
+    }
+
+    pub(crate) fn clear_refresh_state(&mut self) {
+        let addresses: Vec<String> = self
+            .refresh_operations
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect();
+
+        debug!(
+            "clear_refresh_state: removing all refresh data and tasks for addresses: {:?}",
+            addresses
+        );
+
+        for address in addresses {
+            if let Some((_, refresh_state)) = self.refresh_operations.remove(&address) {
+                // Check if handle exists before calling abort
+                if !refresh_state.handle.is_finished() {
+                    refresh_state.handle.abort();
+                }
+            }
+        }
+
+        self.refresh_addresses_started.clear();
+        self.refresh_addresses_done.clear();
     }
 
     // Extends the current connection map with the provided one
