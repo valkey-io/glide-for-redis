@@ -36,7 +36,6 @@ class TestAuthCommands:
 
     @pytest.mark.parametrize("cluster_mode", [True])
     @pytest.mark.parametrize("protocol", [ProtocolVersion.RESP2, ProtocolVersion.RESP3])
-    @pytest.mark.parametrize("request_timeout", [3000])
     async def test_update_connection_password(
         self, glide_client: TGlideClient, management_client: TGlideClient
     ):
