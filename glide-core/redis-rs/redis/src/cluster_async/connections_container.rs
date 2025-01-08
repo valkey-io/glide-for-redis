@@ -2,9 +2,10 @@ use crate::cluster_async::ConnectionFuture;
 use crate::cluster_routing::{Route, ShardAddrs, SlotAddr};
 use crate::cluster_slotmap::{ReadFromReplicaStrategy, SlotMap, SlotMapValue};
 use crate::cluster_topology::TopologyHash;
-use dashmap::{DashMap, DashSet};
+use dashmap::DashMap;
 use futures::FutureExt;
 use rand::seq::IteratorRandom;
+use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -125,11 +126,6 @@ pub(crate) enum ConnectionType {
 
 pub(crate) struct ConnectionsMap<Connection>(pub(crate) DashMap<String, ClusterNode<Connection>>);
 
-pub(crate) struct RefreshState<Connection> {
-    pub handle: JoinHandle<()>, // The currect running refresh task
-    pub node_conn: Option<ClusterNode<Connection>>, // The refreshed connection after the task is done
-}
-
 impl<Connection> std::fmt::Display for ConnectionsMap<Connection> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for item in self.0.iter() {
@@ -143,18 +139,59 @@ impl<Connection> std::fmt::Display for ConnectionsMap<Connection> {
     }
 }
 
+// This struct is used to track the status of each address refresh
+pub(crate) struct RefreshConnectionStates<Connection> {
+    // Holds all the failed addresses that started a refresh task.
+    pub(crate) refresh_addresses_started: HashSet<String>,
+    // Follow the refresh ops on the connections
+    pub(crate) refresh_address_in_progress: HashMap<String, JoinHandle<()>>,
+    // Holds all the refreshed addresses that are ready to be inserted into the connection_map
+    pub(crate) refresh_addresses_done: HashMap<String, Option<ClusterNode<Connection>>>,
+}
+
+impl<Connection> RefreshConnectionStates<Connection> {
+    pub(crate) fn clear_refresh_state(&mut self) {
+        let addresses: Vec<String> = self
+            .refresh_address_in_progress
+            .iter()
+            .map(|entry| entry.0.clone())
+            .collect();
+
+        debug!(
+            "clear_refresh_state: removing all refresh data and tasks for addresses: {:?}",
+            addresses
+        );
+
+        for address in addresses {
+            if let Some(refresh_task) = self.refresh_address_in_progress.remove(&address) {
+                // Check if handle exists before calling abort
+                if !refresh_task.is_finished() {
+                    refresh_task.abort();
+                }
+            }
+        }
+
+        self.refresh_addresses_started.clear();
+        self.refresh_addresses_done.clear();
+    }
+}
+
+impl<Connection> Default for RefreshConnectionStates<Connection> {
+    fn default() -> Self {
+        Self {
+            refresh_addresses_started: HashSet::new(),
+            refresh_address_in_progress: HashMap::new(),
+            refresh_addresses_done: HashMap::new(),
+        }
+    }
+}
+
 pub(crate) struct ConnectionsContainer<Connection> {
     connection_map: DashMap<String, ClusterNode<Connection>>,
     pub(crate) slot_map: SlotMap,
     read_from_replica_strategy: ReadFromReplicaStrategy,
     topology_hash: TopologyHash,
-
-    // Holds all the failed addresses that started a refresh task.
-    pub(crate) refresh_addresses_started: DashSet<String>,
-    // Follow the refresh ops on the connections
-    pub(crate) refresh_operations: DashMap<String, RefreshState<Connection>>,
-    // Holds all the refreshed addresses that are ready to be inserted into the connection_map
-    pub(crate) refresh_addresses_done: DashSet<String>,
+    pub(crate) refresh_conn_state: RefreshConnectionStates<Connection>,
 }
 
 impl<Connection> Drop for ConnectionsContainer<Connection> {
@@ -171,9 +208,7 @@ impl<Connection> Default for ConnectionsContainer<Connection> {
             slot_map: Default::default(),
             read_from_replica_strategy: ReadFromReplicaStrategy::AlwaysFromPrimary,
             topology_hash: 0,
-            refresh_addresses_started: DashSet::new(),
-            refresh_operations: DashMap::new(),
-            refresh_addresses_done: DashSet::new(),
+            refresh_conn_state: Default::default(),
         }
     }
 }
@@ -201,9 +236,7 @@ where
             slot_map,
             read_from_replica_strategy,
             topology_hash,
-            refresh_addresses_started: DashSet::new(),
-            refresh_operations: DashMap::new(),
-            refresh_addresses_done: DashSet::new(),
+            refresh_conn_state: Default::default(),
         }
     }
 
@@ -215,31 +248,6 @@ where
             .nodes_map()
             .iter()
             .map(|item| (item.key().clone(), item.value().clone()))
-    }
-
-    pub(crate) fn clear_refresh_state(&mut self) {
-        let addresses: Vec<String> = self
-            .refresh_operations
-            .iter()
-            .map(|entry| entry.key().clone())
-            .collect();
-
-        debug!(
-            "clear_refresh_state: removing all refresh data and tasks for addresses: {:?}",
-            addresses
-        );
-
-        for address in addresses {
-            if let Some((_, refresh_state)) = self.refresh_operations.remove(&address) {
-                // Check if handle exists before calling abort
-                if !refresh_state.handle.is_finished() {
-                    refresh_state.handle.abort();
-                }
-            }
-        }
-
-        self.refresh_addresses_started.clear();
-        self.refresh_addresses_done.clear();
     }
 
     // Extends the current connection map with the provided one
@@ -619,9 +627,7 @@ mod tests {
             connection_map,
             read_from_replica_strategy: ReadFromReplicaStrategy::AZAffinity("use-1a".to_string()),
             topology_hash: 0,
-            refresh_addresses_started: DashSet::new(),
-            refresh_operations: DashMap::new(),
-            refresh_addresses_done: DashSet::new(),
+            refresh_conn_state: Default::default(),
         }
     }
 
@@ -678,9 +684,7 @@ mod tests {
             connection_map,
             read_from_replica_strategy: strategy,
             topology_hash: 0,
-            refresh_addresses_started: DashSet::new(),
-            refresh_operations: DashMap::new(),
-            refresh_addresses_done: DashSet::new(),
+            refresh_conn_state: Default::default(),
         }
     }
 
