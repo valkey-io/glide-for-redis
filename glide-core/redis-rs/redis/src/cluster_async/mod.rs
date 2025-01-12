@@ -1398,6 +1398,16 @@ where
             let address_clone = address.clone();
             let address_clone_for_task = address.clone();
 
+            // Add this address to be removed in poll_flush so all requests see a consistent connection map.
+            // See next comment for elaborated explanation.
+            inner_clone
+                .conn_lock
+                .write()
+                .expect(MUTEX_READ_ERR)
+                .refresh_conn_state
+                .refresh_addresses_started
+                .insert(address_clone_for_task.clone());
+
             let handle = tokio::spawn(async move {
                 info!(
                     "Refreshing connection task to {:?} started",
@@ -1414,16 +1424,6 @@ where
                     } else {
                         None
                     };
-
-                    // Add this address to be removed in poll_flush so all requests see a consistent connection map.
-                    // See next comment for elaborated explanation.
-                    inner_clone
-                        .conn_lock
-                        .write()
-                        .expect(MUTEX_READ_ERR)
-                        .refresh_conn_state
-                        .refresh_addresses_started
-                        .insert(address_clone_for_task.clone());
 
                     let mut cluster_params = inner_clone
                         .cluster_params
@@ -2548,6 +2548,9 @@ where
                             }
                         }
                     }
+                }
+                else {
+                    debug!("update_refreshed_connection: address {:?} current_existing_addresses_in_slot_map: {:?}", address, current_existing_addresses_in_slot_map);
                 }
 
                 // Remove this address from refresh_addresses_done
