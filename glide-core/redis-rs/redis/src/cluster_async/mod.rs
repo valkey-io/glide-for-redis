@@ -2548,9 +2548,8 @@ where
                             }
                         }
                     }
-                }
-                else {
-                    debug!("update_refreshed_connection: address {:?} current_existing_addresses_in_slot_map: {:?}", address, current_existing_addresses_in_slot_map);
+                } else {
+                    debug!("update_refreshed_connection: address {:?} doesn't appear in addresses in slot_map: {:?}", address, current_existing_addresses_in_slot_map);
                 }
 
                 // Remove this address from refresh_addresses_done
