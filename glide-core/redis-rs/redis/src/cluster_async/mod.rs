@@ -40,6 +40,7 @@ use crate::{
     commands::cluster_scan::{cluster_scan, ClusterScanArgs, ScanStateRC},
     FromRedisValue, InfoDict,
 };
+use connections_container::{RefreshTaskState, RefreshTaskStatus};
 use dashmap::DashMap;
 use std::{
     collections::{HashMap, HashSet},
@@ -1366,8 +1367,8 @@ where
             Self::refresh_connections(
                 inner.clone(),
                 addrs_to_refresh,
-                RefreshConnectionType::AllConnections,
-                false,
+                RefreshConnectionType::OnlyUserConnection,
+                true,
             )
             .await;
         }
@@ -1477,6 +1478,8 @@ where
                                 "Failed to refresh connection for node {}. Error: `{:?}`",
                                 address_clone_for_task, err
                             );
+                            // TODO - When we move to retry more than once, we add this address to a new set of running to long, and then only move
+                            // the RefreshTaskState.status to RunningTooLong in the poll_flush context inside update_refreshed_connection.
                             inner_clone
                                 .conn_lock
                                 .write()
@@ -1493,21 +1496,13 @@ where
             });
 
             // Keep the task handle into the RefreshState of this address
-            info!(
-                "Inserting tokio task to refresh_ops map of address {:?}",
-                address.clone()
-            );
             inner
                 .conn_lock
                 .write()
                 .expect(MUTEX_READ_ERR)
                 .refresh_conn_state
                 .refresh_address_in_progress
-                .insert(address.clone(), handle);
-            info!(
-                "Inserted tokio task to refresh_ops map of address {:?}",
-                address.clone()
-            );
+                .insert(address.clone(), RefreshTaskState::new(handle));
         }
         debug!("refresh connection tasks initiated");
     }
@@ -2356,19 +2351,81 @@ where
 
         let (address, mut conn) = match conn_check {
             ConnectionCheck::Found((address, connection)) => (address, connection.await),
-            ConnectionCheck::OnlyAddress(addr) => {
-                // No connection in for this address in the conn_map
+            ConnectionCheck::OnlyAddress(address) => {
+                // No connection for this address in the conn_map
                 Self::refresh_connections(
-                    core,
-                    HashSet::from_iter(once(addr)),
+                    core.clone(),
+                    HashSet::from_iter(once(address.clone())),
                     RefreshConnectionType::AllConnections,
                     false,
                 )
                 .await;
-                return Err(RedisError::from((
-                    ErrorKind::ConnectionNotFoundForRoute,
-                    "No connection for the address, started a refresh task",
-                )));
+
+                let reconnect_notifier: Option<Arc<Notify>> = match core
+                    .conn_lock
+                    .read()
+                    .expect(MUTEX_READ_ERR)
+                    .refresh_conn_state
+                    .refresh_address_in_progress
+                    .get(&address)
+                {
+                    Some(refresh_task_state) => {
+                        match &refresh_task_state.status {
+                            // If the task status is `Reconnecting`, grab the notifier.
+                            RefreshTaskStatus::Reconnecting(refresh_notifier) => {
+                                Some(refresh_notifier.get_notifier())
+                            }
+                            RefreshTaskStatus::ReconnectingTooLong => {
+                                debug!(
+                                    "get_connection: Address {} is in ReconnectingTooLong state, skipping notifier wait.",
+                                    address
+                                );
+                                None
+                            }
+                        }
+                    }
+                    None => {
+                        debug!(
+                            "get_connection: No refresh task found in progress for address: {}",
+                            address
+                        );
+                        None
+                    }
+                };
+
+                let mut conn_option = None;
+                if let Some(refresh_notifier) = reconnect_notifier {
+                    debug!(
+                        "get_connection: Waiting on the refresh notifier for address: {}",
+                        address
+                    );
+                    // Wait for the refresh task to notify that it's done reconnecting (or transitioning).
+                    refresh_notifier.notified().await;
+                    debug!(
+                        "get_connection: After waiting on the refresh notifier for address: {}",
+                        address
+                    );
+
+                    conn_option = core
+                        .conn_lock
+                        .read()
+                        .expect(MUTEX_READ_ERR)
+                        .connection_for_address(&address);
+                }
+
+                if let Some((address, conn)) = conn_option {
+                    debug!("get_connection: Connection found for address: {}", address);
+                    // If found, return the connection
+                    (address, conn.await)
+                } else {
+                    // Otherwise, return an error indicating the connection wasn't found
+                    return Err((
+                        ErrorKind::ConnectionNotFoundForRoute,
+                        "Requested connection not found",
+                        address,
+                    )
+                        .into());
+                }
             }
             ConnectionCheck::RandomConnection => {
                 let random_conn = core
@@ -2562,7 +2619,7 @@ where
                     .remove(&address);
 
                 // Remove this entry from refresh_address_in_progress
-                if self
+                if let Some(_) = self
                     .inner
                     .conn_lock
                     .write()
@@ -2570,10 +2627,14 @@ where
                     .refresh_conn_state
                     .refresh_address_in_progress
                     .remove(&address)
-                    .is_none()
                 {
+                    debug!(
+                        "update_refreshed_connection: Successfully removed refresh state for address: {}",
+                        address
+                    );
+                } else {
                     warn!(
-                        "update_refreshed_connection: No refresh operation found to remove for address: {:?}",
+                        "update_refreshed_connection: No refresh state found to remove for address: {:?}",
                         address
                     );
                 }

@@ -13,6 +13,7 @@ use telemetrylib::Telemetry;
 
 use tracing::debug;
 
+use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
 /// Count the number of connections in a connections_map object
@@ -139,38 +140,146 @@ impl<Connection> std::fmt::Display for ConnectionsMap<Connection> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct RefreshTaskNotifier {
+    notify: Arc<Notify>,
+}
+
+impl RefreshTaskNotifier {
+    fn new() -> Self {
+        RefreshTaskNotifier {
+            notify: Arc::new(Notify::new()),
+        }
+    }
+
+    pub fn get_notifier(&self) -> Arc<Notify> {
+        self.notify.clone()
+    }
+
+    pub fn notify(&self) {
+        self.notify.notify_waiters();
+    }
+}
+
+// Enum representing the task status during a connection refresh.
+//
+// - **Reconnecting**:
+//   Indicates that a refresh task is in progress. This status includes a dedicated
+//   notifier (`RefreshTaskNotifier`) so that other tasks can wait for the connection
+//   to be refreshed before proceeding.
+//
+// - **ReconnectingTooLong**:
+//   Represents a situation where a refresh task has taken too long to complete.
+//   The status transitions from `Reconnecting` to `ReconnectingTooLong` under specific
+//   conditions (e.g., after one attempt of reconnecting inside the task or after a timeout).
+//
+// The transition from `Reconnecting` to `ReconnectingTooLong` is managed exclusively
+// within the `update_refreshed_connection` function in `poll_flush`. This ensures that
+// all requests maintain a consistent view of the connections.
+//
+// When transitioning from `Reconnecting` to `ReconnectingTooLong`, the associated
+// notifier is triggered to unblock all awaiting tasks.
+#[derive(Clone, Debug)]
+pub(crate) enum RefreshTaskStatus {
+    // The task is actively reconnecting. Includes a notifier for tasks to wait on.
+    Reconnecting(RefreshTaskNotifier),
+    // The task has exceeded the allowed reconnection time.
+    ReconnectingTooLong,
+}
+
+impl Drop for RefreshTaskStatus {
+    fn drop(&mut self) {
+        if let RefreshTaskStatus::Reconnecting(notifier) = self {
+            debug!("RefreshTaskStatus: Dropped while in Reconnecting status. Notifying tasks.");
+            notifier.notify();
+        }
+    }
+}
+
+impl RefreshTaskStatus {
+    /// Creates a new `RefreshTaskStatus` in the `Reconnecting` status with a fresh `RefreshTaskNotifier`.
+    pub fn new() -> Self {
+        debug!("RefreshTaskStatus: Initialized in Reconnecting status with a new notifier.");
+        RefreshTaskStatus::Reconnecting(RefreshTaskNotifier::new())
+    }
+
+    // Transitions the current status from `Reconnecting` to `ReconnectingTooLong` in place.
+    //
+    // If the current status is `Reconnecting`, this method notifies all waiting tasks
+    // using the embedded `RefreshTaskNotifier` and updates the status to `ReconnectingTooLong`.
+    //
+    // If the status is already `ReconnectingTooLong`, this method does nothing.
+    pub fn flip_state(&mut self) {
+        if let RefreshTaskStatus::Reconnecting(notifier) = self {
+            debug!(
+                "RefreshTaskStatus: Notifying tasks before transitioning to ReconnectingTooLong."
+            );
+            notifier.notify();
+            *self = RefreshTaskStatus::ReconnectingTooLong;
+        } else {
+            debug!("RefreshTaskStatus: Already in ReconnectingTooLong status.");
+        }
+    }
+}
+
+// Struct combining the task handle and its status
+#[derive(Debug)]
+pub(crate) struct RefreshTaskState {
+    pub handle: JoinHandle<()>,
+    pub status: RefreshTaskStatus,
+}
+
+impl RefreshTaskState {
+    // Creates a new `RefreshTaskState` with a `Reconnecting` state and a new notifier.
+    pub fn new(handle: JoinHandle<()>) -> Self {
+        debug!("RefreshTaskState: Creating a new instance with a Reconnecting state.");
+        RefreshTaskState {
+            handle,
+            status: RefreshTaskStatus::new(),
+        }
+    }
+}
+
+impl Drop for RefreshTaskState {
+    fn drop(&mut self) {
+        if let RefreshTaskStatus::Reconnecting(ref notifier) = self.status {
+            debug!("RefreshTaskState: Dropped while in Reconnecting status. Notifying tasks.");
+            notifier.notify();
+        } else {
+            debug!("RefreshTaskState: Dropped while in ReconnectingTooLong status.");
+        }
+
+        // Abort the task handle if it's not yet finished
+        if !self.handle.is_finished() {
+            debug!("RefreshTaskState: Aborting unfinished task.");
+            self.handle.abort();
+        } else {
+            debug!("RefreshTaskState: Task already finished, no abort necessary.");
+        }
+    }
+}
+
 // This struct is used to track the status of each address refresh
 pub(crate) struct RefreshConnectionStates<Connection> {
     // Holds all the failed addresses that started a refresh task.
     pub(crate) refresh_addresses_started: HashSet<String>,
     // Follow the refresh ops on the connections
-    pub(crate) refresh_address_in_progress: HashMap<String, JoinHandle<()>>,
+    pub(crate) refresh_address_in_progress: HashMap<String, RefreshTaskState>,
     // Holds all the refreshed addresses that are ready to be inserted into the connection_map
     pub(crate) refresh_addresses_done: HashMap<String, Option<ClusterNode<Connection>>>,
 }
 
 impl<Connection> RefreshConnectionStates<Connection> {
     pub(crate) fn clear_refresh_state(&mut self) {
-        let addresses: Vec<String> = self
-            .refresh_address_in_progress
-            .iter()
-            .map(|entry| entry.0.clone())
-            .collect();
-
         debug!(
-            "clear_refresh_state: removing all refresh data and tasks for addresses: {:?}",
-            addresses
+            "clear_refresh_state: removing all in-progress refresh connection tasks for addresses: {:?}",
+            self.refresh_address_in_progress.keys().collect::<Vec<_>>()
         );
 
-        for address in addresses {
-            if let Some(refresh_task) = self.refresh_address_in_progress.remove(&address) {
-                // Check if handle exists before calling abort
-                if !refresh_task.is_finished() {
-                    refresh_task.abort();
-                }
-            }
-        }
+        // Clear the entire map; Drop handles the cleanup
+        self.refresh_address_in_progress.clear();
 
+        // Clear other state tracking
         self.refresh_addresses_started.clear();
         self.refresh_addresses_done.clear();
     }
