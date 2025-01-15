@@ -4,7 +4,8 @@ use super::rotating_buffer::RotatingBuffer;
 use crate::client::Client;
 use crate::cluster_scan_container::get_cluster_scan_cursor;
 use crate::command_request::{
-    command, command_request, ClusterScan, Command, CommandRequest, Routes, SlotTypes, Transaction,
+    command, command_request, ClusterScan, Command, CommandRequest, Pipeline, Routes, SlotTypes,
+    Transaction,
 };
 use crate::connection_request::ConnectionRequest;
 use crate::errors::{error_message, error_type, RequestErrorType};
@@ -382,6 +383,18 @@ async fn send_transaction(
         .map_err(|err| err.into())
 }
 
+async fn send_pipeline(request: Pipeline, client: &mut Client) -> ClientUsageResult<Value> {
+    let mut pipeline = redis::Pipeline::with_capacity(request.commands.capacity());
+    for command in request.commands {
+        pipeline.add_command(get_redis_command(&command)?);
+    }
+
+    client
+        .send_pipeline(&pipeline)
+        .await
+        .map_err(|err| err.into())
+}
+
 fn get_slot_addr(slot_type: &protobuf::EnumOrUnknown<SlotTypes>) -> ClientUsageResult<SlotAddr> {
     slot_type
         .enum_value()
@@ -484,6 +497,9 @@ fn handle_request(request: CommandRequest, mut client: Client, writer: Rc<Writer
                             Ok(routes) => send_transaction(transaction, &mut client, routes).await,
                             Err(e) => Err(e),
                         }
+                    }
+                    command_request::Command::Pipeline(pipeline) => {
+                        send_pipeline(pipeline, &mut client).await
                     }
                     command_request::Command::ScriptInvocation(script) => {
                         match get_route(request.route.0, None) {

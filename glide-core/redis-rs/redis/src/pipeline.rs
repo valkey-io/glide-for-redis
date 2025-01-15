@@ -203,6 +203,19 @@ impl Pipeline {
     pub fn execute(&self, con: &mut dyn ConnectionLike) {
         self.query::<()>(con).unwrap();
     }
+
+    /// Returns whether the pipeline is in transaction mode (atomic).
+    ///
+    /// When in transaction mode, all commands in the pipeline are executed
+    /// as a single atomic operation.
+    pub fn is_atomic(&self) -> bool {
+        self.transaction_mode
+    }
+
+    /// Returns the number of commands in the pipeline.
+    pub fn len(&self) -> usize {
+        self.commands.len()
+    }
 }
 
 fn encode_pipeline(cmds: &[Cmd], atomic: bool) -> Vec<u8> {

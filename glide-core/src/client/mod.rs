@@ -365,10 +365,10 @@ impl Client {
                     .into());
             }
         };
-        Self::convert_transaction_values_to_expected_types(pipeline, values, command_count)
+        Self::convert_pipeline_values_to_expected_types(pipeline, values, command_count)
     }
 
-    fn convert_transaction_values_to_expected_types(
+    fn convert_pipeline_values_to_expected_types(
         pipeline: &redis::Pipeline,
         values: Vec<Value>,
         command_count: usize,
@@ -409,6 +409,29 @@ impl Client {
             }?;
 
             Self::get_transaction_values(pipeline, values, command_count, offset)
+        })
+        .boxed()
+    }
+
+    pub fn send_pipeline<'a>(
+        &'a mut self,
+        pipeline: &'a redis::Pipeline,
+    ) -> redis::RedisFuture<'a, Value> {
+        let command_count = pipeline.cmd_iter().count();
+        let _offset = command_count + 1; //TODO: check
+
+        run_with_timeout(Some(self.request_timeout), async move {
+            let values = match self.internal_client {
+                ClientWrapper::Standalone(ref mut client) => {
+                    client.send_pipeline(pipeline, 0, command_count).await
+                }
+
+                ClientWrapper::Cluster { ref mut client } => {
+                    client.req_packed_commands(pipeline, 0, command_count).await
+                }
+            }?;
+
+            Self::convert_pipeline_values_to_expected_types(pipeline, values, command_count)
         })
         .boxed()
     }

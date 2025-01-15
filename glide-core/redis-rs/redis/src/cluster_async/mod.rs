@@ -38,7 +38,7 @@ use crate::{
     },
     cmd,
     commands::cluster_scan::{cluster_scan, ClusterScanArgs, ScanStateRC},
-    FromRedisValue, InfoDict,
+    types, FromRedisValue, InfoDict, Pipeline,
 };
 use dashmap::DashMap;
 use std::{
@@ -93,6 +93,7 @@ use tokio::{sync::Notify, time::timeout};
 use dispose::{Disposable, Dispose};
 use futures::{future::BoxFuture, prelude::*, ready};
 use pin_project_lite::pin_project;
+use rand::seq::SliceRandom;
 use std::sync::RwLock as StdRwLock;
 use tokio::sync::{
     mpsc,
@@ -641,24 +642,31 @@ fn route_for_pipeline(pipeline: &crate::Pipeline) -> RedisResult<Option<Route>> 
 
     // Find first specific slot and send to it. There's no need to check If later commands
     // should be routed to a different slot, since the server will return an error indicating this.
-    pipeline.cmd_iter().map(route_for_command).try_fold(
-        None,
-        |chosen_route, next_cmd_route| match (chosen_route, next_cmd_route) {
-            (None, _) => Ok(next_cmd_route),
-            (_, None) => Ok(chosen_route),
-            (Some(chosen_route), Some(next_cmd_route)) => {
-                if chosen_route.slot() != next_cmd_route.slot() {
-                    Err((ErrorKind::CrossSlot, "Received crossed slots in pipeline").into())
-                } else if chosen_route.slot_addr() == SlotAddr::ReplicaOptional {
-                    Ok(Some(next_cmd_route))
-                } else {
-                    Ok(Some(chosen_route))
+    if pipeline.is_atomic() {
+        pipeline
+            .cmd_iter()
+            .map(route_for_command)
+            .try_fold(None, |chosen_route, next_cmd_route| {
+                match (chosen_route, next_cmd_route) {
+                    (None, _) => Ok(next_cmd_route),
+                    (_, None) => Ok(chosen_route),
+                    (Some(chosen_route), Some(next_cmd_route)) => {
+                        if chosen_route.slot() != next_cmd_route.slot() {
+                            Err((
+                                ErrorKind::CrossSlot,
+                                "Received crossed slots in transaction",
+                            )
+                                .into())
+                        } else {
+                            Ok(Some(chosen_route))
+                        }
+                    }
                 }
-            }
-        },
-    )
+            })
+    } else {
+        Ok(None)
+    }
 }
-
 fn boxed_sleep(duration: Duration) -> BoxFuture<'static, ()> {
     Box::pin(tokio::time::sleep(duration))
 }
@@ -2139,6 +2147,223 @@ where
             .map_err(|err| (OperationTarget::Node { address }, err))
     }
 
+    fn add_command_to_pipeline_map(
+        pipelines_by_connection: &mut HashMap<String, (Pipeline, C, Vec<(usize, Option<usize>)>)>,
+        address: String,
+        conn: C,
+        cmd: Cmd,
+        index: usize,
+        index2: Option<usize>,
+    ) {
+        pipelines_by_connection
+            .entry(address.clone())
+            .or_insert_with(|| (Pipeline::new(), conn.clone(), Vec::new()))
+            .0
+            .add_command(cmd);
+        pipelines_by_connection
+            .entry(address)
+            .or_insert_with(|| (Pipeline::new(), conn, Vec::new()))
+            .2
+            .push((index, index2));
+    }
+
+    async fn routes_pipeline_commands(
+        pipeline: &crate::Pipeline,
+        core: Core<C>,
+    ) -> RedisResult<(
+        HashMap<String, (Pipeline, C, Vec<(usize, Option<usize>)>)>,
+        Vec<(usize, MultipleNodeRoutingInfo, Option<ResponsePolicy>)>,
+    )> {
+        let mut pipelines_by_connection: HashMap<
+            String,
+            (Pipeline, C, Vec<(usize, Option<usize>)>),
+        > = HashMap::new();
+        let mut response_policies = Vec::new();
+
+        for (index, cmd) in pipeline.cmd_iter().enumerate() {
+            match cluster_routing::RoutingInfo::for_routable(cmd) {
+                Some(cluster_routing::RoutingInfo::SingleNode(SingleNodeRoutingInfo::Random))
+                | None => {
+                    if pipelines_by_connection.is_empty() {
+                        let conn = crate::cluster_async::ClusterConnInner::get_connection(
+                            SingleNodeRoutingInfo::Random.into(),
+                            core.clone(),
+                            Some(Arc::new(cmd.clone())),
+                        );
+                        let (address, conn) = conn.await.map_err(|err| {
+                            types::RedisError::from((
+                                types::ErrorKind::ConnectionNotFoundForRoute,
+                                "Requested connection not found",
+                                err.to_string(),
+                            ))
+                        })?;
+                        Self::add_command_to_pipeline_map(
+                            &mut pipelines_by_connection,
+                            address,
+                            conn,
+                            cmd.clone(),
+                            index,
+                            None,
+                        );
+                    } else {
+                        let mut rng = rand::thread_rng();
+                        let keys: Vec<_> = pipelines_by_connection.keys().cloned().collect();
+                        let random_key = keys.choose(&mut rng).unwrap();
+                        pipelines_by_connection
+                            .get_mut(random_key)
+                            .unwrap()
+                            .0
+                            .add_command(cmd.clone());
+                        pipelines_by_connection
+                            .get_mut(random_key)
+                            .unwrap()
+                            .2
+                            .push((index, None));
+                    }
+                }
+                Some(cluster_routing::RoutingInfo::SingleNode(
+                    SingleNodeRoutingInfo::SpecificNode(route),
+                )) => {
+                    let route_single: SingleNodeRoutingInfo = Some(route).into();
+                    let conn = crate::cluster_async::ClusterConnInner::get_connection(
+                        route_single.into(),
+                        core.clone(),
+                        Some(Arc::new(cmd.clone())),
+                    );
+                    let (address, conn) = conn.await.map_err(|err| {
+                        types::RedisError::from((
+                            types::ErrorKind::ConnectionNotFoundForRoute,
+                            "Requested connection not found",
+                            err.to_string(),
+                        ))
+                    })?;
+                    Self::add_command_to_pipeline_map(
+                        &mut pipelines_by_connection,
+                        address,
+                        conn,
+                        cmd.clone(),
+                        index,
+                        None,
+                    );
+                }
+                Some(cluster_routing::RoutingInfo::SingleNode(
+                    SingleNodeRoutingInfo::RandomPrimary,
+                )) => {
+                    let route_single: SingleNodeRoutingInfo =
+                        Some(Route::new_random_primary()).into();
+                    let conn = crate::cluster_async::ClusterConnInner::get_connection(
+                        route_single.into(),
+                        core.clone(),
+                        Some(Arc::new(cmd.clone())),
+                    );
+                    let (address, conn) = conn.await.map_err(|err| {
+                        types::RedisError::from((
+                            types::ErrorKind::ConnectionNotFoundForRoute,
+                            "Requested connection not found",
+                            err.to_string(),
+                        ))
+                    })?;
+                    Self::add_command_to_pipeline_map(
+                        &mut pipelines_by_connection,
+                        address,
+                        conn,
+                        cmd.clone(),
+                        index,
+                        None,
+                    );
+                }
+                Some(cluster_routing::RoutingInfo::MultiNode((
+                    multi_node_routing,
+                    response_policy,
+                ))) => {
+                    response_policies.push((index, multi_node_routing.clone(), response_policy));
+                    match multi_node_routing {
+                        MultipleNodeRoutingInfo::AllNodes => {
+                            let all_nodes: Vec<_> = {
+                                let lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
+                                lock.all_node_connections().collect()
+                            };
+                            for (index2, (address, conn)) in all_nodes.into_iter().enumerate() {
+                                Self::add_command_to_pipeline_map(
+                                    &mut pipelines_by_connection,
+                                    address,
+                                    conn.await,
+                                    cmd.clone(),
+                                    index,
+                                    Some(index2),
+                                );
+                            }
+                        }
+                        MultipleNodeRoutingInfo::AllMasters => {
+                            let all_primaries: Vec<_> = {
+                                let lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
+                                lock.all_primary_connections().collect()
+                            };
+                            for (index2, (address, conn)) in all_primaries.into_iter().enumerate() {
+                                Self::add_command_to_pipeline_map(
+                                    &mut pipelines_by_connection,
+                                    address,
+                                    conn.await,
+                                    cmd.clone(),
+                                    index,
+                                    Some(index2),
+                                );
+                            }
+                        }
+                        MultipleNodeRoutingInfo::MultiSlot((slots, _)) => {
+                            for (index2, (route, indices)) in slots.iter().enumerate() {
+                                let conn = {
+                                    let lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
+                                    lock.connection_for_route(&route)
+                                };
+                                if let Some((address, conn)) = conn {
+                                    let new_cmd =
+                                        crate::cluster_routing::command_for_multi_slot_indices(
+                                            cmd,
+                                            indices.iter(),
+                                        );
+                                    Self::add_command_to_pipeline_map(
+                                        &mut pipelines_by_connection,
+                                        address,
+                                        conn.await,
+                                        new_cmd,
+                                        index,
+                                        Some(index2),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                Some(cluster_routing::RoutingInfo::SingleNode(
+                    SingleNodeRoutingInfo::ByAddress { host, port },
+                )) => {
+                    let address = format!("{host}:{port}");
+                    let conn = crate::cluster_async::ClusterConnInner::get_connection(
+                        InternalSingleNodeRouting::ByAddress(address.clone()).into(),
+                        core.clone(),
+                        Some(Arc::new(cmd.clone())),
+                    );
+                    let (address, conn) = conn.await.map_err(|err| {
+                        types::RedisError::from((
+                            types::ErrorKind::ConnectionNotFoundForRoute,
+                            "Requested connection not found",
+                            err.to_string(),
+                        ))
+                    })?;
+                    Self::add_command_to_pipeline_map(
+                        &mut pipelines_by_connection,
+                        address,
+                        conn,
+                        cmd.clone(),
+                        index,
+                        None,
+                    );
+                }
+            }
+        }
+        Ok((pipelines_by_connection, response_policies))
+    }
     async fn try_request(info: RequestInfo<C>, core: Core<C>) -> OperationResult {
         match info.cmd {
             CmdArg::Cmd { cmd, routing } => Self::try_cmd_request(cmd, routing, core).await,
@@ -2148,14 +2373,124 @@ where
                 count,
                 route,
             } => {
-                Self::try_pipeline_request(
-                    pipeline,
-                    offset,
-                    count,
-                    Self::get_connection(route, core, None),
-                )
-                .await
+                if pipeline.is_atomic() {
+                    Self::try_pipeline_request(
+                        pipeline,
+                        offset,
+                        count,
+                        Self::get_connection(route, core, None),
+                    )
+                    .await
+                } else {
+                    let (pipelines_by_connection, response_policies) =
+                        Self::routes_pipeline_commands(&pipeline, core.clone())
+                            .await
+                            .map_err(|err| (OperationTarget::FanOut, err))?;
+                    let mut values_and_addresses = vec![Vec::new(); pipeline.len()];
+
+                    let mut first_error = None;
+                    let mut final_responses: Vec<Value> = Vec::with_capacity(pipeline.len());
+                    let mut join_set = tokio::task::JoinSet::new(); // Manage spawned tasks
+
+                    for (address, (pipeline, conn, indices)) in pipelines_by_connection {
+                        // Spawn the async task
+                        join_set.spawn(async move {
+                            let count = pipeline.len();
+                            let result =
+                                Self::try_pipeline_request(Arc::new(pipeline), 0, count, async {
+                                    Ok((address.clone(), conn))
+                                })
+                                .await?;
+                            match result {
+                                Response::Multiple(values) => Ok((indices, values, address)),
+                                _ => Err((
+                                    OperationTarget::FanOut,
+                                    RedisError::from((
+                                        ErrorKind::ResponseError,
+                                        "Unsupported response type",
+                                    )),
+                                )),
+                            }
+                        });
+                    }
+
+                    // Wait for all spawned tasks to complete
+                    while let Some(future_result) = join_set.join_next().await {
+                        match future_result {
+                            Err(e) => {
+                                return Err((
+                                    OperationTarget::FanOut,
+                                    std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+                                        .into(),
+                                ));
+                            }
+                            Ok(Ok((indices, values, address))) => {
+                                for ((index, index2), value) in indices.into_iter().zip(values) {
+                                    if let Some(index2) = index2 {
+                                        // Ensure the vector is big enough to hold `index2`
+                                        if values_and_addresses[index].len() <= index2 {
+                                            values_and_addresses[index]
+                                                .resize(index2 + 1, (Value::Nil, "".to_string()));
+                                        }
+                                        // Add the value to the specific index2 within index
+                                        values_and_addresses[index][index2] =
+                                            (value, address.clone());
+                                    } else {
+                                        // Push the value into the default `index`
+                                        values_and_addresses[index].push((value, address.clone()));
+                                    }
+                                }
+                            }
+                            Ok(Err(e)) => {
+                                if first_error.is_none() {
+                                    first_error = Some(e);
+                                }
+                            }
+                        }
+                    }
+
+                    // Check for errors
+                    if let Some(first_error) = first_error {
+                        return Err(first_error);
+                    }
+
+                    // Process response policies after all tasks are complete
+                    for (index, routing_info, response_policy) in response_policies {
+                        // Safely access `values_and_addresses` for the current index
+                        let response_receivers: Vec<(
+                            Option<String>,
+                            oneshot::Receiver<Result<Response, types::RedisError>>,
+                        )> = values_and_addresses[index]
+                            .iter()
+                            .map(|(value, address)| {
+                                let (sender, receiver) = oneshot::channel();
+                                let _ = sender.send(Ok(Response::Single(value.clone())));
+                                (Some(address.clone()), receiver)
+                            })
+                            .collect();
+
+                        let aggregated_response = Self::aggregate_results(
+                            response_receivers,
+                            &routing_info,
+                            response_policy,
+                        )
+                        .await
+                        .map_err(|err| (OperationTarget::FanOut, err))?;
+
+                        // Update `values_and_addresses` for the current index
+                        values_and_addresses[index] = vec![(aggregated_response, "".to_string())];
+                    }
+
+                    // Collect final responses
+                    for mut ans in values_and_addresses.into_iter() {
+                        assert_eq!(ans.len(), 1);
+                        final_responses.push(ans.pop().unwrap().0);
+                    }
+
+                    Ok(Response::Multiple(final_responses))
+                }
             }
+
             CmdArg::ClusterScan {
                 cluster_scan_args, ..
             } => {
@@ -2830,6 +3165,7 @@ mod pipeline_routing_tests {
     #[test]
     fn test_first_route_is_found() {
         let mut pipeline = crate::Pipeline::new();
+        pipeline.atomic();
 
         pipeline
             .add_command(cmd("FLUSHALL")) // route to all masters
@@ -2845,7 +3181,7 @@ mod pipeline_routing_tests {
     #[test]
     fn test_return_none_if_no_route_is_found() {
         let mut pipeline = crate::Pipeline::new();
-
+        pipeline.atomic();
         pipeline
             .add_command(cmd("FLUSHALL")) // route to all masters
             .add_command(cmd("EVAL")); // route randomly
@@ -2856,7 +3192,7 @@ mod pipeline_routing_tests {
     #[test]
     fn test_prefer_primary_route_over_replica() {
         let mut pipeline = crate::Pipeline::new();
-
+        pipeline.atomic();
         pipeline
             .get("foo") // route to replica of slot 12182
             .add_command(cmd("FLUSHALL")) // route to all masters
@@ -2873,7 +3209,7 @@ mod pipeline_routing_tests {
     #[test]
     fn test_raise_cross_slot_error_on_conflicting_slots() {
         let mut pipeline = crate::Pipeline::new();
-
+        pipeline.atomic();
         pipeline
             .add_command(cmd("FLUSHALL")) // route to all masters
             .set("baz", "bar") // route to slot 4813
@@ -2888,7 +3224,7 @@ mod pipeline_routing_tests {
     #[test]
     fn unkeyed_commands_dont_affect_route() {
         let mut pipeline = crate::Pipeline::new();
-
+        pipeline.atomic();
         pipeline
             .set("{foo}bar", "baz") // route to primary of slot 12182
             .cmd("CONFIG").arg("GET").arg("timeout") // unkeyed command

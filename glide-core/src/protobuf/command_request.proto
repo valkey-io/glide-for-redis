@@ -501,6 +501,10 @@ message Transaction {
     repeated Command commands = 1;
 }
 
+message Pipeline {
+    repeated Command commands = 1;
+}
+
 message ClusterScan {
     string cursor = 1;
     optional bytes match_pattern = 2;
@@ -524,6 +528,7 @@ message CommandRequest {
         ScriptInvocationPointers script_invocation_pointers = 5;
         ClusterScan cluster_scan = 6;
         UpdateConnectionPassword update_connection_password = 7;
+        Pipeline pipeline = 8;
     }
-    Routes route = 8;
+    Routes route = 9;
 }
