@@ -216,6 +216,11 @@ impl Pipeline {
     pub fn len(&self) -> usize {
         self.commands.len()
     }
+
+    /// Returns `true` if the pipeline contains no commands.
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+    }
 }
 
 fn encode_pipeline(cmds: &[Cmd], atomic: bool) -> Vec<u8> {

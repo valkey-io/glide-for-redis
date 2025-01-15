@@ -2146,14 +2146,14 @@ where
             .map(Response::Multiple)
             .map_err(|err| (OperationTarget::Node { address }, err))
     }
-
+    #[allow(clippy::type_complexity)]
     fn add_command_to_pipeline_map(
         pipelines_by_connection: &mut HashMap<String, (Pipeline, C, Vec<(usize, Option<usize>)>)>,
         address: String,
         conn: C,
         cmd: Cmd,
         index: usize,
-        index2: Option<usize>,
+        inner_index: Option<usize>,
     ) {
         pipelines_by_connection
             .entry(address.clone())
@@ -2164,7 +2164,7 @@ where
             .entry(address)
             .or_insert_with(|| (Pipeline::new(), conn, Vec::new()))
             .2
-            .push((index, index2));
+            .push((index, inner_index));
     }
 
     async fn routes_pipeline_commands(
@@ -2174,6 +2174,7 @@ where
         HashMap<String, (Pipeline, C, Vec<(usize, Option<usize>)>)>,
         Vec<(usize, MultipleNodeRoutingInfo, Option<ResponsePolicy>)>,
     )> {
+        #[allow(clippy::type_complexity)]
         let mut pipelines_by_connection: HashMap<
             String,
             (Pipeline, C, Vec<(usize, Option<usize>)>),
@@ -2283,14 +2284,15 @@ where
                                 let lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
                                 lock.all_node_connections().collect()
                             };
-                            for (index2, (address, conn)) in all_nodes.into_iter().enumerate() {
+                            for (inner_index, (address, conn)) in all_nodes.into_iter().enumerate()
+                            {
                                 Self::add_command_to_pipeline_map(
                                     &mut pipelines_by_connection,
                                     address,
                                     conn.await,
                                     cmd.clone(),
                                     index,
-                                    Some(index2),
+                                    Some(inner_index),
                                 );
                             }
                         }
@@ -2299,22 +2301,24 @@ where
                                 let lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
                                 lock.all_primary_connections().collect()
                             };
-                            for (index2, (address, conn)) in all_primaries.into_iter().enumerate() {
+                            for (inner_index, (address, conn)) in
+                                all_primaries.into_iter().enumerate()
+                            {
                                 Self::add_command_to_pipeline_map(
                                     &mut pipelines_by_connection,
                                     address,
                                     conn.await,
                                     cmd.clone(),
                                     index,
-                                    Some(index2),
+                                    Some(inner_index),
                                 );
                             }
                         }
                         MultipleNodeRoutingInfo::MultiSlot((slots, _)) => {
-                            for (index2, (route, indices)) in slots.iter().enumerate() {
+                            for (inner_index, (route, indices)) in slots.iter().enumerate() {
                                 let conn = {
                                     let lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
-                                    lock.connection_for_route(&route)
+                                    lock.connection_for_route(route)
                                 };
                                 if let Some((address, conn)) = conn {
                                     let new_cmd =
@@ -2328,7 +2332,7 @@ where
                                         conn.await,
                                         new_cmd,
                                         index,
-                                        Some(index2),
+                                        Some(inner_index),
                                     );
                                 }
                             }
@@ -2340,7 +2344,7 @@ where
                 )) => {
                     let address = format!("{host}:{port}");
                     let conn = crate::cluster_async::ClusterConnInner::get_connection(
-                        InternalSingleNodeRouting::ByAddress(address.clone()).into(),
+                        InternalSingleNodeRouting::ByAddress(address.clone()),
                         core.clone(),
                         Some(Arc::new(cmd.clone())),
                     );
@@ -2425,15 +2429,18 @@ where
                                 ));
                             }
                             Ok(Ok((indices, values, address))) => {
-                                for ((index, index2), value) in indices.into_iter().zip(values) {
-                                    if let Some(index2) = index2 {
-                                        // Ensure the vector is big enough to hold `index2`
-                                        if values_and_addresses[index].len() <= index2 {
-                                            values_and_addresses[index]
-                                                .resize(index2 + 1, (Value::Nil, "".to_string()));
+                                for ((index, inner_index), value) in indices.into_iter().zip(values)
+                                {
+                                    if let Some(inner_index) = inner_index {
+                                        // Ensure the vector is big enough to hold `inner_index`
+                                        if values_and_addresses[index].len() <= inner_index {
+                                            values_and_addresses[index].resize(
+                                                inner_index + 1,
+                                                (Value::Nil, "".to_string()),
+                                            );
                                         }
-                                        // Add the value to the specific index2 within index
-                                        values_and_addresses[index][index2] =
+                                        // Add the value to the specific inner_index within index
+                                        values_and_addresses[index][inner_index] =
                                             (value, address.clone());
                                     } else {
                                         // Push the value into the default `index`
@@ -2456,6 +2463,7 @@ where
 
                     // Process response policies after all tasks are complete
                     for (index, routing_info, response_policy) in response_policies {
+                        #[allow(clippy::type_complexity)]
                         // Safely access `values_and_addresses` for the current index
                         let response_receivers: Vec<(
                             Option<String>,
