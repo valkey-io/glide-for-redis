@@ -184,6 +184,7 @@ pub(crate) enum RefreshTaskStatus {
     // The task is actively reconnecting. Includes a notifier for tasks to wait on.
     Reconnecting(RefreshTaskNotifier),
     // The task has exceeded the allowed reconnection time.
+    #[allow(dead_code)]
     ReconnectingTooLong,
 }
 
@@ -209,7 +210,8 @@ impl RefreshTaskStatus {
     // using the embedded `RefreshTaskNotifier` and updates the status to `ReconnectingTooLong`.
     //
     // If the status is already `ReconnectingTooLong`, this method does nothing.
-    pub fn flip_state(&mut self) {
+    #[allow(dead_code)]
+    pub fn flip_status_to_too_long(&mut self) {
         if let RefreshTaskStatus::Reconnecting(notifier) = self {
             debug!(
                 "RefreshTaskStatus: Notifying tasks before transitioning to ReconnectingTooLong."
@@ -218,6 +220,15 @@ impl RefreshTaskStatus {
             *self = RefreshTaskStatus::ReconnectingTooLong;
         } else {
             debug!("RefreshTaskStatus: Already in ReconnectingTooLong status.");
+        }
+    }
+
+    pub fn notify_waiting_requests(&mut self) {
+        if let RefreshTaskStatus::Reconnecting(notifier) = self {
+            debug!("RefreshTaskStatus::notify_waiting_requests notify");
+            notifier.notify();
+        } else {
+            debug!("RefreshTaskStatus::notify_waiting_requests - ReconnectingTooLong status.");
         }
     }
 }
@@ -499,6 +510,51 @@ where
                 None
             }
         })
+    }
+
+    // Fetches the master address for a given route.
+    // Returns `None` if no master address can be resolved.
+    pub(crate) fn address_for_route(&self, route: &Route) -> Option<String> {
+        let slot_map_value = self.slot_map.slot_value_for_route(route)?;
+        Some(slot_map_value.addrs.primary().clone().to_string())
+    }
+
+    // Retrieves the notifier for a reconnect task associated with a given route.
+    // Returns `Some(Arc<Notify>)` if a reconnect task is in the `Reconnecting` state.
+    // Returns `None` if:
+    // - There is no refresh task for the route's address.
+    // - The reconnect task is in `ReconnectingTooLong` state, with a debug log for clarity.
+    pub(crate) fn notifier_for_route(&self, route: &Route) -> Option<Arc<Notify>> {
+        let address = self.address_for_route(route)?;
+
+        if let Some(task_state) = self
+            .refresh_conn_state
+            .refresh_address_in_progress
+            .get(&address)
+        {
+            match &task_state.status {
+                RefreshTaskStatus::Reconnecting(notifier) => {
+                    debug!(
+                        "notifier_for_route: Found reconnect notifier for address: {}",
+                        address
+                    );
+                    Some(notifier.get_notifier())
+                }
+                RefreshTaskStatus::ReconnectingTooLong => {
+                    debug!(
+                        "notifier_for_route: Address {} is in ReconnectingTooLong state. No notifier will be returned.",
+                        address
+                    );
+                    None
+                }
+            }
+        } else {
+            debug!(
+                "notifier_for_route: No refresh task exists for address: {}. No notifier will be returned.",
+                address
+            );
+            None
+        }
     }
 
     pub(crate) fn all_node_connections(
