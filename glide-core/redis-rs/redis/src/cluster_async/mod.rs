@@ -2207,6 +2207,7 @@ where
                             None,
                         );
                     } else {
+                        // since the map is not empty, add the command to a random connection within the map.
                         let mut rng = rand::thread_rng();
                         let keys: Vec<_> = pipelines_by_connection.keys().cloned().collect();
                         let random_key = keys.choose(&mut rng).unwrap();
@@ -2273,10 +2274,36 @@ where
                         None,
                     );
                 }
+                Some(cluster_routing::RoutingInfo::SingleNode(
+                    SingleNodeRoutingInfo::ByAddress { host, port },
+                )) => {
+                    let address = format!("{host}:{port}");
+                    let conn = crate::cluster_async::ClusterConnInner::get_connection(
+                        InternalSingleNodeRouting::ByAddress(address.clone()),
+                        core.clone(),
+                        Some(Arc::new(cmd.clone())),
+                    );
+                    let (address, conn) = conn.await.map_err(|err| {
+                        types::RedisError::from((
+                            types::ErrorKind::ConnectionNotFoundForRoute,
+                            "Requested connection not found",
+                            err.to_string(),
+                        ))
+                    })?;
+                    Self::add_command_to_pipeline_map(
+                        &mut pipelines_by_connection,
+                        address,
+                        conn,
+                        cmd.clone(),
+                        index,
+                        None,
+                    );
+                }
                 Some(cluster_routing::RoutingInfo::MultiNode((
                     multi_node_routing,
                     response_policy,
                 ))) => {
+                    // save the routing info and response policy, so we will be able to aggregate the results later
                     response_policies.push((index, multi_node_routing.clone(), response_policy));
                     match multi_node_routing {
                         MultipleNodeRoutingInfo::AllNodes => {
@@ -2338,31 +2365,6 @@ where
                             }
                         }
                     }
-                }
-                Some(cluster_routing::RoutingInfo::SingleNode(
-                    SingleNodeRoutingInfo::ByAddress { host, port },
-                )) => {
-                    let address = format!("{host}:{port}");
-                    let conn = crate::cluster_async::ClusterConnInner::get_connection(
-                        InternalSingleNodeRouting::ByAddress(address.clone()),
-                        core.clone(),
-                        Some(Arc::new(cmd.clone())),
-                    );
-                    let (address, conn) = conn.await.map_err(|err| {
-                        types::RedisError::from((
-                            types::ErrorKind::ConnectionNotFoundForRoute,
-                            "Requested connection not found",
-                            err.to_string(),
-                        ))
-                    })?;
-                    Self::add_command_to_pipeline_map(
-                        &mut pipelines_by_connection,
-                        address,
-                        conn,
-                        cmd.clone(),
-                        index,
-                        None,
-                    );
                 }
             }
         }
@@ -2443,7 +2445,6 @@ where
                                         values_and_addresses[index][inner_index] =
                                             (value, address.clone());
                                     } else {
-                                        // Push the value into the default `index`
                                         values_and_addresses[index].push((value, address.clone()));
                                     }
                                 }
@@ -2490,15 +2491,14 @@ where
                     }
 
                     // Collect final responses
-                    for mut ans in values_and_addresses.into_iter() {
-                        assert_eq!(ans.len(), 1);
-                        final_responses.push(ans.pop().unwrap().0);
+                    for mut value in values_and_addresses.into_iter() {
+                        assert_eq!(value.len(), 1);
+                        final_responses.push(value.pop().unwrap().0);
                     }
 
                     Ok(Response::Multiple(final_responses))
                 }
             }
-
             CmdArg::ClusterScan {
                 cluster_scan_args, ..
             } => {
