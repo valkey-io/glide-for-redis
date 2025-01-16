@@ -281,6 +281,12 @@ pub(crate) struct RefreshConnectionStates<Connection> {
 }
 
 impl<Connection> RefreshConnectionStates<Connection> {
+    // Clears all ongoing refresh connection tasks and resets associated state tracking.
+    //
+    // - This method removes all entries in the `refresh_address_in_progress` map.
+    // - The `Drop` trait is responsible for notifying the associated notifiers and aborting any unfinished refresh tasks.
+    // - Additionally, this method clears `refresh_addresses_started` and `refresh_addresses_done`
+    //   to ensure no stale data remains in the refresh state tracking.
     pub(crate) fn clear_refresh_state(&mut self) {
         debug!(
             "clear_refresh_state: removing all in-progress refresh connection tasks for addresses: {:?}",
@@ -293,6 +299,35 @@ impl<Connection> RefreshConnectionStates<Connection> {
         // Clear other state tracking
         self.refresh_addresses_started.clear();
         self.refresh_addresses_done.clear();
+    }
+
+    // Collects the notifiers for the given addresses and returns them as a vector.
+    //
+    // This function retrieves the notifiers for the provided addresses from the `refresh_address_in_progress`
+    // map and returns them, so they can be awaited outside of the lock.
+    //
+    // # Arguments
+    // * `addresses` - A list of addresses for which notifiers are required.
+    //
+    // # Returns
+    // A vector of `futures::future::Notified` that can be awaited.
+    pub(crate) fn collect_refresh_notifiers(
+        &self,
+        addresses: &HashSet<String>,
+    ) -> Vec<Arc<Notify>> {
+        addresses
+            .iter()
+            .filter_map(|address| {
+                self.refresh_address_in_progress
+                    .get(address)
+                    .and_then(|refresh_state| match &refresh_state.status {
+                        RefreshTaskStatus::Reconnecting(notifier) => {
+                            Some(notifier.get_notifier().clone())
+                        }
+                        _ => None,
+                    })
+            })
+            .collect()
     }
 }
 
