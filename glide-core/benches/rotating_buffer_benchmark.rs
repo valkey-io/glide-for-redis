@@ -1,6 +1,6 @@
 // Copyright Valkey GLIDE Project Contributors - SPDX Identifier: Apache-2.0
 
-use std::io::Write;
+use std::{io::Write, ptr::from_mut};
 
 use bytes::BufMut;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -169,9 +169,9 @@ fn create_request(args: Vec<bytes::Bytes>, args_pointer: bool) -> CommandRequest
     let mut command = Command::new();
     command.request_type = RequestType::CustomCommand.into();
     if args_pointer {
-        command.args = Some(command::Args::ArgsVecPointer(Box::leak(Box::new(args))
-            as *mut Vec<bytes::Bytes>
-            as u64));
+        command.args = Some(command::Args::ArgsVecPointer(
+            from_mut(Box::leak(Box::new(args))) as u64,
+        ));
     } else {
         let mut args_array = command::ArgsArray::new();
         args_array.args = args;

@@ -5739,7 +5739,7 @@ class CoreCommands(Protocol):
 
         Examples:
             >>> await client.set("key1", "A")  # "A" has binary value 01000001
-            >>> await client.set("key1", "B")  # "B" has binary value 01000010
+            >>> await client.set("key2", "B")  # "B" has binary value 01000010
             >>> await client.bitop(BitwiseOperation.AND, "destination", ["key1", "key2"])
                 1  # The size of the resulting string stored in "destination" is 1
             >>> await client.get("destination")

@@ -204,6 +204,7 @@ class ClusterCommands(CoreCommands):
     ) -> TClusterResponse[Dict[bytes, bytes]]:
         """
         Get the values of configuration parameters.
+        Starting from server version 7, command supports multiple parameters.
         See https://valkey.io/commands/config-get/ for details.
 
         Args:
@@ -236,6 +237,7 @@ class ClusterCommands(CoreCommands):
     ) -> TOK:
         """
         Set configuration parameters to the specified values.
+        Starting from server version 7, command supports multiple parameters.
         See https://valkey.io/commands/config-set/ for details.
 
         Args:

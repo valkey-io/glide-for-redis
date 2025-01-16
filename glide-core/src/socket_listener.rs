@@ -23,6 +23,7 @@ use redis::cluster_routing::{ResponsePolicy, Routable};
 use redis::{ClusterScanArgs, Cmd, PushInfo, RedisError, ScanStateRC, Value};
 use std::cell::Cell;
 use std::collections::HashSet;
+use std::ptr::from_mut;
 use std::rc::Rc;
 use std::sync::RwLock;
 use std::{env, str};
@@ -192,8 +193,8 @@ async fn write_result(
             if value != Value::Nil {
                 // Since null values don't require any additional data, they can be sent without any extra effort.
                 // Move the value to the heap and leak it. The wrapper should use `Box::from_raw` to recreate the box, use the value, and drop the allocation.
-                let pointer = Box::leak(Box::new(value));
-                let raw_pointer = pointer as *mut redis::Value;
+                let reference = Box::leak(Box::new(value));
+                let raw_pointer = from_mut(reference);
                 Some(response::response::Value::RespPointer(raw_pointer as u64))
             } else {
                 None
@@ -303,10 +304,15 @@ async fn send_command(
     mut client: Client,
     routing: Option<RoutingInfo>,
 ) -> ClientUsageResult<Value> {
-    client
+    let child_span = cmd.span().map(|span| span.add_span("send_command"));
+    let res = client
         .send_command(&cmd, routing)
         .await
-        .map_err(|err| err.into())
+        .map_err(|err| err.into());
+    if let Some(child_span) = child_span {
+        child_span.end();
+    }
+    res
 }
 
 // Parse the cluster scan command parameters from protobuf and send the command to redis-rs.
@@ -650,8 +656,8 @@ async fn push_manager_loop(mut push_rx: mpsc::UnboundedReceiver<PushInfo>, write
                         kind: (push_msg.kind),
                         data: (push_msg.data),
                     };
-                    let pointer = Box::leak(Box::new(push_val));
-                    let raw_pointer = pointer as *mut redis::Value;
+                    let reference = Box::leak(Box::new(push_val));
+                    let raw_pointer = from_mut(reference);
                     Some(response::response::Value::RespPointer(raw_pointer as u64))
                 };
 

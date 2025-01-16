@@ -13,7 +13,7 @@ pub(crate) enum ExpectedReturnType<'a> {
     // Second parameter is a function which returns true if value needs to be converted
     SingleOrMultiNode(
         &'a Option<ExpectedReturnType<'a>>,
-        Option<fn(Value) -> bool>,
+        Option<&'a (dyn Fn(Value) -> bool + Sync)>,
     ),
     MapOfStringToDouble,
     Double,
@@ -1387,6 +1387,10 @@ fn convert_flat_array_to_array_of_pairs(
     Ok(Value::Array(result))
 }
 
+fn is_array(val: Value) -> bool {
+    matches!(val, Value::Array(_))
+}
+
 pub(crate) fn expected_type_for_cmd(cmd: &Cmd) -> Option<ExpectedReturnType> {
     let command = cmd.command()?;
 
@@ -1403,7 +1407,7 @@ pub(crate) fn expected_type_for_cmd(cmd: &Cmd) -> Option<ExpectedReturnType> {
                 key_type: &None,
                 value_type: &None,
             }),
-            Some(|val| matches!(val, Value::Array(_))),
+            Some(&is_array),
         )),
         b"XCLAIM" => {
             if cmd.position(b"JUSTID").is_some() {
@@ -1497,7 +1501,7 @@ pub(crate) fn expected_type_for_cmd(cmd: &Cmd) -> Option<ExpectedReturnType> {
         ))),
         b"FUNCTION STATS" => Some(ExpectedReturnType::SingleOrMultiNode(
             &Some(ExpectedReturnType::FunctionStatsReturnType),
-            Some(|val| matches!(val, Value::Array(_))),
+            Some(&is_array),
         )),
         b"GEOSEARCH" => {
             if cmd.position(b"WITHDIST").is_some()

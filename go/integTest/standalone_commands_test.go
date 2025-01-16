@@ -71,7 +71,7 @@ func (suite *GlideTestSuite) TestCustomCommandHExists_BoolResponse() {
 
 	res1, err := client.HSet(key, fields)
 	assert.Nil(suite.T(), err)
-	assert.Equal(suite.T(), int64(1), res1.Value())
+	assert.Equal(suite.T(), int64(1), res1)
 
 	result, err := client.CustomCommand([]string{"HEXISTS", key, "field1"})
 
@@ -122,9 +122,7 @@ func (suite *GlideTestSuite) TestCustomCommandConfigGet_MapResponse() {
 		suite.T().Skip("This feature is added in version 7")
 	}
 	configMap := map[string]string{"timeout": "1000", "maxmemory": "1GB"}
-	result, err := client.ConfigSet(configMap)
-	assert.Nil(suite.T(), err)
-	assert.Equal(suite.T(), "OK", result.Value())
+	suite.verifyOK(client.ConfigSet(configMap))
 
 	result2, err := client.CustomCommand([]string{"CONFIG", "GET", "timeout", "maxmemory"})
 	assert.Nil(suite.T(), err)
@@ -138,7 +136,7 @@ func (suite *GlideTestSuite) TestCustomCommandConfigSMembers_SetResponse() {
 
 	res1, err := client.SAdd(key, members)
 	assert.Nil(suite.T(), err)
-	assert.Equal(suite.T(), int64(3), res1.Value())
+	assert.Equal(suite.T(), int64(3), res1)
 
 	result2, err := client.CustomCommand([]string{"SMEMBERS", key})
 	assert.Nil(suite.T(), err)
@@ -186,9 +184,7 @@ func (suite *GlideTestSuite) TestConfigSetAndGet_multipleArgs() {
 	key2 := api.CreateStringResult("maxmemory")
 	value2 := api.CreateStringResult("1073741824")
 	resultConfigMap := map[api.Result[string]]api.Result[string]{key1: value1, key2: value2}
-	result, err := client.ConfigSet(configMap)
-	assert.Nil(suite.T(), err)
-	assert.Equal(suite.T(), "OK", result.Value())
+	suite.verifyOK(client.ConfigSet(configMap))
 
 	result2, err := client.ConfigGet([]string{"timeout", "maxmemory"})
 	assert.Nil(suite.T(), err)
@@ -200,8 +196,7 @@ func (suite *GlideTestSuite) TestConfigSetAndGet_noArgs() {
 
 	configMap := map[string]string{}
 
-	result, err := client.ConfigSet(configMap)
-	assert.Equal(suite.T(), api.CreateNilStringResult(), result)
+	_, err := client.ConfigSet(configMap)
 	assert.NotNil(suite.T(), err)
 	assert.IsType(suite.T(), &api.RequestError{}, err)
 
@@ -216,8 +211,7 @@ func (suite *GlideTestSuite) TestConfigSetAndGet_invalidArgs() {
 
 	configMap := map[string]string{"time": "1000"}
 
-	result, err := client.ConfigSet(configMap)
-	assert.Equal(suite.T(), api.CreateNilStringResult(), result)
+	_, err := client.ConfigSet(configMap)
 	assert.NotNil(suite.T(), err)
 	assert.IsType(suite.T(), &api.RequestError{}, err)
 
@@ -229,10 +223,7 @@ func (suite *GlideTestSuite) TestConfigSetAndGet_invalidArgs() {
 func (suite *GlideTestSuite) TestSelect_WithValidIndex() {
 	client := suite.defaultClient()
 	index := int64(1)
-	result, err := client.Select(index)
-
-	assert.Nil(suite.T(), err)
-	assert.Equal(suite.T(), "OK", result.Value())
+	suite.verifyOK(client.Select(index))
 
 	key := uuid.New().String()
 	value := uuid.New().String()
@@ -248,11 +239,11 @@ func (suite *GlideTestSuite) TestSelect_InvalidIndex_OutOfBounds() {
 
 	result, err := client.Select(-1)
 	assert.NotNil(suite.T(), err)
-	assert.Equal(suite.T(), "", result.Value())
+	assert.Equal(suite.T(), "", result)
 
 	result, err = client.Select(1000)
 	assert.NotNil(suite.T(), err)
-	assert.Equal(suite.T(), "", result.Value())
+	assert.Equal(suite.T(), "", result)
 }
 
 func (suite *GlideTestSuite) TestSelect_SwitchBetweenDatabases() {

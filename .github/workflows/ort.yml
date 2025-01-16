@@ -93,6 +93,7 @@ jobs:
                   cat << EOF > ~/.ort/config/config.yml
                   ort:
                     analyzer:
+                      skip_excluded: true
                       allowDynamicVersions: true
                       enabledPackageManagers: [Cargo, NPM, PIP, GradleInspector]
                   EOF

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.junit.jupiter.api.Named.named;
 
 import glide.TransactionTestUtilities.TransactionBuilder;
 import glide.api.GlideClient;
@@ -34,6 +35,7 @@ import glide.api.models.commands.SortOptions;
 import glide.api.models.commands.function.FunctionRestorePolicy;
 import glide.api.models.commands.scan.ScanOptions;
 import glide.api.models.commands.stream.StreamAddOptions;
+import glide.api.models.configuration.ProtocolVersion;
 import glide.api.models.exceptions.RequestException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -41,43 +43,53 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Stream;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.ArrayUtils;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 @Timeout(10) // seconds
 public class TransactionTests {
 
-    private static GlideClient client = null;
-
-    @BeforeAll
     @SneakyThrows
-    public static void init() {
-        client = GlideClient.createClient(commonClientConfig().requestTimeout(7000).build()).get();
+    public static Stream<Arguments> getClients() {
+        return Stream.of(
+                Arguments.of(
+                        named(
+                                "RESP2",
+                                GlideClient.createClient(
+                                                commonClientConfig()
+                                                        .requestTimeout(7000)
+                                                        .protocol(ProtocolVersion.RESP2)
+                                                        .build())
+                                        .get())),
+                Arguments.of(
+                        named(
+                                "RESP3",
+                                GlideClient.createClient(
+                                                commonClientConfig()
+                                                        .requestTimeout(7000)
+                                                        .protocol(ProtocolVersion.RESP3)
+                                                        .build())
+                                        .get())));
     }
 
-    @AfterAll
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public static void teardown() {
-        client.close();
-    }
-
-    @Test
-    @SneakyThrows
-    public void custom_command_info() {
+    public void custom_command_info(GlideClient client) {
         Transaction transaction = new Transaction().customCommand(new String[] {"info"});
         Object[] result = client.exec(transaction).get();
         assertTrue(((String) result[0]).contains("# Stats"));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_test() {
+    public void info_test(GlideClient client) {
         Transaction transaction = new Transaction().info().info(new Section[] {CLUSTER});
         Object[] result = client.exec(transaction).get();
 
@@ -86,9 +98,10 @@ public class TransactionTests {
         assertFalse(((String) result[1]).contains("# Stats"));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void ping_tests() {
+    public void ping_tests(GlideClient client) {
         Transaction transaction = new Transaction();
         int numberOfPings = 100;
         for (int idx = 0; idx < numberOfPings; idx++) {
@@ -108,10 +121,19 @@ public class TransactionTests {
         }
     }
 
+    public static Stream<Arguments> getCommonTransactionBuilders() {
+        return glide.TransactionTestUtilities.getCommonTransactionBuilders()
+                .flatMap(
+                        test ->
+                                getClients()
+                                        .map(client -> Arguments.of(test.get()[0], test.get()[1], client.get()[0])));
+    }
+
     @SneakyThrows
     @ParameterizedTest(name = "{0}")
-    @MethodSource("glide.TransactionTestUtilities#getCommonTransactionBuilders")
-    public void transactions_with_group_of_commands(String testName, TransactionBuilder builder) {
+    @MethodSource("getCommonTransactionBuilders")
+    public void transactions_with_group_of_commands(
+            String testName, TransactionBuilder builder, GlideClient client) {
         Transaction transaction = new Transaction();
         Object[] expectedResult = builder.apply(transaction);
 
@@ -119,11 +141,19 @@ public class TransactionTests {
         assertDeepEquals(expectedResult, results);
     }
 
+    public static Stream<Arguments> getPrimaryNodeTransactionBuilders() {
+        return glide.TransactionTestUtilities.getPrimaryNodeTransactionBuilders()
+                .flatMap(
+                        test ->
+                                getClients()
+                                        .map(client -> Arguments.of(test.get()[0], test.get()[1], client.get()[0])));
+    }
+
     @SneakyThrows
     @ParameterizedTest(name = "{0}")
-    @MethodSource("glide.TransactionTestUtilities#getPrimaryNodeTransactionBuilders")
+    @MethodSource("getPrimaryNodeTransactionBuilders")
     public void keyless_transactions_with_group_of_commands(
-            String testName, TransactionBuilder builder) {
+            String testName, TransactionBuilder builder, GlideClient client) {
         Transaction transaction = new Transaction();
         Object[] expectedResult = builder.apply(transaction);
 
@@ -132,8 +162,9 @@ public class TransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void test_transaction_large_values() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void test_transaction_large_values(GlideClient client) {
         int length = 1 << 25; // 33mb
         String key = "0".repeat(length);
         String value = "0".repeat(length);
@@ -153,8 +184,9 @@ public class TransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void test_standalone_transaction() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void test_standalone_transaction(GlideClient client) {
         String key = UUID.randomUUID().toString();
         String value = UUID.randomUUID().toString();
 
@@ -180,18 +212,20 @@ public class TransactionTests {
         assertArrayEquals(expectedResult, result);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void lastsave() {
+    public void lastsave(GlideClient client) {
         var yesterday = Instant.now().minus(1, ChronoUnit.DAYS);
 
         var response = client.exec(new Transaction().lastsave()).get();
         assertTrue(Instant.ofEpochSecond((long) response[0]).isAfter(yesterday));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void objectFreq() {
+    public void objectFreq(GlideClient client) {
         String objectFreqKey = "key";
         String maxmemoryPolicy = "maxmemory-policy";
 
@@ -210,9 +244,10 @@ public class TransactionTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void objectIdletime() {
+    public void objectIdletime(GlideClient client) {
         String objectIdletimeKey = "key";
         Transaction transaction = new Transaction();
         transaction.set(objectIdletimeKey, "");
@@ -222,9 +257,10 @@ public class TransactionTests {
         assertTrue((long) response[1] >= 0L);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void objectRefcount() {
+    public void objectRefcount(GlideClient client) {
         String objectRefcountKey = "key";
         Transaction transaction = new Transaction();
         transaction.set(objectRefcountKey, "");
@@ -234,9 +270,10 @@ public class TransactionTests {
         assertTrue((long) response[1] >= 0L);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void zrank_zrevrank_withscores() {
+    public void zrank_zrevrank_withscores(GlideClient client) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.2.0"));
         String zSetKey1 = "{key}:zsetKey1-" + UUID.randomUUID();
         Transaction transaction = new Transaction();
@@ -250,9 +287,10 @@ public class TransactionTests {
         assertArrayEquals(new Object[] {2L, 1.0}, (Object[]) result[2]);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void copy() {
+    public void copy(GlideClient client) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("6.2.0"));
         // setup
         String copyKey1 = "{CopyKey}-1-" + UUID.randomUUID();
@@ -287,9 +325,10 @@ public class TransactionTests {
         assertArrayEquals(expectedResult, result);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void watch() {
+    public void watch(GlideClient client) {
         String key1 = "{key}-1" + UUID.randomUUID();
         String key2 = "{key}-2" + UUID.randomUUID();
         String key3 = "{key}-3" + UUID.randomUUID();
@@ -342,9 +381,10 @@ public class TransactionTests {
         assertInstanceOf(RequestException.class, executionException.getCause());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void watch_binary() {
+    public void watch_binary(GlideClient client) {
         GlideString key1 = gs("{key}-1" + UUID.randomUUID());
         GlideString key2 = gs("{key}-2" + UUID.randomUUID());
         GlideString key3 = gs("{key}-3" + UUID.randomUUID());
@@ -403,9 +443,10 @@ public class TransactionTests {
         assertInstanceOf(RequestException.class, executionException.getCause());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void unwatch() {
+    public void unwatch(GlideClient client) {
         String key1 = "{key}-1" + UUID.randomUUID();
         String key2 = "{key}-2" + UUID.randomUUID();
         String foobarString = "foobar";
@@ -427,42 +468,50 @@ public class TransactionTests {
         assertEquals(foobarString, client.get(key2).get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void sort_and_sortReadOnly() {
+    public void sort_and_sortReadOnly(GlideClient client) {
         Transaction transaction1 = new Transaction();
         Transaction transaction2 = new Transaction();
-        String genericKey1 = "{GenericKey}-1-" + UUID.randomUUID();
-        String genericKey2 = "{GenericKey}-2-" + UUID.randomUUID();
+        var prefix = UUID.randomUUID();
+        String genericKey1 = "{GenericKey}-1-" + prefix;
+        String genericKey2 = "{GenericKey}-2-" + prefix;
         String[] ascendingListByAge = new String[] {"Bob", "Alice"};
         String[] descendingListByAge = new String[] {"Alice", "Bob"};
 
         transaction1
-                .hset("user:1", Map.of("name", "Alice", "age", "30"))
-                .hset("user:2", Map.of("name", "Bob", "age", "25"))
+                .hset(prefix + "user:1", Map.of("name", "Alice", "age", "30"))
+                .hset(prefix + "user:2", Map.of("name", "Bob", "age", "25"))
                 .lpush(genericKey1, new String[] {"2", "1"})
                 .sort(
                         genericKey1,
-                        SortOptions.builder().byPattern("user:*->age").getPattern("user:*->name").build())
+                        SortOptions.builder()
+                                .byPattern(prefix + "user:*->age")
+                                .getPattern(prefix + "user:*->name")
+                                .build())
                 .sort(
                         genericKey1,
                         SortOptions.builder()
                                 .orderBy(DESC)
-                                .byPattern("user:*->age")
-                                .getPattern("user:*->name")
+                                .byPattern(prefix + "user:*->age")
+                                .getPattern(prefix + "user:*->name")
                                 .build())
                 .sortStore(
                         genericKey1,
                         genericKey2,
-                        SortOptions.builder().byPattern("user:*->age").getPattern("user:*->name").build())
+                        SortOptions.builder()
+                                .byPattern(prefix + "user:*->age")
+                                .getPattern(prefix + "user:*->name")
+                                .build())
                 .lrange(genericKey2, 0, -1)
                 .sortStore(
                         genericKey1,
                         genericKey2,
                         SortOptions.builder()
                                 .orderBy(DESC)
-                                .byPattern("user:*->age")
-                                .getPattern("user:*->name")
+                                .byPattern(prefix + "user:*->age")
+                                .getPattern(prefix + "user:*->name")
                                 .build())
                 .lrange(genericKey2, 0, -1);
 
@@ -485,13 +534,16 @@ public class TransactionTests {
             transaction2
                     .sortReadOnly(
                             genericKey1,
-                            SortOptions.builder().byPattern("user:*->age").getPattern("user:*->name").build())
+                            SortOptions.builder()
+                                    .byPattern(prefix + "user:*->age")
+                                    .getPattern(prefix + "user:*->name")
+                                    .build())
                     .sortReadOnly(
                             genericKey1,
                             SortOptions.builder()
                                     .orderBy(DESC)
-                                    .byPattern("user:*->age")
-                                    .getPattern("user:*->name")
+                                    .byPattern(prefix + "user:*->age")
+                                    .getPattern(prefix + "user:*->name")
                                     .build());
 
             expectedResults =
@@ -505,8 +557,9 @@ public class TransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void waitTest() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void waitTest(GlideClient client) {
         // setup
         String key = UUID.randomUUID().toString();
         long numreplicas = 1L;
@@ -527,8 +580,9 @@ public class TransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void scan_test() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void scan_test(GlideClient client) {
         // setup
         String key = UUID.randomUUID().toString();
         Map<String, String> msetMap = Map.of(key, UUID.randomUUID().toString());
@@ -548,8 +602,9 @@ public class TransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void scan_binary_test() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void scan_binary_test(GlideClient client) {
         // setup
         String key = UUID.randomUUID().toString();
         Map<String, String> msetMap = Map.of(key, UUID.randomUUID().toString());
@@ -568,8 +623,9 @@ public class TransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void scan_with_options_test() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void scan_with_options_test(GlideClient client) {
         // setup
         Transaction setupTransaction = new Transaction();
 
@@ -627,8 +683,9 @@ public class TransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void scan_binary_with_options_test() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void scan_binary_with_options_test(GlideClient client) {
         // setup
         Transaction setupTransaction = new Transaction().withBinaryOutput();
 
@@ -686,9 +743,10 @@ public class TransactionTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_transaction_dump_restore() {
+    public void test_transaction_dump_restore(GlideClient client) {
         GlideString key1 = gs("{key}-1" + UUID.randomUUID());
         GlideString key2 = gs("{key}-2" + UUID.randomUUID());
         String value = UUID.randomUUID().toString();
@@ -710,9 +768,10 @@ public class TransactionTests {
         assertEquals(value, response[1]);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_transaction_function_dump_restore() {
+    public void test_transaction_function_dump_restore(GlideClient client) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"));
         String libName = "mylib";
         String funcName = "myfun";
@@ -733,9 +792,10 @@ public class TransactionTests {
         assertEquals(OK, response[0]);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_transaction_xinfoStream() {
+    public void test_transaction_xinfoStream(GlideClient client) {
         Transaction transaction = new Transaction();
         final String streamKey = "{streamKey}-" + UUID.randomUUID();
         LinkedHashMap<String, Object> expectedStreamInfo =
@@ -788,8 +848,9 @@ public class TransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void binary_strings() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void binary_strings(GlideClient client) {
         String key = UUID.randomUUID().toString();
         client.set(key, "_").get();
         // use dump to ensure that we have non-string convertible bytes

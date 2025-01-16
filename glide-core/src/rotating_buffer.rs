@@ -62,6 +62,8 @@ impl RotatingBuffer {
 
 #[cfg(test)]
 mod tests {
+    use std::ptr::from_mut;
+
     use super::*;
     use crate::command_request::{command, command_request};
     use crate::command_request::{Command, CommandRequest, RequestType};
@@ -87,9 +89,9 @@ mod tests {
         let mut command = Command::new();
         command.request_type = request_type.into();
         if args_pointer {
-            command.args = Some(command::Args::ArgsVecPointer(Box::leak(Box::new(args))
-                as *mut Vec<Bytes>
-                as u64));
+            command.args = Some(command::Args::ArgsVecPointer(
+                from_mut(Box::leak(Box::new(args))) as u64,
+            ));
         } else {
             let mut args_array = command::ArgsArray::new();
             args_array.args.clone_from(&args);

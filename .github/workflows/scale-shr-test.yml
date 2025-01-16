@@ -1,0 +1,10 @@
+name: Test workflow for scaling of Self Hosted Runners
+on:
+    workflow_dispatch:
+
+jobs:
+    hello-world:
+        runs-on: [self-hosted, linux, ARM64]
+        steps:
+            - name: print Hello World
+              run: echo "Hello World"

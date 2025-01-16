@@ -1,0 +1,10 @@
+maturin==0.14.17 # higher version break the needs structure changes, the name of the project is not the same as the package name, and the naming both glide create a circular dependency - TODO: fix this 
+pytest
+pytest-asyncio
+pytest-html
+black >= 24.3.0
+flake8 == 5.0
+isort == 5.10
+mypy == 1.13.0
+mypy-protobuf == 3.5
+packaging >= 22.0

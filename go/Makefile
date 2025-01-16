@@ -1,3 +1,5 @@
+SHELL:=/bin/bash
+
 install-build-tools:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.33.0
 	cargo install cbindgen
@@ -40,6 +42,7 @@ clean:
 	rm -f benchmarks/benchmarks
 	rm -rf protobuf
 	rm -rf target
+	rm -rf reports
 
 build-glide-client:
 	cargo build --release
@@ -76,8 +79,11 @@ format:
 
 # unit tests - skip complete IT suite (including MT)
 unit-test:
+	mkdir -p reports
+	set -o pipefail; \
 	LD_LIBRARY_PATH=$(shell find . -name libglide_rs.so|grep -w release|tail -1|xargs dirname|xargs readlink -f):${LD_LIBRARY_PATH} \
-	go test -v -race ./... -skip TestGlideTestSuite $(if $(test-filter), -run $(test-filter))
+	go test -v -race ./... -skip TestGlideTestSuite $(if $(test-filter), -run $(test-filter)) \
+	| tee >(go tool test2json -t -p github.com/valkey-io/valkey-glide/go/glide/utils | go-test-report -o reports/unit-tests.html -t unit-test > /dev/null)
 
 # integration tests - run subtask with skipping modules tests
 integ-test: export TEST_FILTER = -skip TestGlideTestSuite/TestModule $(if $(test-filter), -run $(test-filter))
@@ -88,17 +94,14 @@ modules-test: export TEST_FILTER = $(if $(test-filter), -run $(test-filter), -ru
 modules-test: __it
 
 __it:
+	mkdir -p reports
+	set -o pipefail; \
 	LD_LIBRARY_PATH=$(shell find . -name libglide_rs.so|grep -w release|tail -1|xargs dirname|xargs readlink -f):${LD_LIBRARY_PATH} \
 	go test -v -race ./integTest/... \
-		$(TEST_FILTER) \
-		$(if $(filter true, $(tls)), --tls,) \
-		$(if $(standalone-endpoints), --standalone-endpoints=$(standalone-endpoints)) \
-		$(if $(cluster-endpoints), --cluster-endpoints=$(cluster-endpoints))
-
-# Note: this task is no longer run by CI because:
-# - build failures that occur while running the task can be hidden by the task; CI still reports success in these scenarios.
-# - there is not a good way to both generate a test report and log the test outcomes to GH actions.
-# TODO: fix this and include -run/-skip flags
-test-and-report:
-	mkdir -p reports
-	go test -v -race ./... -json | go-test-report -o reports/test-report.html
+	$(TEST_FILTER) \
+	$(if $(filter true, $(tls)), --tls,) \
+	$(if $(standalone-endpoints), --standalone-endpoints=$(standalone-endpoints)) \
+	$(if $(cluster-endpoints), --cluster-endpoints=$(cluster-endpoints)) \
+	| tee >(go tool test2json -t -p github.com/valkey-io/valkey-glide/go/glide/integTest | go-test-report -o reports/integ-tests.html -t integ-test > /dev/null)
+# code above ^ is similar to `go test .... -json | go-test-report ....`, but it also prints plain text output to stdout
+# `go test` prints plain text, tee duplicates it to stdout and to `test2json` which is coupled with `go-test-report` to generate the report

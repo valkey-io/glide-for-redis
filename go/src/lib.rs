@@ -258,31 +258,21 @@ pub unsafe extern "C" fn free_connection_response(
 }
 
 /// Provides the string mapping for the ResponseType enum.
-#[no_mangle]
-pub extern "C" fn get_response_type_string(response_type: ResponseType) -> *mut c_char {
-    let s = match response_type {
-        ResponseType::Null => "Null",
-        ResponseType::Int => "Int",
-        ResponseType::Float => "Float",
-        ResponseType::Bool => "Bool",
-        ResponseType::String => "String",
-        ResponseType::Array => "Array",
-        ResponseType::Map => "Map",
-        ResponseType::Sets => "Sets",
-    };
-    let c_str = CString::new(s).unwrap_or_default();
-    c_str.into_raw()
-}
-
-/// Deallocates a string generated via get_response_type_string.
 ///
-/// # Safety
-/// free_response_type_string can be called only once per response_string.
+/// Important: the returned pointer is a pointer to a constant string and should not be freed.
 #[no_mangle]
-pub extern "C" fn free_response_type_string(response_string: *mut c_char) {
-    if !response_string.is_null() {
-        drop(unsafe { CString::from_raw(response_string as *mut c_char) });
-    }
+pub extern "C" fn get_response_type_string(response_type: ResponseType) -> *const c_char {
+    let c_str = match response_type {
+        ResponseType::Null => c"Null",
+        ResponseType::Int => c"Int",
+        ResponseType::Float => c"Float",
+        ResponseType::Bool => c"Bool",
+        ResponseType::String => c"String",
+        ResponseType::Array => c"Array",
+        ResponseType::Map => c"Map",
+        ResponseType::Sets => c"Sets",
+    };
+    c_str.as_ptr()
 }
 
 /// Deallocates a `CommandResponse`.

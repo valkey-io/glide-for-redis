@@ -24,6 +24,7 @@ use num_traits::sign::Signed;
 use redis::{aio::MultiplexedConnection, AsyncCommands, Value};
 #[cfg(feature = "testing_utilities")]
 use std::collections::HashMap;
+use std::ptr::from_mut;
 use std::str;
 use tokio::runtime::{Builder, Runtime};
 #[napi]
@@ -315,7 +316,7 @@ fn split_pointer<T>(pointer: *mut T) -> [u32; 2] {
 #[cfg(feature = "testing_utilities")]
 pub fn create_leaked_string(message: String) -> [u32; 2] {
     let value = Value::SimpleString(message);
-    let pointer = Box::leak(Box::new(value)) as *mut Value;
+    let pointer = from_mut(Box::leak(Box::new(value)));
     split_pointer(pointer)
 }
 
@@ -323,7 +324,7 @@ pub fn create_leaked_string(message: String) -> [u32; 2] {
 pub fn create_leaked_string_vec(message: Vec<Uint8Array>) -> [u32; 2] {
     // Convert the string vec -> Bytes vector
     let bytes_vec: Vec<Bytes> = message.iter().map(|v| Bytes::from(v.to_vec())).collect();
-    let pointer = Box::leak(Box::new(bytes_vec)) as *mut Vec<Bytes>;
+    let pointer = from_mut(Box::leak(Box::new(bytes_vec)));
     split_pointer(pointer)
 }
 
@@ -332,11 +333,11 @@ pub fn create_leaked_string_vec(message: Vec<Uint8Array>) -> [u32; 2] {
 /// Should NOT be used in production.
 #[cfg(feature = "testing_utilities")]
 pub fn create_leaked_map(map: HashMap<String, String>) -> [u32; 2] {
-    let pointer = Box::leak(Box::new(Value::Map(
+    let pointer = from_mut(Box::leak(Box::new(Value::Map(
         map.into_iter()
             .map(|(key, value)| (Value::SimpleString(key), Value::SimpleString(value)))
             .collect(),
-    ))) as *mut Value;
+    ))));
     split_pointer(pointer)
 }
 
@@ -345,9 +346,9 @@ pub fn create_leaked_map(map: HashMap<String, String>) -> [u32; 2] {
 /// Should NOT be used in production.
 #[cfg(feature = "testing_utilities")]
 pub fn create_leaked_array(array: Vec<String>) -> [u32; 2] {
-    let pointer = Box::leak(Box::new(Value::Array(
+    let pointer = from_mut(Box::leak(Box::new(Value::Array(
         array.into_iter().map(Value::SimpleString).collect(),
-    ))) as *mut Value;
+    ))));
     split_pointer(pointer)
 }
 
@@ -356,13 +357,13 @@ pub fn create_leaked_array(array: Vec<String>) -> [u32; 2] {
 /// Should NOT be used in production.
 #[cfg(feature = "testing_utilities")]
 pub fn create_leaked_attribute(message: String, attribute: HashMap<String, String>) -> [u32; 2] {
-    let pointer = Box::leak(Box::new(Value::Attribute {
+    let pointer = from_mut(Box::leak(Box::new(Value::Attribute {
         data: Box::new(Value::SimpleString(message)),
         attributes: attribute
             .into_iter()
             .map(|(key, value)| (Value::SimpleString(key), Value::SimpleString(value)))
             .collect(),
-    })) as *mut Value;
+    })));
     split_pointer(pointer)
 }
 
@@ -371,21 +372,23 @@ pub fn create_leaked_attribute(message: String, attribute: HashMap<String, Strin
 /// Should NOT be used in production.
 #[cfg(feature = "testing_utilities")]
 pub fn create_leaked_bigint(big_int: BigInt) -> [u32; 2] {
-    let pointer = Box::leak(Box::new(Value::BigNumber(num_bigint::BigInt::new(
-        if big_int.sign_bit {
-            num_bigint::Sign::Minus
-        } else {
-            num_bigint::Sign::Plus
-        },
-        big_int
-            .words
-            .into_iter()
-            .flat_map(|word| {
-                let bytes = u64::to_le_bytes(word);
-                unsafe { std::mem::transmute::<[u8; 8], [u32; 2]>(bytes) }
-            })
-            .collect(),
-    )))) as *mut Value;
+    let pointer = from_mut(Box::leak(Box::new(Value::BigNumber(
+        num_bigint::BigInt::new(
+            if big_int.sign_bit {
+                num_bigint::Sign::Minus
+            } else {
+                num_bigint::Sign::Plus
+            },
+            big_int
+                .words
+                .into_iter()
+                .flat_map(|word| {
+                    let bytes = u64::to_le_bytes(word);
+                    unsafe { std::mem::transmute::<[u8; 8], [u32; 2]>(bytes) }
+                })
+                .collect(),
+        ),
+    ))));
     split_pointer(pointer)
 }
 
@@ -394,7 +397,7 @@ pub fn create_leaked_bigint(big_int: BigInt) -> [u32; 2] {
 /// Should NOT be used in production.
 #[cfg(feature = "testing_utilities")]
 pub fn create_leaked_double(float: f64) -> [u32; 2] {
-    let pointer = Box::leak(Box::new(Value::Double(float))) as *mut Value;
+    let pointer = from_mut(Box::leak(Box::new(Value::Double(float))));
     split_pointer(pointer)
 }
 

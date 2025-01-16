@@ -33,6 +33,7 @@ import {
     Script,
     SlotKeyTypes,
     SortOrder,
+    convertGlideRecordToRecord,
     convertRecordToGlideRecord,
 } from "..";
 import { ValkeyCluster } from "../../utils/TestUtils";
@@ -323,6 +324,27 @@ describe("GlideClusterClient", () => {
                 "OK",
                 convertRecordToGlideRecord({ timeout: "1000" }),
             ]);
+
+            if (!cluster.checkIfServerVersionLessThan("7.0.0")) {
+                const transaction = new ClusterTransaction()
+                    .configSet({
+                        timeout: "2000",
+                        "cluster-node-timeout": "16000",
+                    })
+                    .configGet(["timeout", "cluster-node-timeout"]);
+                const result = await client.exec(transaction);
+                const convertedResult = [
+                    result[0],
+                    convertGlideRecordToRecord(result[1]),
+                ];
+                expect(convertedResult).toEqual([
+                    "OK",
+                    {
+                        timeout: "2000",
+                        "cluster-node-timeout": "16000",
+                    },
+                ]);
+            }
         },
         TIMEOUT,
     );
@@ -2194,8 +2216,10 @@ describe("GlideClusterClient", () => {
                             getClientConfigurationOption(
                                 azCluster.getAddresses(),
                                 protocol,
+                                { requestTimeout: 3000 },
                             ),
                         );
+
                     await client_for_config_set.configResetStat();
                     await client_for_config_set.configSet(
                         { "availability-zone": az },
@@ -2223,6 +2247,7 @@ describe("GlideClusterClient", () => {
                                 azCluster.getAddresses(),
                                 protocol,
                                 {
+                                    requestTimeout: 3000,
                                     readFrom: "AZAffinity",
                                     clientAz: az,
                                 },
@@ -2295,6 +2320,7 @@ describe("GlideClusterClient", () => {
                             getClientConfigurationOption(
                                 azCluster.getAddresses(),
                                 protocol,
+                                { requestTimeout: 3000 },
                             ),
                         );
 
@@ -2317,6 +2343,7 @@ describe("GlideClusterClient", () => {
                                 azCluster.getAddresses(),
                                 protocol,
                                 {
+                                    requestTimeout: 3000,
                                     readFrom: "AZAffinity",
                                     clientAz: az,
                                 },
@@ -2386,7 +2413,7 @@ describe("GlideClusterClient", () => {
                                 {
                                     readFrom: "AZAffinity",
                                     clientAz: "non-existing-az",
-                                    requestTimeout: 2000,
+                                    requestTimeout: 3000,
                                 },
                             ),
                         );

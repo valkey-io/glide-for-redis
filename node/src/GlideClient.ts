@@ -490,6 +490,7 @@ export class GlideClient extends BaseClient {
 
     /**
      * Reads the configuration parameters of the running server.
+     * Starting from server version 7, command supports multiple parameters.
      *
      * @see {@link https://valkey.io/commands/config-get/|valkey.io} for details.
      *
@@ -517,6 +518,7 @@ export class GlideClient extends BaseClient {
 
     /**
      * Sets configuration parameters to the specified values.
+     * Starting from server version 7, command supports multiple parameters.
      *
      * @see {@link  https://valkey.io/commands/config-set/|valkey.io} for details.
      * @param parameters - A map consisting of configuration parameters and their respective values to set.

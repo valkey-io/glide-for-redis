@@ -271,6 +271,11 @@ async def transaction_test(
     args.append(OK)
     transaction.config_get(["timeout"])
     args.append({b"timeout": b"1000"})
+    if not await check_if_server_version_lt(glide_client, "7.0.0"):
+        transaction.config_set({"timeout": "2000", "cluster-node-timeout": "16000"})
+        args.append(OK)
+        transaction.config_get(["timeout", "cluster-node-timeout"])
+        args.append({b"timeout": b"2000", b"cluster-node-timeout": b"16000"})
 
     transaction.hset(key4, {key: value, key2: value2})
     args.append(2)

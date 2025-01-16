@@ -7,6 +7,9 @@ excludes:
           reason: "DEV_DEPENDENCY_OF"
           comment: "Packages for development only."
     paths:
+        - pattern: "dev_requirements.txt"
+          reason: "TEST_TOOL_OF"
+          comment: "Packages for testing only."
         - pattern: ".*"
           reason: "BUILD_TOOL_OF"
           comment: "invisible"

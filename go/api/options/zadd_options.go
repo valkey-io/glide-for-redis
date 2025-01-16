@@ -22,8 +22,7 @@ func NewZAddOptionsBuilder() *ZAddOptions {
 	return &ZAddOptions{}
 }
 
-// `conditionalChange“ defines conditions for updating or adding elements with {@link SortedSetBaseCommands#zadd}
-// command.
+// `conditionalChange` defines conditions for updating or adding elements with `ZADD` command.
 func (options *ZAddOptions) SetConditionalChange(c ConditionalChange) *ZAddOptions {
 	options.conditionalChange = c
 	return options

@@ -855,6 +855,46 @@ class TestCommands:
             == OK
         )
 
+        if not await check_if_server_version_lt(glide_client, "7.0.0"):
+            previous_timeout = await glide_client.config_get(["timeout"])
+            previous_cluster_node_timeout = await glide_client.config_get(
+                ["cluster-node-timeout"]
+            )
+            assert (
+                await glide_client.config_set(
+                    {"timeout": "2000", "cluster-node-timeout": "16000"}
+                )
+                == OK
+            )
+            assert await glide_client.config_get(
+                ["timeout", "cluster-node-timeout"]
+            ) == {
+                b"timeout": b"2000",
+                b"cluster-node-timeout": b"16000",
+            }
+            # revert changes to previous timeout
+            previous_timeout_decoded = convert_bytes_to_string_object(previous_timeout)
+            previous_cluster_node_timeout_decoded = convert_bytes_to_string_object(
+                previous_cluster_node_timeout
+            )
+            assert isinstance(previous_timeout_decoded, dict)
+            assert isinstance(previous_cluster_node_timeout_decoded, dict)
+            assert isinstance(previous_timeout_decoded["timeout"], str)
+            assert isinstance(
+                previous_cluster_node_timeout_decoded["cluster-node-timeout"], str
+            )
+            assert (
+                await glide_client.config_set(
+                    {
+                        "timeout": previous_timeout_decoded["timeout"],
+                        "cluster-node-timeout": previous_cluster_node_timeout_decoded[
+                            "cluster-node-timeout"
+                        ],
+                    }
+                )
+                == OK
+            )
+
     @pytest.mark.parametrize("cluster_mode", [True])
     @pytest.mark.parametrize("protocol", [ProtocolVersion.RESP2, ProtocolVersion.RESP3])
     async def test_config_get_with_wildcard_and_multi_node_route(

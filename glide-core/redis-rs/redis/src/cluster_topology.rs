@@ -76,24 +76,12 @@ pub(crate) fn slot(key: &[u8]) -> u16 {
 }
 
 fn get_hashtag(key: &[u8]) -> Option<&[u8]> {
-    let open = key.iter().position(|v| *v == b'{');
-    let open = match open {
-        Some(open) => open,
-        None => return None,
-    };
+    let open = key.iter().position(|v| *v == b'{')?;
 
-    let close = key[open..].iter().position(|v| *v == b'}');
-    let close = match close {
-        Some(close) => close,
-        None => return None,
-    };
+    let close = key[open..].iter().position(|v| *v == b'}')?;
 
     let rv = &key[open + 1..open + close];
-    if rv.is_empty() {
-        None
-    } else {
-        Some(rv)
-    }
+    (!rv.is_empty()).then_some(rv)
 }
 
 /// Returns the slot that matches `key`.

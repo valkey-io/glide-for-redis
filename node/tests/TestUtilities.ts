@@ -23,6 +23,7 @@ import {
     GeospatialData,
     GlideClient,
     GlideClusterClient,
+    GlideMultiJson,
     GlideReturnType,
     GlideString,
     InfBoundary,
@@ -1879,6 +1880,188 @@ export async function transactionTest(
         baseTransaction.sortReadOnly(key21);
         responseData.push(["sortReadOnly(key21)", ["1", "2", "3"]]);
     }
+
+    return responseData;
+}
+
+/**
+ * Populates a transaction with JSON commands to test.
+ * @param baseTransaction - A transaction.
+ * @returns Array of tuples, where first element is a test name/description, second - expected return value.
+ */
+export async function transactionMultiJsonForArrCommands(
+    baseTransaction: ClusterTransaction,
+): Promise<[string, GlideReturnType][]> {
+    const responseData: [string, GlideReturnType][] = [];
+    const key = "{key}:1" + uuidv4();
+    const jsonValue = { a: 1.0, b: 2 };
+
+    // JSON.SET
+    GlideMultiJson.set(baseTransaction, key, "$", JSON.stringify(jsonValue));
+    responseData.push(['set(key, "{ a: 1.0, b: 2 }")', "OK"]);
+
+    // JSON.CLEAR
+    GlideMultiJson.clear(baseTransaction, key, { path: "$" });
+    responseData.push(['clear(key, "bar")', 1]);
+
+    GlideMultiJson.set(baseTransaction, key, "$", JSON.stringify(jsonValue));
+    responseData.push(['set(key, "$", "{ "a": 1, b: ["one", "two"] }")', "OK"]);
+
+    // JSON.GET
+    GlideMultiJson.get(baseTransaction, key, { path: "." });
+    responseData.push(['get(key, {path: "."})', JSON.stringify(jsonValue)]);
+
+    const jsonValue2 = { a: 1.0, b: [1, 2] };
+    GlideMultiJson.set(baseTransaction, key, "$", JSON.stringify(jsonValue2));
+    responseData.push(['set(key, "$", "{ "a": 1, b: ["1", "2"] }")', "OK"]);
+
+    // JSON.ARRAPPEND
+    GlideMultiJson.arrappend(baseTransaction, key, "$.b", ["3", "4"]);
+    responseData.push(['arrappend(key, "$.b", [\'"3"\', \'"4"\'])', [4]]);
+
+    // JSON.GET to check JSON.ARRAPPEND was successful.
+    const jsonValueAfterAppend = { a: 1.0, b: [1, 2, 3, 4] };
+    GlideMultiJson.get(baseTransaction, key, { path: "." });
+    responseData.push([
+        'get(key, {path: "."})',
+        JSON.stringify(jsonValueAfterAppend),
+    ]);
+
+    // JSON.ARRINDEX
+    GlideMultiJson.arrindex(baseTransaction, key, "$.b", "2");
+    responseData.push(['arrindex(key, "$.b", "1")', [1]]);
+
+    // JSON.ARRINSERT
+    GlideMultiJson.arrinsert(baseTransaction, key, "$.b", 2, ["5"]);
+    responseData.push(['arrinsert(key, "$.b", 4, [\'"5"\'])', [5]]);
+
+    // JSON.GET to check JSON.ARRINSERT was successful.
+    const jsonValueAfterArrInsert = { a: 1.0, b: [1, 2, 5, 3, 4] };
+    GlideMultiJson.get(baseTransaction, key, { path: "." });
+    responseData.push([
+        'get(key, {path: "."})',
+        JSON.stringify(jsonValueAfterArrInsert),
+    ]);
+
+    // JSON.ARRLEN
+    GlideMultiJson.arrlen(baseTransaction, key, { path: "$.b" });
+    responseData.push(['arrlen(key, "$.b")', [5]]);
+
+    // JSON.ARRPOP
+    GlideMultiJson.arrpop(baseTransaction, key, {
+        path: "$.b",
+        index: 2,
+    });
+    responseData.push(['arrpop(key, {path: "$.b", index: 4})', ["5"]]);
+
+    // JSON.GET to check JSON.ARRPOP was successful.
+    const jsonValueAfterArrpop = { a: 1.0, b: [1, 2, 3, 4] };
+    GlideMultiJson.get(baseTransaction, key, { path: "." });
+    responseData.push([
+        'get(key, {path: "."})',
+        JSON.stringify(jsonValueAfterArrpop),
+    ]);
+
+    // JSON.ARRTRIM
+    GlideMultiJson.arrtrim(baseTransaction, key, "$.b", 1, 2);
+    responseData.push(['arrtrim(key, "$.b", 2, 3)', [2]]);
+
+    // JSON.GET to check JSON.ARRTRIM was successful.
+    const jsonValueAfterArrTrim = { a: 1.0, b: [2, 3] };
+    GlideMultiJson.get(baseTransaction, key, { path: "." });
+    responseData.push([
+        'get(key, {path: "."})',
+        JSON.stringify(jsonValueAfterArrTrim),
+    ]);
+    return responseData;
+}
+
+export async function transactionMultiJson(
+    baseTransaction: ClusterTransaction,
+): Promise<[string, GlideReturnType][]> {
+    const responseData: [string, GlideReturnType][] = [];
+    const key = "{key}:1" + uuidv4();
+    const jsonValue = { a: [1, 2], b: [3, 4], c: "c", d: true };
+
+    // JSON.SET to create a key for testing commands.
+    GlideMultiJson.set(baseTransaction, key, "$", JSON.stringify(jsonValue));
+    responseData.push(['set(key, "$")', "OK"]);
+
+    // JSON.DEBUG MEMORY
+    GlideMultiJson.debugMemory(baseTransaction, key, { path: "$.a" });
+    responseData.push(['debugMemory(key, "{ path: "$.a" }")', [48]]);
+
+    // JSON.DEBUG FIELDS
+    GlideMultiJson.debugFields(baseTransaction, key, { path: "$.a" });
+    responseData.push(['debugFields(key, "{ path: "$.a" }")', [2]]);
+
+    // JSON.OBJLEN
+    GlideMultiJson.objlen(baseTransaction, key, { path: "." });
+    responseData.push(["objlen(key)", 4]);
+
+    // JSON.OBJKEY
+    GlideMultiJson.objkeys(baseTransaction, key, { path: "." });
+    responseData.push(['objkeys(key, "$.")', ["a", "b", "c", "d"]]);
+
+    // JSON.NUMINCRBY
+    GlideMultiJson.numincrby(baseTransaction, key, "$.a[*]", 10.0);
+    responseData.push(['numincrby(key, "$.a[*]", 10.0)', "[11,12]"]);
+
+    // JSON.NUMMULTBY
+    GlideMultiJson.nummultby(baseTransaction, key, "$.a[*]", 10.0);
+    responseData.push(['nummultby(key, "$.a[*]", 10.0)', "[110,120]"]);
+
+    // // JSON.STRAPPEND
+    GlideMultiJson.strappend(baseTransaction, key, '"-test"', { path: "$.c" });
+    responseData.push(['strappend(key, \'"-test"\', "$.c")', [6]]);
+
+    // // JSON.STRLEN
+    GlideMultiJson.strlen(baseTransaction, key, { path: "$.c" });
+    responseData.push(['strlen(key, "$.c")', [6]]);
+
+    // JSON.TYPE
+    GlideMultiJson.type(baseTransaction, key, { path: "$.a" });
+    responseData.push(['type(key, "$.a")', ["array"]]);
+
+    // JSON.MGET
+    const key2 = "{key}:2" + uuidv4();
+    const key3 = "{key}:3" + uuidv4();
+    const jsonValue2 = { b: [3, 4], c: "c", d: true };
+    GlideMultiJson.set(baseTransaction, key2, "$", JSON.stringify(jsonValue2));
+    responseData.push(['set(key2, "$")', "OK"]);
+
+    GlideMultiJson.mget(baseTransaction, [key, key2, key3], "$.a");
+    responseData.push([
+        'json.mget([key, key2, key3], "$.a")',
+        ["[[110,120]]", "[]", null],
+    ]);
+
+    // JSON.TOGGLE
+    GlideMultiJson.toggle(baseTransaction, key, { path: "$.d" });
+    responseData.push(['toggle(key2, "$.d")', [false]]);
+
+    // JSON.RESP
+    GlideMultiJson.resp(baseTransaction, key, { path: "$" });
+    responseData.push([
+        'resp(key, "$")',
+        [
+            [
+                "{",
+                ["a", ["[", 110, 120]],
+                ["b", ["[", 3, 4]],
+                ["c", "c-test"],
+                ["d", "false"],
+            ],
+        ],
+    ]);
+
+    // JSON.DEL
+    GlideMultiJson.del(baseTransaction, key, { path: "$.d" });
+    responseData.push(['del(key, { path: "$.d" })', 1]);
+
+    // JSON.FORGET
+    GlideMultiJson.forget(baseTransaction, key, { path: "$.c" });
+    responseData.push(['forget(key, {path: "$.c" })', 1]);
 
     return responseData;
 }

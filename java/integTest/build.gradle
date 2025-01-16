@@ -129,7 +129,7 @@ clearDirs.finalizedBy 'startStandalone'
 clearDirs.finalizedBy 'startCluster'
 clearDirs.finalizedBy 'startClusterForAz'
 test.finalizedBy 'stopAllAfterTests'
-test.dependsOn ':client:buildRustRelease'
+test.dependsOn ':client:buildRust'
 
 tasks.withType(Test) {
     doFirst {

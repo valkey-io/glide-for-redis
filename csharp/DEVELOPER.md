@@ -85,19 +85,13 @@ Before starting this step, make sure you've installed all software requirments.
     cd valkey-glide
     ```
 
-2. Initialize git submodule
-
-```bash
-git submodule update --init --recursive
-```
-
-3. Build the C# wrapper
+2. Build the C# wrapper
 
 ```bash
 dotnet build
 ```
 
-4. Run tests
+3. Run tests
 
 Run test suite from `csharp` directory:
 
@@ -105,7 +99,7 @@ Run test suite from `csharp` directory:
 dotnet test
 ```
 
-5. Run benchmark
+4. Run benchmark
 
     1. Ensure that you have installed `redis-server` and `redis-cli` on your host. You can find the Redis installation guide at the following link: [Redis Installation Guide](https://redis.io/docs/install/install-redis/install-redis-on-linux/).
 
@@ -125,7 +119,7 @@ dotnet test
 
     Run benchmarking script with `-h` flag to get list and help about all command line parameters.
 
-6. Lint the code
+5. Lint the code
 
 Before making a contribution ensure that all new user API and non-obvious places in code is well documented and run a code linter.
 

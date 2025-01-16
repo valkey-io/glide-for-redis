@@ -4,19 +4,26 @@ import copy
 import json as OuterJson
 import random
 import typing
+from typing import List
 
 import pytest
 from glide.async_commands.core import ConditionalChange, InfoSection
 from glide.async_commands.server_modules import glide_json as json
+from glide.async_commands.server_modules import json_transaction
 from glide.async_commands.server_modules.glide_json import (
     JsonArrIndexOptions,
     JsonArrPopOptions,
     JsonGetOptions,
 )
+from glide.async_commands.transaction import (
+    BaseTransaction,
+    ClusterTransaction,
+    Transaction,
+)
 from glide.config import ProtocolVersion
 from glide.constants import OK
 from glide.exceptions import RequestError
-from glide.glide_client import TGlideClient
+from glide.glide_client import GlideClusterClient, TGlideClient
 from tests.test_async_client import get_random_string, parse_info_response
 
 
@@ -2097,3 +2104,128 @@ class TestJson:
 
         assert await json.arrpop(glide_client, key2, JsonArrPopOptions("[*]")) == b'"a"'
         assert await json.get(glide_client, key2, ".") == b'[[],[],["a"],["a","b"]]'
+
+    @pytest.mark.parametrize("cluster_mode", [True])
+    @pytest.mark.parametrize("protocol", [ProtocolVersion.RESP2, ProtocolVersion.RESP3])
+    async def test_json_transaction_array(self, glide_client: GlideClusterClient):
+        transaction = ClusterTransaction()
+
+        key = get_random_string(5)
+        json_value1 = {"a": 1.0, "b": 2}
+        json_value2 = {"a": 1.0, "b": [1, 2]}
+
+        # Test 'set', 'get', and 'clear' commands
+        json_transaction.set(transaction, key, "$", OuterJson.dumps(json_value1))
+        json_transaction.clear(transaction, key, "$")
+        json_transaction.set(transaction, key, "$", OuterJson.dumps(json_value1))
+        json_transaction.get(transaction, key, ".")
+
+        # Test array related commands
+        json_transaction.set(transaction, key, "$", OuterJson.dumps(json_value2))
+        json_transaction.arrappend(transaction, key, "$.b", ["3", "4"])
+        json_transaction.arrindex(transaction, key, "$.b", "2")
+        json_transaction.arrinsert(transaction, key, "$.b", 2, ["5"])
+        json_transaction.arrlen(transaction, key, "$.b")
+        json_transaction.arrpop(
+            transaction, key, JsonArrPopOptions(path="$.b", index=2)
+        )
+        json_transaction.arrtrim(transaction, key, "$.b", 1, 2)
+        json_transaction.get(transaction, key, ".")
+
+        result = await glide_client.exec(transaction)
+        assert isinstance(result, list)
+
+        assert result[0] == "OK"  # set
+        assert result[1] == 1  # clear
+        assert result[2] == "OK"  # set
+        assert isinstance(result[3], bytes)
+        assert OuterJson.loads(result[3]) == json_value1  # get
+
+        assert result[4] == "OK"  # set
+        assert result[5] == [4]  # arrappend
+        assert result[6] == [1]  # arrindex
+        assert result[7] == [5]  # arrinsert
+        assert result[8] == [5]  # arrlen
+        assert result[9] == [b"5"]  # arrpop
+        assert result[10] == [2]  # arrtrim
+        assert isinstance(result[11], bytes)
+        assert OuterJson.loads(result[11]) == {"a": 1.0, "b": [2, 3]}  # get
+
+    @pytest.mark.parametrize("cluster_mode", [True])
+    @pytest.mark.parametrize("protocol", [ProtocolVersion.RESP2, ProtocolVersion.RESP3])
+    async def test_json_transaction(self, glide_client: GlideClusterClient):
+        transaction = ClusterTransaction()
+
+        key = f"{{key}}-1{get_random_string(5)}"
+        key2 = f"{{key}}-2{get_random_string(5)}"
+        key3 = f"{{key}}-3{get_random_string(5)}"
+        json_value = {"a": [1, 2], "b": [3, 4], "c": "c", "d": True}
+
+        json_transaction.set(transaction, key, "$", OuterJson.dumps(json_value))
+
+        # Test debug commands
+        json_transaction.debug_memory(transaction, key, "$.a")
+        json_transaction.debug_fields(transaction, key, "$.a")
+
+        # Test obj commands
+        json_transaction.objlen(transaction, key, ".")
+        json_transaction.objkeys(transaction, key, ".")
+
+        # Test num commands
+        json_transaction.numincrby(transaction, key, "$.a[*]", 10.0)
+        json_transaction.nummultby(transaction, key, "$.a[*]", 10.0)
+
+        # Test str commands
+        json_transaction.strappend(transaction, key, '"-test"', "$.c")
+        json_transaction.strlen(transaction, key, "$.c")
+
+        # Test type command
+        json_transaction.type(transaction, key, "$.a")
+
+        # Test mget command
+        json_value2 = {"b": [3, 4], "c": "c", "d": True}
+        json_transaction.set(transaction, key2, "$", OuterJson.dumps(json_value2))
+        json_transaction.mget(transaction, [key, key2, key3], "$.a")
+
+        # Test toggle command
+        json_transaction.toggle(transaction, key, "$.d")
+
+        # Test resp command
+        json_transaction.resp(transaction, key, "$")
+
+        # Test del command
+        json_transaction.delete(transaction, key, "$.d")
+
+        # Test forget command
+        json_transaction.forget(transaction, key, "$.c")
+
+        result = await glide_client.exec(transaction)
+        assert isinstance(result, list)
+
+        assert result[0] == "OK"  # set
+        assert result[1] == [48]  # debug_memory
+        assert result[2] == [2]  # debug_field
+
+        assert result[3] == 4  # objlen
+        assert result[4] == [b"a", b"b", b"c", b"d"]  # objkeys
+        assert result[5] == b"[11,12]"  # numincrby
+        assert result[6] == b"[110,120]"  # nummultby
+        assert result[7] == [6]  # strappend
+        assert result[8] == [6]  # strlen
+        assert result[9] == [b"array"]  # type
+        assert result[10] == "OK"  # set
+        assert result[11] == [b"[[110,120]]", b"[]", None]  # mget
+        assert result[12] == [False]  # toggle
+
+        assert result[13] == [
+            [
+                b"{",
+                [b"a", [b"[", 110, 120]],
+                [b"b", [b"[", 3, 4]],
+                [b"c", b"c-test"],
+                [b"d", b"false"],
+            ]
+        ]  # resp
+
+        assert result[14] == 1  # del
+        assert result[15] == 1  # forget

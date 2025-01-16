@@ -313,6 +313,7 @@ class BaseTransaction:
     def config_get(self: TTransaction, parameters: List[TEncodable]) -> TTransaction:
         """
         Get the values of configuration parameters.
+        Starting from server version 7, command supports multiple parameters.
         See https://valkey.io/commands/config-get/ for details.
 
         Args:
@@ -329,6 +330,7 @@ class BaseTransaction:
     ) -> TTransaction:
         """
         Set configuration parameters to the specified values.
+        Starting from server version 7, command supports multiple parameters.
         See https://valkey.io/commands/config-set/ for details.
 
         Args:

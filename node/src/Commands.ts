@@ -124,15 +124,29 @@ export function createGetRange(
     ]);
 }
 
-export interface SetOptions {
-    /**
-     *  `onlyIfDoesNotExist` - Only set the key if it does not already exist.
-     * Equivalent to `NX` in the Valkey API. `onlyIfExists` - Only set the key if
-     * it already exist. Equivalent to `EX` in the Valkey API. if `conditional` is
-     * not set the value will be set regardless of prior value existence. If value
-     * isn't set because of the condition, return null.
-     */
-    conditionalSet?: "onlyIfExists" | "onlyIfDoesNotExist";
+export type SetOptions = (
+    | {
+          /**
+           * `onlyIfDoesNotExist` - Only set the key if it does not already exist.
+           * `NX` in the Valkey API.
+           *
+           * `onlyIfExists` - Only set the key if it already exists.
+           * `EX` in the Valkey API.
+           */
+          conditionalSet?: "onlyIfExists" | "onlyIfDoesNotExist";
+      }
+    | {
+          /**
+           * `onlyIfEqual` - Only set the key if the comparison value equals the current value of key.
+           * `IFEQ` in the Valkey API.
+           */
+          conditionalSet: "onlyIfEqual";
+          /**
+           * The value to compare the existing value with.
+           */
+          comparisonValue: GlideString;
+      }
+) & {
     /**
      * Return the old string stored at key, or nil if key did not exist. An error
      * is returned and SET aborted if the value stored at key is not a string.
@@ -151,7 +165,7 @@ export interface SetOptions {
               type: TimeUnit;
               count: number;
           };
-}
+};
 
 /**
  * @internal
@@ -168,6 +182,8 @@ export function createSet(
             args.push("XX");
         } else if (options.conditionalSet === "onlyIfDoesNotExist") {
             args.push("NX");
+        } else if (options.conditionalSet === "onlyIfEqual") {
+            args.push("IFEQ", options.comparisonValue);
         }
 
         if (options.returnOldValue) {

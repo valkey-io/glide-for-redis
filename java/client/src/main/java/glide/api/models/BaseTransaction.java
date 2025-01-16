@@ -215,6 +215,8 @@ import static glide.api.models.commands.stream.StreamGroupOptions.ENTRIES_READ_V
 import static glide.api.models.commands.stream.StreamReadOptions.READ_COUNT_VALKEY_API;
 import static glide.api.models.commands.stream.XInfoStreamOptions.COUNT;
 import static glide.api.models.commands.stream.XInfoStreamOptions.FULL;
+import static glide.utils.ArgsBuilder.checkTypeOrThrow;
+import static glide.utils.ArgsBuilder.newArgsBuilder;
 import static glide.utils.ArrayTransformUtils.flattenAllKeysFollowedByAllValues;
 import static glide.utils.ArrayTransformUtils.flattenMapToGlideStringArray;
 import static glide.utils.ArrayTransformUtils.flattenMapToGlideStringArrayValueFirst;
@@ -1646,7 +1648,8 @@ public abstract class BaseTransaction<T extends BaseTransaction<T>> {
     }
 
     /**
-     * Reads the configuration parameters of the running server.
+     * Reads the configuration parameters of the running server.<br>
+     * Starting from server version 7, command supports multiple parameters.
      *
      * @implNote {@link ArgType} is limited to {@link String} or {@link GlideString}, any other type
      *     will throw {@link IllegalArgumentException}.
@@ -1663,7 +1666,8 @@ public abstract class BaseTransaction<T extends BaseTransaction<T>> {
     }
 
     /**
-     * Sets configuration parameters to the specified values.
+     * Sets configuration parameters to the specified values.<br>
+     * Starting from server version 7, command supports multiple parameters.
      *
      * @implNote {@link ArgType} is limited to {@link String} or {@link GlideString}, any other type
      *     will throw {@link IllegalArgumentException}.
@@ -7265,35 +7269,6 @@ public abstract class BaseTransaction<T extends BaseTransaction<T>> {
     protected ArgsArray emptyArgs() {
         ArgsArray.Builder commandArgs = ArgsArray.newBuilder();
         return commandArgs.build();
-    }
-
-    protected ArgsBuilder newArgsBuilder() {
-        return new ArgsBuilder();
-    }
-
-    protected <ArgType> void checkTypeOrThrow(ArgType arg) {
-        if ((arg instanceof String) || (arg instanceof GlideString)) {
-            return;
-        }
-        throw new IllegalArgumentException("Expected String or GlideString");
-    }
-
-    protected <ArgType> void checkTypeOrThrow(ArgType[] args) {
-        if (args.length == 0) {
-            // nothing to check here
-            return;
-        }
-        checkTypeOrThrow(args[0]);
-    }
-
-    protected <ArgType> void checkTypeOrThrow(Map<ArgType, ArgType> argsMap) {
-        if (argsMap.isEmpty()) {
-            // nothing to check here
-            return;
-        }
-
-        var arg = argsMap.keySet().iterator().next();
-        checkTypeOrThrow(arg);
     }
 
     /** Helper function for creating generic type ("ArgType") array */

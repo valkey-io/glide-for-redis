@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.junit.jupiter.api.Named.named;
 
 import glide.TransactionTestUtilities.TransactionBuilder;
 import glide.api.GlideClusterClient;
@@ -24,6 +25,7 @@ import glide.api.models.GlideString;
 import glide.api.models.commands.SortOptions;
 import glide.api.models.commands.function.FunctionRestorePolicy;
 import glide.api.models.commands.stream.StreamAddOptions;
+import glide.api.models.configuration.ProtocolVersion;
 import glide.api.models.configuration.RequestRoutingConfiguration.SingleNodeRoute;
 import glide.api.models.configuration.RequestRoutingConfiguration.SlotIdRoute;
 import glide.api.models.configuration.RequestRoutingConfiguration.SlotType;
@@ -32,44 +34,52 @@ import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.SneakyThrows;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 @Timeout(10) // seconds
 public class ClusterTransactionTests {
 
-    private static GlideClusterClient clusterClient = null;
-
-    @BeforeAll
     @SneakyThrows
-    public static void init() {
-        clusterClient =
-                GlideClusterClient.createClient(commonClusterClientConfig().requestTimeout(5000).build())
-                        .get();
+    public static Stream<Arguments> getClients() {
+        return Stream.of(
+                Arguments.of(
+                        named(
+                                "RESP2",
+                                GlideClusterClient.createClient(
+                                                commonClusterClientConfig()
+                                                        .requestTimeout(7000)
+                                                        .protocol(ProtocolVersion.RESP2)
+                                                        .build())
+                                        .get())),
+                Arguments.of(
+                        named(
+                                "RESP3",
+                                GlideClusterClient.createClient(
+                                                commonClusterClientConfig()
+                                                        .requestTimeout(7000)
+                                                        .protocol(ProtocolVersion.RESP3)
+                                                        .build())
+                                        .get())));
     }
 
-    @AfterAll
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public static void teardown() {
-        clusterClient.close();
-    }
-
-    @Test
-    @SneakyThrows
-    public void custom_command_info() {
+    public void custom_command_info(GlideClusterClient clusterClient) {
         ClusterTransaction transaction = new ClusterTransaction().customCommand(new String[] {"info"});
         Object[] result = clusterClient.exec(transaction).get();
         assertTrue(((String) result[0]).contains("# Stats"));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_simple_route_test() {
+    public void info_simple_route_test(GlideClusterClient clusterClient) {
         ClusterTransaction transaction = new ClusterTransaction().info().info();
         Object[] result = clusterClient.exec(transaction, RANDOM).get();
 
@@ -77,10 +87,19 @@ public class ClusterTransactionTests {
         assertTrue(((String) result[1]).contains("# Stats"));
     }
 
+    public static Stream<Arguments> getCommonTransactionBuilders() {
+        return glide.TransactionTestUtilities.getCommonTransactionBuilders()
+                .flatMap(
+                        test ->
+                                getClients()
+                                        .map(client -> Arguments.of(test.get()[0], test.get()[1], client.get()[0])));
+    }
+
     @SneakyThrows
     @ParameterizedTest(name = "{0}")
-    @MethodSource("glide.TransactionTestUtilities#getCommonTransactionBuilders")
-    public void transactions_with_group_of_commands(String testName, TransactionBuilder builder) {
+    @MethodSource("getCommonTransactionBuilders")
+    public void transactions_with_group_of_commands(
+            String testName, TransactionBuilder builder, GlideClusterClient clusterClient) {
         ClusterTransaction transaction = new ClusterTransaction();
         Object[] expectedResult = builder.apply(transaction);
 
@@ -88,11 +107,19 @@ public class ClusterTransactionTests {
         assertDeepEquals(expectedResult, results);
     }
 
+    public static Stream<Arguments> getPrimaryNodeTransactionBuilders() {
+        return glide.TransactionTestUtilities.getPrimaryNodeTransactionBuilders()
+                .flatMap(
+                        test ->
+                                getClients()
+                                        .map(client -> Arguments.of(test.get()[0], test.get()[1], client.get()[0])));
+    }
+
     @SneakyThrows
     @ParameterizedTest(name = "{0}")
-    @MethodSource("glide.TransactionTestUtilities#getPrimaryNodeTransactionBuilders")
+    @MethodSource("getPrimaryNodeTransactionBuilders")
     public void keyless_transactions_with_group_of_commands(
-            String testName, TransactionBuilder builder) {
+            String testName, TransactionBuilder builder, GlideClusterClient clusterClient) {
         ClusterTransaction transaction = new ClusterTransaction();
         Object[] expectedResult = builder.apply(transaction);
 
@@ -102,8 +129,9 @@ public class ClusterTransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void test_transaction_large_values() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void test_transaction_large_values(GlideClusterClient clusterClient) {
         int length = 1 << 25; // 33mb
         String key = "0".repeat(length);
         String value = "0".repeat(length);
@@ -122,17 +150,19 @@ public class ClusterTransactionTests {
         assertArrayEquals(expectedResult, result);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void lastsave() {
+    public void lastsave(GlideClusterClient clusterClient) {
         var yesterday = Instant.now().minus(1, ChronoUnit.DAYS);
         var response = clusterClient.exec(new ClusterTransaction().lastsave()).get();
         assertTrue(Instant.ofEpochSecond((long) response[0]).isAfter(yesterday));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void objectFreq() {
+    public void objectFreq(GlideClusterClient clusterClient) {
         String objectFreqKey = "key";
         String maxmemoryPolicy = "maxmemory-policy";
         String oldPolicy =
@@ -151,9 +181,10 @@ public class ClusterTransactionTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void objectIdletime() {
+    public void objectIdletime(GlideClusterClient clusterClient) {
         String objectIdletimeKey = "key";
         ClusterTransaction transaction = new ClusterTransaction();
         transaction.set(objectIdletimeKey, "");
@@ -163,9 +194,10 @@ public class ClusterTransactionTests {
         assertTrue((long) response[1] >= 0L);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void objectRefcount() {
+    public void objectRefcount(GlideClusterClient clusterClient) {
         String objectRefcountKey = "key";
         ClusterTransaction transaction = new ClusterTransaction();
         transaction.set(objectRefcountKey, "");
@@ -175,9 +207,10 @@ public class ClusterTransactionTests {
         assertTrue((long) response[1] >= 0L);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void zrank_zrevrank_withscores() {
+    public void zrank_zrevrank_withscores(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.2.0"));
         String zSetKey1 = "{key}:zsetKey1-" + UUID.randomUUID();
         ClusterTransaction transaction = new ClusterTransaction();
@@ -191,9 +224,10 @@ public class ClusterTransactionTests {
         assertArrayEquals(new Object[] {2L, 1.0}, (Object[]) result[2]);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void watch() {
+    public void watch(GlideClusterClient clusterClient) {
         String key1 = "{key}-1" + UUID.randomUUID();
         String key2 = "{key}-2" + UUID.randomUUID();
         String key3 = "{key}-3" + UUID.randomUUID();
@@ -240,17 +274,17 @@ public class ClusterTransactionTests {
         assertEquals(helloString, clusterClient.get(key2).get());
         assertEquals(helloString, clusterClient.get(key3).get());
 
-        // WATCH can not have an empty String array parameter
-        // Test fails due to https://github.com/amazon-contributing/redis-rs/issues/158
+        // TODO activate test when https://github.com/valkey-io/valkey-glide/issues/2380 fixed
         // ExecutionException executionException =
         //         assertThrows(ExecutionException.class, () -> clusterClient.watch(new String[]
         // {}).get());
         // assertInstanceOf(RequestException.class, executionException.getCause());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void unwatch() {
+    public void unwatch(GlideClusterClient clusterClient) {
         String key1 = "{key}-1" + UUID.randomUUID();
         String key2 = "{key}-2" + UUID.randomUUID();
         String foobarString = "foobar";
@@ -273,24 +307,27 @@ public class ClusterTransactionTests {
         assertEquals(foobarString, clusterClient.get(key2).get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void spublish() {
+    public void spublish(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
         ClusterTransaction transaction = new ClusterTransaction().publish("messagae", "Schannel", true);
 
         assertArrayEquals(new Object[] {0L}, clusterClient.exec(transaction).get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void sort() {
-        String key1 = "{key}:1" + UUID.randomUUID();
-        String key2 = "{key}:2" + UUID.randomUUID();
-        String key3 = "{key}:3";
-        String key4 = "{key}:4";
-        String key5 = "{key}:5" + UUID.randomUUID();
-        String key6 = "{key}:6" + UUID.randomUUID();
+    public void sort(GlideClusterClient clusterClient) {
+        var prefix = "{" + UUID.randomUUID() + "}:";
+        String key1 = prefix + "1";
+        String key2 = prefix + "2";
+        String key3 = prefix + "3";
+        String key4 = prefix + "4";
+        String key5 = prefix + "5";
+        String key6 = prefix + "6";
         String[] descendingList = new String[] {"3", "2", "1"};
         ClusterTransaction transaction = new ClusterTransaction();
         String[] ascendingListByAge = new String[] {"Bob", "Alice"};
@@ -312,26 +349,32 @@ public class ClusterTransactionTests {
                     .lpush(key5, new String[] {"4", "3"})
                     .sort(
                             key5,
-                            SortOptions.builder().byPattern("{key}:*->age").getPattern("{key}:*->name").build())
+                            SortOptions.builder()
+                                    .byPattern(prefix + "*->age")
+                                    .getPattern(prefix + "*->name")
+                                    .build())
                     .sort(
                             key5,
                             SortOptions.builder()
                                     .orderBy(DESC)
-                                    .byPattern("{key}:*->age")
-                                    .getPattern("{key}:*->name")
+                                    .byPattern(prefix + "*->age")
+                                    .getPattern(prefix + "*->name")
                                     .build())
                     .sortStore(
                             key5,
                             key6,
-                            SortOptions.builder().byPattern("{key}:*->age").getPattern("{key}:*->name").build())
+                            SortOptions.builder()
+                                    .byPattern(prefix + "*->age")
+                                    .getPattern(prefix + "*->name")
+                                    .build())
                     .lrange(key6, 0, -1)
                     .sortStore(
                             key5,
                             key6,
                             SortOptions.builder()
                                     .orderBy(DESC)
-                                    .byPattern("{key}:*->age")
-                                    .getPattern("{key}:*->name")
+                                    .byPattern(prefix + "*->age")
+                                    .getPattern(prefix + "*->name")
                                     .build())
                     .lrange(key6, 0, -1);
         }
@@ -373,8 +416,9 @@ public class ClusterTransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void waitTest() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void waitTest(GlideClusterClient clusterClient) {
         // setup
         String key = UUID.randomUUID().toString();
         long numreplicas = 1L;
@@ -392,9 +436,10 @@ public class ClusterTransactionTests {
         assertTrue((Long) expectedResult[1] <= (Long) results[1]);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_transaction_function_dump_restore() {
+    public void test_transaction_function_dump_restore(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"));
         String libName = "mylib";
         String funcName = "myfun";
@@ -418,9 +463,10 @@ public class ClusterTransactionTests {
         assertEquals(OK, response[0]);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_transaction_xinfoStream() {
+    public void test_transaction_xinfoStream(GlideClusterClient clusterClient) {
         ClusterTransaction transaction = new ClusterTransaction();
         final String streamKey = "{streamKey}-" + UUID.randomUUID();
         LinkedHashMap<String, Object> expectedStreamInfo =
@@ -473,8 +519,9 @@ public class ClusterTransactionTests {
     }
 
     @SneakyThrows
-    @Test
-    public void binary_strings() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void binary_strings(GlideClusterClient clusterClient) {
         String key = UUID.randomUUID().toString();
         clusterClient.set(key, "_").get();
         // use dump to ensure that we have non-string convertible bytes

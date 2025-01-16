@@ -49,4 +49,62 @@ type StreamCommands interface {
 	//
 	// [valkey.io]: https://valkey.io/commands/xadd/
 	XAddWithOptions(key string, values [][]string, options *options.XAddOptions) (Result[string], error)
+
+	// Trims the stream by evicting older entries.
+	//
+	// See [valkey.io] for details.
+	//
+	// Parameters:
+	//  key     - The key of the stream.
+	//  options - Stream trim options
+	//
+	// Return value:
+	//  The number of entries deleted from the stream.
+	//
+	// For example:
+	//  xAddResult, err = client.XAddWithOptions(
+	//		"key1",
+	//		[][]string{{field1, "foo4"}, {field2, "bar4"}},
+	//		options.NewXAddOptions().SetTrimOptions(
+	//			options.NewXTrimOptionsWithMinId(id).SetExactTrimming(),
+	//		),
+	//	)
+	//	xTrimResult, err := client.XTrim(
+	//		"key1",
+	//		options.NewXTrimOptionsWithMaxLen(1).SetExactTrimming(),
+	//  )
+	//  fmt.Println(xTrimResult) // Output: 1
+	//
+	// [valkey.io]: https://valkey.io/commands/xtrim/
+	XTrim(key string, options *options.XTrimOptions) (int64, error)
+
+	// Returns the number of entries in the stream stored at `key`.
+	//
+	// See [valkey.io] for details.
+	//
+	// Parameters:
+	//  key - The key of the stream.
+	//
+	// Return value:
+	//  The number of entries in the stream. If `key` does not exist, return 0.
+	//
+	// For example:
+	//	xAddResult, err = client.XAddWithOptions(
+	//		"key1",
+	//		[][]string{{field1, "foo4"}, {field2, "bar4"}},
+	//		options.NewXAddOptions().SetTrimOptions(
+	//			options.NewXTrimOptionsWithMinId(id).SetExactTrimming(),
+	//		),
+	//	)
+	//	xLenResult, err = client.XLen("key1")
+	//  fmt.Println(xLenResult) // Output: 2
+	//
+	// [valkey.io]: https://valkey.io/commands/xlen/
+	XLen(key string) (int64, error)
+
+	XRead(keysAndIds map[string]string) (map[string]map[string][][]string, error)
+
+	XReadWithOptions(keysAndIds map[string]string, options *options.XReadOptions) (map[string]map[string][][]string, error)
+
+	XDel(key string, ids []string) (int64, error)
 }

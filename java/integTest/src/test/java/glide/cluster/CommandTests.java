@@ -50,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.junit.jupiter.api.Named.named;
 
 import glide.api.GlideClusterClient;
 import glide.api.models.ClusterTransaction;
@@ -74,6 +75,7 @@ import glide.api.models.commands.geospatial.GeoSearchStoreOptions;
 import glide.api.models.commands.geospatial.GeoUnit;
 import glide.api.models.commands.scan.ClusterScanCursor;
 import glide.api.models.commands.scan.ScanOptions;
+import glide.api.models.configuration.ProtocolVersion;
 import glide.api.models.configuration.RequestRoutingConfiguration;
 import glide.api.models.configuration.RequestRoutingConfiguration.ByAddressRoute;
 import glide.api.models.configuration.RequestRoutingConfiguration.Route;
@@ -98,19 +100,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.SneakyThrows;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 @Timeout(30) // seconds
 public class CommandTests {
-
-    private static GlideClusterClient clusterClient = null;
 
     private static final String INITIAL_VALUE = "VALUE";
 
@@ -158,23 +154,52 @@ public class CommandTests {
                             "Cluster",
                             "Keyspace");
 
-    @BeforeAll
     @SneakyThrows
-    public static void init() {
-        clusterClient =
-                GlideClusterClient.createClient(commonClusterClientConfig().requestTimeout(7000).build())
-                        .get();
+    public static Stream<Arguments> getClients() {
+        return Stream.of(
+                Arguments.of(
+                        named(
+                                "RESP2",
+                                GlideClusterClient.createClient(
+                                                commonClusterClientConfig()
+                                                        .requestTimeout(7000)
+                                                        .protocol(ProtocolVersion.RESP2)
+                                                        .build())
+                                        .get())),
+                Arguments.of(
+                        named(
+                                "RESP3",
+                                GlideClusterClient.createClient(
+                                                commonClusterClientConfig()
+                                                        .requestTimeout(7000)
+                                                        .protocol(ProtocolVersion.RESP3)
+                                                        .build())
+                                        .get())));
     }
 
-    @AfterAll
-    @SneakyThrows
-    public static void teardown() {
-        clusterClient.close();
+    private static Stream<Arguments> getTestScenarios() {
+        return getClients()
+                .flatMap(
+                        clientArg ->
+                                Stream.of(
+                                        Arguments.of(clientArg.get()[0], named("single node route", true)),
+                                        Arguments.of(clientArg.get()[0], named("multi node route", false))));
     }
 
-    @Test
+    public static Stream<Arguments> getClientsAndPrefixes() {
+        return getClients()
+                .flatMap(
+                        clientArg ->
+                                Stream.of(
+                                        Arguments.of(clientArg.get()[0], "abc"),
+                                        Arguments.of(clientArg.get()[0], "kln"),
+                                        Arguments.of(clientArg.get()[0], "xyz")));
+    }
+
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void custom_command_info() {
+    public void custom_command_info(GlideClusterClient clusterClient) {
         ClusterValue<Object> data = clusterClient.customCommand(new String[] {"info"}).get();
         assertTrue(data.hasMultiData());
         for (Object info : data.getMultiValue().values()) {
@@ -182,9 +207,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void custom_command_info_binary() {
+    public void custom_command_info_binary(GlideClusterClient clusterClient) {
         ClusterValue<Object> data = clusterClient.customCommand(new GlideString[] {gs("info")}).get();
         assertTrue(data.hasMultiData());
         for (Object info : data.getMultiValue().values()) {
@@ -193,23 +219,26 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void custom_command_ping() {
+    public void custom_command_ping(GlideClusterClient clusterClient) {
         ClusterValue<Object> data = clusterClient.customCommand(new String[] {"ping"}).get();
         assertEquals("PONG", data.getSingleValue());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void custom_command_ping_binary() {
+    public void custom_command_ping_binary(GlideClusterClient clusterClient) {
         ClusterValue<Object> data = clusterClient.customCommand(new GlideString[] {gs("ping")}).get();
         assertEquals(gs("PONG"), data.getSingleValue());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void custom_command_binary_with_route() {
+    public void custom_command_binary_with_route(GlideClusterClient clusterClient) {
         ClusterValue<Object> data =
                 clusterClient.customCommand(new GlideString[] {gs("info")}, ALL_NODES).get();
         for (Object info : data.getMultiValue().values()) {
@@ -222,9 +251,10 @@ public class CommandTests {
         assertTrue(data.getSingleValue().toString().contains("# Stats"));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void custom_command_del_returns_a_number() {
+    public void custom_command_del_returns_a_number(GlideClusterClient clusterClient) {
         String key = "custom_command_del_returns_a_number";
         clusterClient.set(key, INITIAL_VALUE).get();
         var del = clusterClient.customCommand(new String[] {"DEL", key}).get();
@@ -233,51 +263,58 @@ public class CommandTests {
         assertNull(data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void ping() {
+    public void ping(GlideClusterClient clusterClient) {
         String data = clusterClient.ping().get();
         assertEquals("PONG", data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void ping_with_message() {
+    public void ping_with_message(GlideClusterClient clusterClient) {
         String data = clusterClient.ping("H3LL0").get();
         assertEquals("H3LL0", data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void ping_binary_with_message() {
+    public void ping_binary_with_message(GlideClusterClient clusterClient) {
         GlideString data = clusterClient.ping(gs("H3LL0")).get();
         assertEquals(gs("H3LL0"), data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void ping_with_route() {
+    public void ping_with_route(GlideClusterClient clusterClient) {
         String data = clusterClient.ping(ALL_NODES).get();
         assertEquals("PONG", data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void ping_with_message_with_route() {
+    public void ping_with_message_with_route(GlideClusterClient clusterClient) {
         String data = clusterClient.ping("H3LL0", ALL_PRIMARIES).get();
         assertEquals("H3LL0", data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void ping_binary_with_message_with_route() {
+    public void ping_binary_with_message_with_route(GlideClusterClient clusterClient) {
         GlideString data = clusterClient.ping(gs("H3LL0"), ALL_PRIMARIES).get();
         assertEquals(gs("H3LL0"), data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_without_options() {
+    public void info_without_options(GlideClusterClient clusterClient) {
         ClusterValue<String> data = clusterClient.info().get();
         assertTrue(data.hasMultiData());
         for (String info : data.getMultiValue().values()) {
@@ -287,9 +324,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_with_single_node_route() {
+    public void info_with_single_node_route(GlideClusterClient clusterClient) {
         ClusterValue<String> data = clusterClient.info(RANDOM).get();
         assertTrue(data.hasSingleData());
         String infoData = data.getSingleValue();
@@ -298,9 +336,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_with_multi_node_route() {
+    public void info_with_multi_node_route(GlideClusterClient clusterClient) {
         ClusterValue<String> data = clusterClient.info(ALL_NODES).get();
         assertTrue(data.hasMultiData());
         for (String info : data.getMultiValue().values()) {
@@ -310,9 +349,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_with_multiple_options() {
+    public void info_with_multiple_options(GlideClusterClient clusterClient) {
         Section[] sections = {CLUSTER};
         if (SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0")) {
             sections = concatenateArrays(sections, new Section[] {CPU, MEMORY});
@@ -327,9 +367,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_with_everything_option() {
+    public void info_with_everything_option(GlideClusterClient clusterClient) {
         ClusterValue<String> data = clusterClient.info(new Section[] {EVERYTHING}).get();
         assertTrue(data.hasMultiData());
         for (String info : data.getMultiValue().values()) {
@@ -339,9 +380,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_with_single_node_route_and_options() {
+    public void info_with_single_node_route_and_options(GlideClusterClient clusterClient) {
         ClusterValue<Object> slotData =
                 clusterClient.customCommand(new String[] {"cluster", "slots"}).get();
 
@@ -370,9 +412,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_with_multi_node_route_and_options() {
+    public void info_with_multi_node_route_and_options(GlideClusterClient clusterClient) {
         Section[] sections = {CLIENTS};
         if (SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0")) {
             sections = concatenateArrays(sections, new Section[] {COMMANDSTATS, REPLICATION});
@@ -388,30 +431,34 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void clientId() {
+    public void clientId(GlideClusterClient clusterClient) {
         var id = clusterClient.clientId().get();
         assertTrue(id > 0);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void clientId_with_single_node_route() {
+    public void clientId_with_single_node_route(GlideClusterClient clusterClient) {
         var data = clusterClient.clientId(RANDOM).get();
         assertTrue(data.getSingleValue() > 0L);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void clientId_with_multi_node_route() {
+    public void clientId_with_multi_node_route(GlideClusterClient clusterClient) {
         var data = clusterClient.clientId(ALL_NODES).get();
         data.getMultiValue().values().forEach(id -> assertTrue(id > 0));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void clientGetName() {
+    public void clientGetName(GlideClusterClient clusterClient) {
         // TODO replace with the corresponding command once implemented
         clusterClient.customCommand(new String[] {"client", "setname", "clientGetName"}).get();
 
@@ -420,9 +467,10 @@ public class CommandTests {
         assertEquals("clientGetName", name);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void clientGetName_with_single_node_route() {
+    public void clientGetName_with_single_node_route(GlideClusterClient clusterClient) {
         // TODO replace with the corresponding command once implemented
         clusterClient
                 .customCommand(
@@ -434,9 +482,10 @@ public class CommandTests {
         assertEquals("clientGetName_with_single_node_route", name.getSingleValue());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void clientGetName_with_multi_node_route() {
+    public void clientGetName_with_multi_node_route(GlideClusterClient clusterClient) {
         // TODO replace with the corresponding command once implemented
         clusterClient
                 .customCommand(
@@ -448,9 +497,10 @@ public class CommandTests {
         assertEquals("clientGetName_with_multi_node_route", getFirstEntryFromMultiValue(name));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void config_reset_stat() {
+    public void config_reset_stat(GlideClusterClient clusterClient) {
         var data = clusterClient.info(new Section[] {STATS}).get();
         String firstNodeInfo = getFirstEntryFromMultiValue(data);
         long value_before = getValueFromInfo(firstNodeInfo, "total_net_input_bytes");
@@ -464,9 +514,10 @@ public class CommandTests {
         assertTrue(value_after < value_before);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void config_rewrite_non_existent_config_file() {
+    public void config_rewrite_non_existent_config_file(GlideClusterClient clusterClient) {
         var info = clusterClient.info(new Section[] {SERVER}, RANDOM).get();
         var configFile = parseInfoResponseToMap(info.getSingleValue()).get("config_file");
 
@@ -489,27 +540,30 @@ public class CommandTests {
                 .orElse(null);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configGet_with_no_args_returns_error() {
+    public void configGet_with_no_args_returns_error(GlideClusterClient clusterClient) {
         var exception =
                 assertThrows(
                         ExecutionException.class, () -> clusterClient.configGet(new String[] {}).get());
         assertInstanceOf(GlideException.class, exception.getCause());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configGet_with_wildcard() {
+    public void configGet_with_wildcard(GlideClusterClient clusterClient) {
         var data = clusterClient.configGet(new String[] {"*file"}).get();
         assertTrue(data.size() > 5);
         assertTrue(data.containsKey("pidfile"));
         assertTrue(data.containsKey("logfile"));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configGet_with_multiple_params() {
+    public void configGet_with_multiple_params(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
         var data = clusterClient.configGet(new String[] {"pidfile", "logfile"}).get();
         assertAll(
@@ -518,9 +572,10 @@ public class CommandTests {
                 () -> assertTrue(data.containsKey("logfile")));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configGet_with_wildcard_and_multi_node_route() {
+    public void configGet_with_wildcard_and_multi_node_route(GlideClusterClient clusterClient) {
         var data = clusterClient.configGet(new String[] {"*file"}, ALL_PRIMARIES).get();
         assertTrue(data.hasMultiData());
         assertTrue(data.getMultiValue().size() > 1);
@@ -532,9 +587,10 @@ public class CommandTests {
                 () -> assertTrue(config.containsKey("logfile")));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configSet_a_parameter() {
+    public void configSet_a_parameter(GlideClusterClient clusterClient) {
         var oldValue = clusterClient.configGet(new String[] {"maxclients"}).get().get("maxclients");
 
         var response = clusterClient.configSet(Map.of("maxclients", "42")).get();
@@ -546,9 +602,10 @@ public class CommandTests {
         assertEquals(OK, response);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configSet_a_parameter_with_routing() {
+    public void configSet_a_parameter_with_routing(GlideClusterClient clusterClient) {
         var oldValue =
                 clusterClient
                         .configGet(new String[] {"cluster-node-timeout"})
@@ -566,9 +623,10 @@ public class CommandTests {
         assertEquals(OK, response);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void cluster_route_by_address_reaches_correct_node() {
+    public void cluster_route_by_address_reaches_correct_node(GlideClusterClient clusterClient) {
         // Masks timestamps in the cluster nodes output to avoid flakiness due to dynamic values.
         String initialNode =
                 cleanResult(
@@ -603,23 +661,27 @@ public class CommandTests {
         assertEquals(initialNode, specifiedClusterNode2);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void cluster_fail_routing_by_address_if_no_port_is_provided() {
+    public void cluster_fail_routing_by_address_if_no_port_is_provided(
+            GlideClusterClient clusterClient) {
         assertThrows(RequestException.class, () -> clusterClient.info(new ByAddressRoute("foo")).get());
     }
 
     @SneakyThrows
-    @Test
-    public void echo() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void echo(GlideClusterClient clusterClient) {
         String message = "GLIDE";
         String response = clusterClient.echo(message).get();
         assertEquals(message, response);
     }
 
     @SneakyThrows
-    @Test
-    public void echo_with_route() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void echo_with_route(GlideClusterClient clusterClient) {
         String message = "GLIDE";
 
         String singlePayload = clusterClient.echo(message, RANDOM).get().getSingleValue();
@@ -630,16 +692,18 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void echo_gs() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void echo_gs(GlideClusterClient clusterClient) {
         byte[] message = {(byte) 0x01, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x02};
         GlideString response = clusterClient.echo(gs(message)).get();
         assertEquals(gs(message), response);
     }
 
     @SneakyThrows
-    @Test
-    public void echo_gs_with_route() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void echo_gs_with_route(GlideClusterClient clusterClient) {
         byte[] message = {(byte) 0x01, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x02};
         GlideString singlePayload = clusterClient.echo(gs(message), RANDOM).get().getSingleValue();
         assertEquals(gs(message), singlePayload);
@@ -649,9 +713,10 @@ public class CommandTests {
         multiPayload.forEach((key, value) -> assertEquals(gs(message), value));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void time() {
+    public void time(GlideClusterClient clusterClient) {
         // Take the time now, convert to 10 digits and subtract 1 second
         long now = Instant.now().getEpochSecond() - 1L;
         String[] result = clusterClient.time().get();
@@ -662,9 +727,10 @@ public class CommandTests {
         assertTrue(Long.parseLong(result[1]) < 1000000);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void time_with_route() {
+    public void time_with_route(GlideClusterClient clusterClient) {
         // Take the time now, convert to 10 digits and subtract 1 second
         long now = Instant.now().getEpochSecond() - 1L;
 
@@ -683,9 +749,10 @@ public class CommandTests {
         assertTrue(Long.parseLong((String) serverTime[1]) < 1000000);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void lastsave() {
+    public void lastsave(GlideClusterClient clusterClient) {
         long result = clusterClient.lastsave().get();
         var yesterday = Instant.now().minus(1, ChronoUnit.DAYS);
 
@@ -697,9 +764,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void lolwut_lolwut() {
+    public void lolwut_lolwut(GlideClusterClient clusterClient) {
         var response = clusterClient.lolwut().get();
         System.out.printf("%nLOLWUT cluster client standard response%n%s%n", response);
         assertTrue(response.contains("Redis ver. " + SERVER_VERSION));
@@ -734,9 +802,10 @@ public class CommandTests {
         assertTrue(clusterResponse.getSingleValue().contains("Redis ver. " + SERVER_VERSION));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void dbsize_and_flushdb() {
+    public void dbsize_and_flushdb(GlideClusterClient clusterClient) {
         boolean is62orHigher = SERVER_VERSION.isGreaterThanOrEqualTo("6.2.0");
 
         assertEquals(OK, clusterClient.flushall().get());
@@ -788,9 +857,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void objectFreq() {
+    public void objectFreq(GlideClusterClient clusterClient) {
         String key = UUID.randomUUID().toString();
         String maxmemoryPolicy = "maxmemory-policy";
         String oldPolicy =
@@ -804,7 +874,9 @@ public class CommandTests {
         }
     }
 
+    @SneakyThrows
     public static Stream<Arguments> callCrossSlotCommandsWhichShouldFail() {
+        var clusterClient = GlideClusterClient.createClient(commonClusterClientConfig().build()).get();
         return Stream.of(
                 Arguments.of("smove", null, clusterClient.smove("abc", "zxy", "lkn")),
                 Arguments.of("rename", null, clusterClient.rename("abc", "xyz")),
@@ -1010,7 +1082,9 @@ public class CommandTests {
         assertTrue(executionException.getMessage().toLowerCase().contains("crossslot"));
     }
 
+    @SneakyThrows
     public static Stream<Arguments> callCrossSlotCommandsWhichShouldPass() {
+        var clusterClient = GlideClusterClient.createClient(commonClusterClientConfig().build()).get();
         return Stream.of(
                 Arguments.of("exists", clusterClient.exists(new String[] {"abc", "zxy", "lkn"})),
                 Arguments.of("unlink", clusterClient.unlink(new String[] {"abc", "zxy", "lkn"})),
@@ -1031,9 +1105,10 @@ public class CommandTests {
         future.get();
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void flushall() {
+    public void flushall(GlideClusterClient clusterClient) {
         if (SERVER_VERSION.isGreaterThanOrEqualTo("6.2.0")) {
             assertEquals(OK, clusterClient.flushall(SYNC).get());
         } else {
@@ -1071,11 +1146,11 @@ public class CommandTests {
         }
     }
 
-    // TODO: add a binary version of this test
     @SneakyThrows
-    @ParameterizedTest(name = "functionLoad: singleNodeRoute = {0}")
-    @ValueSource(booleans = {true, false})
-    public void function_commands_without_keys_with_route(boolean singleNodeRoute) {
+    @ParameterizedTest
+    @MethodSource("getTestScenarios")
+    public void function_commands_without_keys_with_route(
+            GlideClusterClient clusterClient, boolean singleNodeRoute) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String libName = "mylib1c_" + singleNodeRoute;
@@ -1221,11 +1296,11 @@ public class CommandTests {
         assertEquals(OK, clusterClient.functionFlush(route).get());
     }
 
-    // TODO: add a binary version of this test
     @SneakyThrows
-    @ParameterizedTest(name = "functionLoad: singleNodeRoute = {0}")
-    @ValueSource(booleans = {true, false})
-    public void function_commands_without_keys_with_route_binary(boolean singleNodeRoute) {
+    @ParameterizedTest
+    @MethodSource("getTestScenarios")
+    public void function_commands_without_keys_with_route_binary(
+            GlideClusterClient clusterClient, boolean singleNodeRoute) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         GlideString libName = gs("mylib1c_" + singleNodeRoute);
@@ -1381,8 +1456,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void function_commands_without_keys_and_without_route() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void function_commands_without_keys_and_without_route(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         assertEquals(OK, clusterClient.functionFlush(SYNC).get());
@@ -1464,8 +1540,10 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void function_commands_without_keys_and_without_route_binary() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void function_commands_without_keys_and_without_route_binary(
+            GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         assertEquals(OK, clusterClient.functionFlush(SYNC).get());
@@ -1557,9 +1635,9 @@ public class CommandTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"abc", "xyz", "kln"})
+    @MethodSource("getClientsAndPrefixes")
     @SneakyThrows
-    public void fcall_with_keys(String prefix) {
+    public void fcall_with_keys(GlideClusterClient clusterClient, String prefix) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String key = "{" + prefix + "}-fcall_with_keys-";
@@ -1598,9 +1676,9 @@ public class CommandTests {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"abc", "xyz", "kln"})
+    @MethodSource("getClientsAndPrefixes")
     @SneakyThrows
-    public void fcall_binary_with_keys(String prefix) {
+    public void fcall_binary_with_keys(GlideClusterClient clusterClient, String prefix) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String key = "{" + prefix + "}-fcall_with_keys-";
@@ -1645,8 +1723,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void fcall_readonly_function() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void fcall_readonly_function(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String libName = "fcall_readonly_function";
@@ -1702,8 +1781,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void fcall_readonly_binary_function() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void fcall_readonly_binary_function(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
         assumeTrue(
                 !SERVER_VERSION.isGreaterThanOrEqualTo("8.0.0"),
@@ -1760,9 +1840,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionKill_no_write_without_route() {
+    public void functionKill_no_write_without_route(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String libName = "functionKill_no_write_without_route";
@@ -1814,9 +1895,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionKillBinary_no_write_without_route() {
+    public void functionKillBinary_no_write_without_route(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         GlideString libName = gs("functionKillBinary_no_write_without_route");
@@ -1869,10 +1951,11 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @ParameterizedTest(name = "single node route = {0}")
-    @ValueSource(booleans = {true, false})
+    @ParameterizedTest
+    @MethodSource("getTestScenarios")
     @SneakyThrows
-    public void functionKill_no_write_with_route(boolean singleNodeRoute) {
+    public void functionKill_no_write_with_route(
+            GlideClusterClient clusterClient, boolean singleNodeRoute) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String libName = "functionKill_no_write_with_route" + singleNodeRoute;
@@ -1921,10 +2004,11 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @ParameterizedTest(name = "single node route = {0}")
-    @ValueSource(booleans = {true, false})
+    @ParameterizedTest
+    @MethodSource("getTestScenarios")
     @SneakyThrows
-    public void functionKillBinary_no_write_with_route(boolean singleNodeRoute) {
+    public void functionKillBinary_no_write_with_route(
+            GlideClusterClient clusterClient, boolean singleNodeRoute) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         GlideString libName = gs("functionKillBinary_no_write_with_route" + singleNodeRoute);
@@ -1975,9 +2059,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionKill_key_based_write_function() {
+    public void functionKill_key_based_write_function(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String libName = "functionKill_key_based_write_function";
@@ -2041,9 +2126,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionKillBinary_key_based_write_function() {
+    public void functionKillBinary_key_based_write_function(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         GlideString libName = gs("functionKillBinary_key_based_write_function");
@@ -2108,9 +2194,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionStats_without_route() {
+    public void functionStats_without_route(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String libName = "functionStats_without_route";
@@ -2146,9 +2233,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionStatsBinary_without_route() {
+    public void functionStatsBinary_without_route(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         GlideString libName = gs("functionStats_without_route");
@@ -2189,10 +2277,10 @@ public class CommandTests {
         }
     }
 
-    @ParameterizedTest(name = "single node route = {0}")
-    @ValueSource(booleans = {true, false})
+    @ParameterizedTest
+    @MethodSource("getTestScenarios")
     @SneakyThrows
-    public void functionStats_with_route(boolean singleNodeRoute) {
+    public void functionStats_with_route(GlideClusterClient clusterClient, boolean singleNodeRoute) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
         Route route =
                 singleNodeRoute ? new SlotKeyRoute(UUID.randomUUID().toString(), PRIMARY) : ALL_PRIMARIES;
@@ -2242,10 +2330,11 @@ public class CommandTests {
         }
     }
 
-    @ParameterizedTest(name = "single node route = {0}")
-    @ValueSource(booleans = {true, false})
+    @ParameterizedTest
+    @MethodSource("getTestScenarios")
     @SneakyThrows
-    public void functionStatsBinary_with_route(boolean singleNodeRoute) {
+    public void functionStatsBinary_with_route(
+            GlideClusterClient clusterClient, boolean singleNodeRoute) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
         Route route =
                 singleNodeRoute ? new SlotKeyRoute(UUID.randomUUID().toString(), PRIMARY) : ALL_PRIMARIES;
@@ -2301,9 +2390,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void function_dump_and_restore() {
+    public void function_dump_and_restore(GlideClusterClient clusterClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         assertEquals(OK, clusterClient.functionFlush(SYNC).get());
@@ -2383,9 +2473,10 @@ public class CommandTests {
                 2L, clusterClient.fcallReadOnly(name2, new String[0], new String[] {"meow", "woem"}).get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void randomKey() {
+    public void randomKey(GlideClusterClient clusterClient) {
         String key1 = "{key}" + UUID.randomUUID();
         String key2 = "{key}" + UUID.randomUUID();
 
@@ -2405,9 +2496,10 @@ public class CommandTests {
         assertNull(clusterClient.randomKey().get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void randomKeyBinary() {
+    public void randomKeyBinary(GlideClusterClient clusterClient) {
         GlideString key1 = gs("{key}" + UUID.randomUUID());
         GlideString key2 = gs("{key}" + UUID.randomUUID());
 
@@ -2427,9 +2519,10 @@ public class CommandTests {
         assertNull(clusterClient.randomKey().get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void sort() {
+    public void sort(GlideClusterClient clusterClient) {
         String key1 = "{key}-1" + UUID.randomUUID();
         String key2 = "{key}-2" + UUID.randomUUID();
         String key3 = "{key}-3" + UUID.randomUUID();
@@ -2508,9 +2601,10 @@ public class CommandTests {
         assertArrayEquals(key2DescendingListSubset, clusterClient.lrange(key3, 0, -1).get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void sort_binary() {
+    public void sort_binary(GlideClusterClient clusterClient) {
         GlideString key1 = gs("{key}-1" + UUID.randomUUID());
         GlideString key2 = gs("{key}-2" + UUID.randomUUID());
         GlideString key3 = gs("{key}-3" + UUID.randomUUID());
@@ -2601,9 +2695,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_simple() {
+    public void test_cluster_scan_simple(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
 
         String key = "key:test_cluster_scan_simple" + UUID.randomUUID();
@@ -2632,9 +2727,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_binary_simple() {
+    public void test_cluster_scan_binary_simple(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
 
         String key = "key:test_cluster_scan_simple" + UUID.randomUUID();
@@ -2663,9 +2759,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_with_object_type_and_pattern() {
+    public void test_cluster_scan_with_object_type_and_pattern(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
         String key = "key:" + UUID.randomUUID();
         Map<String, String> expectedData = new LinkedHashMap<>();
@@ -2720,9 +2817,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_with_count() {
+    public void test_cluster_scan_with_count(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
         String key = "key:" + UUID.randomUUID();
         Map<String, String> expectedData = new LinkedHashMap<>();
@@ -2769,9 +2867,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_with_match() {
+    public void test_cluster_scan_with_match(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
         String key = "key:" + UUID.randomUUID();
         Map<String, String> expectedData = new LinkedHashMap<>();
@@ -2803,9 +2902,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_cleaning_cursor() {
+    public void test_cluster_scan_cleaning_cursor(GlideClusterClient clusterClient) {
         // We test whether the cursor is cleaned up after it is deleted, which we expect to happen when
         // the GC is called.
         assertEquals(OK, clusterClient.flushall().get());
@@ -2829,9 +2929,10 @@ public class CommandTests {
         assertTrue(exception.getCause().getMessage().contains("Invalid scan_state_cursor id"));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_all_strings() {
+    public void test_cluster_scan_all_strings(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
 
         String key = "key:" + UUID.randomUUID();
@@ -2858,9 +2959,10 @@ public class CommandTests {
         assertEquals(stringData.keySet(), results);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_all_set() {
+    public void test_cluster_scan_all_set(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
         final int baseNumberOfEntries = 5;
 
@@ -2889,9 +2991,10 @@ public class CommandTests {
         assertEquals(setData.keySet(), results);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_all_hash() {
+    public void test_cluster_scan_all_hash(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
         final int baseNumberOfEntries = 5;
 
@@ -2920,9 +3023,10 @@ public class CommandTests {
         assertEquals(hashData.keySet(), results);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_all_list() {
+    public void test_cluster_scan_all_list(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
         final int baseNumberOfEntries = 5;
 
@@ -2951,9 +3055,10 @@ public class CommandTests {
         assertEquals(listData.keySet(), results);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_all_sorted_set() {
+    public void test_cluster_scan_all_sorted_set(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
         final int baseNumberOfEntries = 5;
 
@@ -2983,9 +3088,10 @@ public class CommandTests {
         assertEquals(zSetData.keySet(), results);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void test_cluster_scan_all_stream() {
+    public void test_cluster_scan_all_stream(GlideClusterClient clusterClient) {
         assertEquals(OK, clusterClient.flushall().get());
         final int baseNumberOfEntries = 5;
 
@@ -3016,8 +3122,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void invokeScript_test() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void invokeScript_test(GlideClusterClient clusterClient) {
         String key1 = UUID.randomUUID().toString();
         String key2 = UUID.randomUUID().toString();
 
@@ -3055,8 +3162,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void script_large_keys_and_or_args() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void script_large_keys_and_or_args(GlideClusterClient clusterClient) {
         String str1 = "0".repeat(1 << 12); // 4k
         String str2 = "0".repeat(1 << 12); // 4k
 
@@ -3098,8 +3206,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void invokeScript_gs_test() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void invokeScript_gs_test(GlideClusterClient clusterClient) {
         GlideString key1 = gs(UUID.randomUUID().toString());
         GlideString key2 = gs(UUID.randomUUID().toString());
 
@@ -3140,9 +3249,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scriptExists() {
+    public void scriptExists(GlideClusterClient clusterClient) {
         Script script1 = new Script("return 'Hello'", true);
         Script script2 = new Script("return 'World'", true);
         Script script3 = new Script("return 'Hello World'", true);
@@ -3174,9 +3284,10 @@ public class CommandTests {
         script3.close();
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scriptExistsBinary() {
+    public void scriptExistsBinary(GlideClusterClient clusterClient) {
         Script script1 = new Script(gs("return 'Hello'"), true);
         Script script2 = new Script(gs("return 'World'"), true);
         Script script3 = new Script(gs("return 'Hello World'"), true);
@@ -3210,9 +3321,10 @@ public class CommandTests {
         script3.close();
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scriptFlush() {
+    public void scriptFlush(GlideClusterClient clusterClient) {
         Script script = new Script("return 'Hello'", true);
 
         // Load script
@@ -3238,9 +3350,10 @@ public class CommandTests {
         script.close();
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scriptKill_with_route() {
+    public void scriptKill_with_route(GlideClusterClient clusterClient) {
         // create and load a long-running script and a primary node route
         Script script = new Script(createLongRunningLuaScript(5, true), true);
         RequestRoutingConfiguration.Route route =
@@ -3300,8 +3413,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void scriptKill_unkillable() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void scriptKill_unkillable(GlideClusterClient clusterClient) {
         String key = UUID.randomUUID().toString();
         RequestRoutingConfiguration.Route route =
                 new RequestRoutingConfiguration.SlotKeyRoute(key, PRIMARY);

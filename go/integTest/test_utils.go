@@ -17,3 +17,13 @@ func isSubset(sliceA []api.Result[string], sliceB []api.Result[string]) bool {
 	}
 	return true
 }
+
+func convertMapKeysAndValuesToResultList(m map[string]string) ([]api.Result[string], []api.Result[string]) {
+	keys := make([]api.Result[string], 0)
+	values := make([]api.Result[string], 0)
+	for key, value := range m {
+		keys = append(keys, api.CreateStringResult(key))
+		values = append(values, api.CreateStringResult(value))
+	}
+	return keys, values
+}

@@ -108,7 +108,7 @@ protoc -Iprotobuf=${GLIDE_ROOT}/glide-core/src/protobuf/    \
 cd python
 python3 -m venv .env
 source .env/bin/activate
-pip install -r requirements.txt
+pip install -r dev_requirements.txt
 ```
 
 ## Build the package (in release mode):
@@ -210,7 +210,7 @@ Run from the main `/python` folder
     ```bash
     cd $HOME/src/valkey-glide/python
     source .env/bin/activate
-    pip install -r requirements.txt
+    pip install -r dev_requirements.txt
     isort . --profile black --skip-glob python/glide/protobuf --skip-glob .env
     black . --exclude python/glide/protobuf --exclude .env
     flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics      \
@@ -235,6 +235,6 @@ Run from the main `/python` folder
 
 -   [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python)
 -   [isort](https://marketplace.visualstudio.com/items?itemName=ms-python.isort)
--   [Black Formetter](https://marketplace.visualstudio.com/items?itemName=ms-python.black-formatter)
+-   [Black Formatter](https://marketplace.visualstudio.com/items?itemName=ms-python.black-formatter)
 -   [Flake8](https://marketplace.visualstudio.com/items?itemName=ms-python.flake8)
 -   [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)

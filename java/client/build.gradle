@@ -89,42 +89,20 @@ tasks.register('cleanRust') {
     }
 }
 
-tasks.register('buildRustRelease', Exec) {
+tasks.register('buildRust', Exec) {
     commandLine 'cargo', 'build', '--release'
     workingDir project.rootDir
     environment CARGO_TERM_COLOR: 'always'
 }
 
-tasks.register('buildRustReleaseStrip', Exec) {
-    commandLine 'cargo', 'build', '--release', '--strip'
-    workingDir project.rootDir
-    environment CARGO_TERM_COLOR: 'always'
-}
-
-tasks.register('buildRust', Exec) {
-    commandLine 'cargo', 'build'
-    workingDir project.rootDir
-    environment CARGO_TERM_COLOR: 'always'
-}
-
 tasks.register('buildRustFfi', Exec) {
-    commandLine 'cargo', 'build'
+    commandLine 'cargo', 'build', '--release'
     workingDir project.rootDir
     environment CARGO_TERM_COLOR: 'always', CARGO_BUILD_RUSTFLAGS: '--cfg ffi_test'
 }
 
 tasks.register('buildWithRust') {
     dependsOn 'buildRust'
-    finalizedBy 'build'
-}
-
-tasks.register('buildWithRustRelease') {
-    dependsOn 'buildRustRelease'
-    finalizedBy 'build'
-}
-
-tasks.register('buildWithRustReleaseStrip') {
-    dependsOn 'buildRustReleaseStrip'
     finalizedBy 'build'
 }
 
@@ -143,11 +121,6 @@ tasks.register('buildAll') {
     finalizedBy 'build'
 }
 
-tasks.register('buildAllRelease') {
-    dependsOn 'protobuf', 'buildRustRelease', 'testFfi'
-    finalizedBy 'build'
-}
-
 compileJava.dependsOn('protobuf')
 clean.dependsOn('cleanProtobuf', 'cleanRust')
 
@@ -162,10 +135,10 @@ def defaultReleaseVersion = "255.255.255";
 delombok.dependsOn('compileJava')
 jar.dependsOn('copyNativeLib')
 javadoc.dependsOn('copyNativeLib')
-copyNativeLib.dependsOn('buildRustRelease')
+copyNativeLib.dependsOn('buildRust')
 compileTestJava.dependsOn('copyNativeLib')
-test.dependsOn('buildRustRelease')
-testFfi.dependsOn('buildRustRelease')
+test.dependsOn('buildRust')
+testFfi.dependsOn('buildRust')
 
 test {
     exclude "glide/ffi/FfiTest.class"
@@ -243,7 +216,7 @@ tasks.withType(Test) {
         showStandardStreams true
     }
     // This is needed for the FFI tests
-    jvmArgs "-Djava.library.path=${projectDir}/../target/debug"
+    jvmArgs "-Djava.library.path=${projectDir}/../target/release"
 }
 
 jar {

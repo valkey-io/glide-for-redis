@@ -1206,9 +1206,9 @@ export function runBaseTests(config: {
     );
 
     it.each([ProtocolVersion.RESP2, ProtocolVersion.RESP3])(
-        `config get and config set with timeout parameter_%p`,
+        `config get and config set with multiple parameters_%p`,
         async (protocol) => {
-            await runTest(async (client: BaseClient) => {
+            await runTest(async (client: BaseClient, cluster) => {
                 const prevTimeout = (await client.configGet([
                     "timeout",
                 ])) as Record<string, GlideString>;
@@ -1225,6 +1225,37 @@ export function runBaseTests(config: {
                         timeout: prevTimeout["timeout"],
                     }),
                 ).toEqual("OK");
+
+                if (!cluster.checkIfServerVersionLessThan("7.0.0")) {
+                    const prevTimeout = (await client.configGet([
+                        "timeout",
+                    ])) as Record<string, GlideString>;
+                    const prevClusterNodeTimeout = (await client.configGet([
+                        "cluster-node-timeout",
+                    ])) as Record<string, GlideString>;
+                    expect(
+                        await client.configSet({
+                            timeout: "1000",
+                            "cluster-node-timeout": "16000",
+                        }),
+                    ).toEqual("OK");
+                    const currParameterValues = (await client.configGet([
+                        "timeout",
+                        "cluster-node-timeout",
+                    ])) as Record<string, GlideString>;
+                    expect(currParameterValues).toEqual({
+                        timeout: "1000",
+                        "cluster-node-timeout": "16000",
+                    });
+                    /// Revert to the previous configuration
+                    expect(
+                        await client.configSet({
+                            timeout: prevTimeout["timeout"],
+                            "cluster-node-timeout":
+                                prevClusterNodeTimeout["cluster-node-timeout"],
+                        }),
+                    ).toEqual("OK");
+                }
             }, protocol);
         },
         config.timeout,
@@ -8135,6 +8166,34 @@ export function runBaseTests(config: {
         expect(getNotExistingKey).toEqual(null);
     }
 
+    async function setWithOnlyIfEquals(client: BaseClient) {
+        const key = uuidv4();
+        const initialValue = uuidv4();
+        const newValue = uuidv4();
+        const setKey = await client.set(key, initialValue);
+        expect(setKey).toEqual("OK");
+        const getRes = await client.get(key);
+        expect(getRes).toEqual(initialValue);
+
+        // Attempt to set with a non-matching value (should fail -> return null)
+        const conditionalSetFailResponse = await client.set(key, newValue, {
+            conditionalSet: "onlyIfEqual",
+            comparisonValue: newValue,
+        });
+        expect(conditionalSetFailResponse).toEqual(null);
+
+        // Attempt to set with a matching value (should succeed -> return OK)
+        const conditionalSetSuccessResponse = await client.set(key, newValue, {
+            conditionalSet: "onlyIfEqual",
+            comparisonValue: initialValue,
+        });
+        expect(conditionalSetSuccessResponse).toEqual("OK");
+
+        // Retrieve the updated value of the key
+        const updatedGetResponse = await client.get(key);
+        expect(updatedGetResponse).toEqual(newValue);
+    }
+
     async function setWithOnlyIfNotExistOptions(client: BaseClient) {
         const key = uuidv4();
         const value = uuidv4();
@@ -8202,9 +8261,54 @@ export function runBaseTests(config: {
         expect(await client.get(key)).toEqual(null);
     }
 
-    async function testSetWithAllCombination(client: BaseClient) {
+    async function setIfeqWithAllOptions(client: BaseClient) {
         const key = uuidv4();
-        const value = uuidv4();
+        const initialValue = uuidv4();
+        const newValue = uuidv4();
+
+        await client.set(key, initialValue);
+        // set with multiple options:
+        // * only apply SET if the provided value equals oldValue
+        // * expires after 1 second
+        // * returns the old value
+        const setResWithAllOptions = await client.set(key, newValue, {
+            expiry: {
+                type: TimeUnit.UnixSeconds,
+                count: Math.floor(Date.now() / 1000) + 1,
+            },
+            conditionalSet: "onlyIfEqual",
+            comparisonValue: initialValue,
+            returnOldValue: true,
+        });
+        // initialValue should be get from the key
+        expect(setResWithAllOptions).toEqual(initialValue);
+        // newValue should be set as the key value
+        expect(await client.get(key)).toEqual(newValue);
+
+        // fail command
+        const wrongValue = "wrong value";
+        const setResFailedWithAllOptions = await client.set(key, wrongValue, {
+            expiry: {
+                type: TimeUnit.UnixSeconds,
+                count: Math.floor(Date.now() / 1000) + 1,
+            },
+            conditionalSet: "onlyIfEqual",
+            comparisonValue: wrongValue,
+            returnOldValue: true,
+        });
+        // current value of key should be newValue
+        expect(setResFailedWithAllOptions).toEqual(newValue);
+        // key should not be set. it remains the same
+        expect(await client.get(key)).toEqual(newValue);
+    }
+
+    async function testSetWithAllCombination(
+        client: BaseClient,
+        cluster: ValkeyCluster,
+    ) {
+        const key = uuidv4();
+        const value = uuidv4(); // Initial value
+        const value2 = uuidv4(); // New value for IFEQ testing
         const count = 2;
         const expiryCombination = [
             { type: TimeUnit.Seconds, count },
@@ -8215,6 +8319,7 @@ export function runBaseTests(config: {
         ];
         let exist = false;
 
+        // onlyIfDoesNotExist tests
         for (const expiryVal of expiryCombination) {
             const setRes = await client.set(key, value, {
                 expiry: expiryVal as
@@ -8241,6 +8346,7 @@ export function runBaseTests(config: {
             expect(getRes).toEqual(value);
         }
 
+        // OnlyIfExist tests
         for (const expiryVal of expiryCombination) {
             const setRes = await client.set(key, value, {
                 expiry: expiryVal as
@@ -8260,18 +8366,55 @@ export function runBaseTests(config: {
 
             expect(setRes).toBeDefined();
         }
+
+        //  onlyIfEqual tests
+        if (!cluster.checkIfServerVersionLessThan("8.1.0")) {
+            for (const expiryVal of expiryCombination) {
+                // Set the key with the initial value
+                await client.set(key, value);
+
+                const setRes = await client.set(key, value2, {
+                    expiry: expiryVal as
+                        | "keepExisting"
+                        | {
+                              type:
+                                  | TimeUnit.Seconds
+                                  | TimeUnit.Milliseconds
+                                  | TimeUnit.UnixSeconds
+                                  | TimeUnit.UnixMilliseconds;
+                              count: number;
+                          },
+                    conditionalSet: "onlyIfEqual",
+                    comparisonValue: value, // Ensure it matches the current key's value
+                });
+
+                if (setRes) {
+                    expect(setRes).toEqual("OK"); // Should return 'OK' if the condition is met
+                } else {
+                    // If condition fails, ensure value remains unchanged
+                    const getRes = await client.get(key);
+                    expect(getRes).toEqual(value);
+                }
+            }
+        }
     }
 
     it.each([ProtocolVersion.RESP2, ProtocolVersion.RESP3])(
         "Set commands with options test_%p",
         async (protocol) => {
-            await runTest(async (client: BaseClient) => {
+            await runTest(async (client: BaseClient, cluster) => {
                 await setWithExpiryOptions(client);
                 await setWithOnlyIfExistOptions(client);
                 await setWithOnlyIfNotExistOptions(client);
                 await setWithGetOldOptions(client);
                 await setWithAllOptions(client);
-                await testSetWithAllCombination(client);
+
+                if (!cluster.checkIfServerVersionLessThan("8.1.0")) {
+                    await setWithOnlyIfEquals(client);
+                    await setIfeqWithAllOptions(client);
+                }
+
+                await testSetWithAllCombination(client, cluster);
             }, protocol);
         },
         config.timeout,

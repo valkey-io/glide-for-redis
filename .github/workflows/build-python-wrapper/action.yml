@@ -65,5 +65,5 @@ runs:
               source "$HOME/.cargo/env"
               python3 -m venv .env
               source .env/bin/activate
-              python3 -m pip install --no-cache-dir -r requirements.txt
+              python3 -m pip install --no-cache-dir -r dev_requirements.txt
               maturin develop

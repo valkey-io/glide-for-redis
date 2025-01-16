@@ -672,7 +672,8 @@ fn base_routing(cmd: &[u8]) -> RouteBy {
         | b"OBJECT ENCODING"
         | b"OBJECT FREQ"
         | b"OBJECT IDLETIME"
-        | b"OBJECT REFCOUNT" => RouteBy::SecondArg,
+        | b"OBJECT REFCOUNT"
+        | b"JSON.DEBUG" => RouteBy::SecondArg,
 
         b"LMPOP" | b"SINTERCARD" | b"ZDIFF" | b"ZINTER" | b"ZINTERCARD" | b"ZMPOP" | b"ZUNION" => {
             RouteBy::SecondArgAfterKeyCount

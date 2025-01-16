@@ -1,5 +1,7 @@
 #### Changes
 
+* Go: Add `HScan` command ([#2917](https://github.com/valkey-io/valkey-glide/pull/2917))
+* Java, Node, Python: Add transaction commands for JSON module ([#2862](https://github.com/valkey-io/valkey-glide/pull/2862))
 * Go: Add HINCRBY command ([#2847](https://github.com/valkey-io/valkey-glide/pull/2847))
 * Go: Add HINCRBYFLOAT command ([#2846](https://github.com/valkey-io/valkey-glide/pull/2846))
 * Go: Add SUNIONSTORE command ([#2805](https://github.com/valkey-io/valkey-glide/pull/2805))
@@ -13,10 +15,17 @@
 * Go: Add `ZPopMin` and `ZPopMax` ([#2850](https://github.com/valkey-io/valkey-glide/pull/2850))
 * Java: Add binary version of `ZRANK WITHSCORE` ([#2896](https://github.com/valkey-io/valkey-glide/pull/2896))
 * Go: Add `ZCARD` ([#2838](https://github.com/valkey-io/valkey-glide/pull/2838))
+* Java, Node, Python: Update documentation for CONFIG SET and CONFIG GET ([#2919](https://github.com/valkey-io/valkey-glide/pull/2919))
+* Go: Add `BZPopMin` ([#2849](https://github.com/valkey-io/valkey-glide/pull/2849))
+* Java: Add `RESP2` support ([#2383](https://github.com/valkey-io/valkey-glide/pull/2383))
+* Node: Add `IFEQ` option ([#2909](https://github.com/valkey-io/valkey-glide/pull/2909))
 
 #### Breaking Changes
 
 #### Fixes
+
+* Node: Fix `zrangeWithScores` (disallow `RangeByLex` as it is not supported) ([#2926](https://github.com/valkey-io/valkey-glide/pull/2926))
+* Core: improve fix in #2381 ([#2929](https://github.com/valkey-io/valkey-glide/pull/2929))
 
 #### Operational Enhancements
 

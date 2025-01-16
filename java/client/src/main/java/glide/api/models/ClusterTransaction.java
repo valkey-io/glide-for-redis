@@ -4,6 +4,8 @@ package glide.api.models;
 import static command_request.CommandRequestOuterClass.RequestType.PubSubShardChannels;
 import static command_request.CommandRequestOuterClass.RequestType.PubSubShardNumSub;
 import static command_request.CommandRequestOuterClass.RequestType.SPublish;
+import static glide.utils.ArgsBuilder.checkTypeOrThrow;
+import static glide.utils.ArgsBuilder.newArgsBuilder;
 
 import glide.api.GlideClusterClient;
 import lombok.NonNull;

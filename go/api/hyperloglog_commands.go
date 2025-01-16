@@ -19,15 +19,14 @@ type HyperLogLogCommands interface {
 	//
 	// Return value:
 	//  If the HyperLogLog is newly created, or if the HyperLogLog approximated cardinality is
-	//  altered, then returns 1. Otherwise, returns 0.
+	//  altered, then returns `1`. Otherwise, returns `0`.
 	//
 	// Example:
 	//  result, err := client.PfAdd("key",[]string{"value1", "value2", "value3"})
-	//  result.Value(): 1
-	//  result.IsNil(): false
+	//  result: 1
 	//
 	// [valkey.io]: https://valkey.io/commands/pfadd/
-	PfAdd(key string, elements []string) (Result[int64], error)
+	PfAdd(key string, elements []string) (int64, error)
 
 	// Estimates the cardinality of the data stored in a HyperLogLog structure for a single key or
 	// calculates the combined cardinality of multiple keys by merging their HyperLogLogs temporarily.
@@ -45,13 +44,12 @@ type HyperLogLogCommands interface {
 	//
 	// Return value:
 	//  The approximated cardinality of given HyperLogLog data structures.
-	//  The cardinality of a key that does not exist is 0.
+	//  The cardinality of a key that does not exist is `0`.
 	//
 	// Example:
 	//  result, err := client.PfCount([]string{"key1","key2"})
-	//  result.Value(): 5
-	//  result.IsNil(): false
+	//  result: 5
 	//
 	// [valkey.io]: https://valkey.io/commands/pfcount/
-	PfCount(keys []string) (Result[int64], error)
+	PfCount(keys []string) (int64, error)
 }

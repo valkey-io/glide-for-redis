@@ -23,6 +23,7 @@ import glide.api.models.commands.InfoOptions;
 import glide.api.models.configuration.AdvancedGlideClientConfiguration;
 import glide.api.models.configuration.AdvancedGlideClusterClientConfiguration;
 import glide.api.models.configuration.BackoffStrategy;
+import glide.api.models.configuration.ProtocolVersion;
 import glide.api.models.configuration.ReadFrom;
 import glide.api.models.configuration.RequestRoutingConfiguration;
 import glide.api.models.exceptions.ClosingException;
@@ -36,22 +37,28 @@ import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 @Timeout(10) // seconds
 public class ConnectionTests {
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(ProtocolVersion.class)
     @SneakyThrows
-    public void basic_client() {
-        var regularClient = GlideClient.createClient(commonClientConfig().build()).get();
+    public void basic_client(ProtocolVersion protocol) {
+        var regularClient =
+                GlideClient.createClient(commonClientConfig().protocol(protocol).build()).get();
         regularClient.close();
     }
 
-    @Test
+    @ParameterizedTest
+    @EnumSource(ProtocolVersion.class)
     @SneakyThrows
-    public void cluster_client() {
-        var clusterClient = GlideClusterClient.createClient(commonClusterClientConfig().build()).get();
+    public void cluster_client(ProtocolVersion protocol) {
+        var clusterClient =
+                GlideClusterClient.createClient(commonClusterClientConfig().protocol(protocol).build())
+                        .get();
         clusterClient.close();
     }
 

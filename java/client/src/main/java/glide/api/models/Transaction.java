@@ -7,6 +7,8 @@ import static command_request.CommandRequestOuterClass.RequestType.Scan;
 import static command_request.CommandRequestOuterClass.RequestType.Select;
 import static glide.api.commands.GenericBaseCommands.REPLACE_VALKEY_API;
 import static glide.api.commands.GenericCommands.DB_VALKEY_API;
+import static glide.utils.ArgsBuilder.checkTypeOrThrow;
+import static glide.utils.ArgsBuilder.newArgsBuilder;
 
 import glide.api.GlideClient;
 import glide.api.models.commands.scan.ScanOptions;

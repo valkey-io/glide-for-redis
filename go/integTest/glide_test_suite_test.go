@@ -24,8 +24,8 @@ type GlideTestSuite struct {
 	clusterHosts    []api.NodeAddress
 	tls             bool
 	serverVersion   string
-	clients         []*api.GlideClient
-	clusterClients  []*api.GlideClusterClient
+	clients         []api.GlideClient
+	clusterClients  []api.GlideClusterClient
 }
 
 var (
@@ -115,7 +115,7 @@ func extractAddresses(suite *GlideTestSuite, output string) []api.NodeAddress {
 func runClusterManager(suite *GlideTestSuite, args []string, ignoreExitCode bool) string {
 	pythonArgs := append([]string{"../../utils/cluster_manager.py"}, args...)
 	output, err := exec.Command("python3", pythonArgs...).CombinedOutput()
-	if len(output) > 0 {
+	if len(output) > 0 && !ignoreExitCode {
 		suite.T().Logf("cluster_manager.py output:\n====\n%s\n====\n", string(output))
 	}
 
@@ -227,7 +227,7 @@ func (suite *GlideTestSuite) getDefaultClients() []api.BaseClient {
 	return []api.BaseClient{suite.defaultClient(), suite.defaultClusterClient()}
 }
 
-func (suite *GlideTestSuite) defaultClient() *api.GlideClient {
+func (suite *GlideTestSuite) defaultClient() api.GlideClient {
 	config := api.NewGlideClientConfiguration().
 		WithAddress(&suite.standaloneHosts[0]).
 		WithUseTLS(suite.tls).
@@ -235,7 +235,7 @@ func (suite *GlideTestSuite) defaultClient() *api.GlideClient {
 	return suite.client(config)
 }
 
-func (suite *GlideTestSuite) client(config *api.GlideClientConfiguration) *api.GlideClient {
+func (suite *GlideTestSuite) client(config *api.GlideClientConfiguration) api.GlideClient {
 	client, err := api.NewGlideClient(config)
 
 	assert.Nil(suite.T(), err)
@@ -245,7 +245,7 @@ func (suite *GlideTestSuite) client(config *api.GlideClientConfiguration) *api.G
 	return client
 }
 
-func (suite *GlideTestSuite) defaultClusterClient() *api.GlideClusterClient {
+func (suite *GlideTestSuite) defaultClusterClient() api.GlideClusterClient {
 	config := api.NewGlideClusterClientConfiguration().
 		WithAddress(&suite.clusterHosts[0]).
 		WithUseTLS(suite.tls).
@@ -253,7 +253,7 @@ func (suite *GlideTestSuite) defaultClusterClient() *api.GlideClusterClient {
 	return suite.clusterClient(config)
 }
 
-func (suite *GlideTestSuite) clusterClient(config *api.GlideClusterClientConfiguration) *api.GlideClusterClient {
+func (suite *GlideTestSuite) clusterClient(config *api.GlideClusterClientConfiguration) api.GlideClusterClient {
 	client, err := api.NewGlideClusterClient(config)
 
 	assert.Nil(suite.T(), err)
@@ -264,16 +264,16 @@ func (suite *GlideTestSuite) clusterClient(config *api.GlideClusterClientConfigu
 }
 
 func (suite *GlideTestSuite) runWithClients(clients []api.BaseClient, test func(client api.BaseClient)) {
-	for i, client := range clients {
-		suite.T().Run(fmt.Sprintf("Testing [%v]", i), func(t *testing.T) {
+	for _, client := range clients {
+		suite.T().Run(fmt.Sprintf("%T", client)[5:], func(t *testing.T) {
 			test(client)
 		})
 	}
 }
 
-func (suite *GlideTestSuite) verifyOK(result api.Result[string], err error) {
+func (suite *GlideTestSuite) verifyOK(result string, err error) {
 	assert.Nil(suite.T(), err)
-	assert.Equal(suite.T(), api.OK, result.Value())
+	assert.Equal(suite.T(), api.OK, result)
 }
 
 func (suite *GlideTestSuite) SkipIfServerVersionLowerThanBy(version string) {

@@ -2,11 +2,13 @@
 
 package api
 
-// SetCommands supports commands and transactions for the "Set Commands" group for standalone and cluster clients.
+import "github.com/valkey-io/valkey-glide/go/glide/api/options"
+
+// Supports commands and transactions for the "Set" group of commands for standalone and cluster clients.
 //
 // See [valkey.io] for details.
 //
-// [valkey.io]: https://valkey.io/commands/?group=set
+// [valkey.io]: https://valkey.io/commands/#set
 type SetCommands interface {
 	// SAdd adds specified members to the set stored at key.
 	//
@@ -17,16 +19,14 @@ type SetCommands interface {
 	//  members - A list of members to add to the set stored at key.
 	//
 	// Return value:
-	//  The Result[int64] containing number of members that were added to the set,
-	//  or [api.NilResult[int64]](api.CreateNilInt64Result()) when the key does not exist.
+	//  The number of members that were added to the set, excluding members already present.
 	//
 	// For example:
 	//  result, err := client.SAdd("my_set", []string{"member1", "member2"})
-	//  // result.Value(): 2
-	//  // result.IsNil(): false
+	//  // result: 2
 	//
 	// [valkey.io]: https://valkey.io/commands/sadd/
-	SAdd(key string, members []string) (Result[int64], error)
+	SAdd(key string, members []string) (int64, error)
 
 	// SRem removes specified members from the set stored at key.
 	//
@@ -37,16 +37,14 @@ type SetCommands interface {
 	//  members - A list of members to remove from the set stored at key.
 	//
 	// Return value:
-	//  The Result[int64] containing number of members that were removed from the set, excluding non-existing members.
-	//  Returns [api.NilResult[int64]](api.CreateNilInt64Result()) if key does not exist.
+	//  The number of members that were removed from the set, excluding non-existing members.
 	//
 	// For example:
 	//  result, err := client.SRem("my_set", []string{"member1", "member2"})
-	//  // result.Value(): 2
-	//  // result.IsNil(): false
+	//  // result: 2
 	//
 	// [valkey.io]: https://valkey.io/commands/srem/
-	SRem(key string, members []string) (Result[int64], error)
+	SRem(key string, members []string) (int64, error)
 
 	// SMembers retrieves all the members of the set value stored at key.
 	//
@@ -79,16 +77,14 @@ type SetCommands interface {
 	//   key - The key from which to retrieve the number of set members.
 	//
 	// Return value:
-	//   The Result[int64] containing the cardinality (number of elements) of the set,
-	//   or 0 if the key does not exist.
+	//   The cardinality (number of elements) of the set, or `0` if the key does not exist.
 	//
 	// Example:
 	//   result, err := client.SCard("my_set")
-	//   // result.Value(): 3
-	//   // result.IsNil(): false
+	//   // result: 3
 	//
 	// [valkey.io]: https://valkey.io/commands/scard/
-	SCard(key string) (Result[int64], error)
+	SCard(key string) (int64, error)
 
 	// SIsMember returns if member is a member of the set stored at key.
 	//
@@ -99,7 +95,7 @@ type SetCommands interface {
 	//   member - The member to check for existence in the set.
 	//
 	// Return value:
-	//   A Result[bool] containing true if the member exists in the set, false otherwise.
+	//   A bool containing true if the member exists in the set, false otherwise.
 	//   If key doesn't exist, it is treated as an empty set and the method returns false.
 	//
 	// Example:
@@ -111,7 +107,7 @@ type SetCommands interface {
 	//   // Indicates that "nonExistingMember" does not exist in the set "mySet".
 	//
 	// [valkey.io]: https://valkey.io/commands/sismember/
-	SIsMember(key string, member string) (Result[bool], error)
+	SIsMember(key string, member string) (bool, error)
 
 	// SDiff computes the difference between the first set and all the successive sets in keys.
 	//
@@ -149,15 +145,15 @@ type SetCommands interface {
 	//   keys        - The keys of the sets to diff.
 	//
 	// Return value:
-	//   A Result[int64] containing the number of elements in the resulting set.
+	//   The number of elements in the resulting set.
 	//
 	// Example:
 	//   result, err := client.SDiffStore("mySet", []string{"set1", "set2"})
-	//   // result.Value(): 5
+	//   // result: 5
 	//   // Indicates that the resulting set "mySet" contains 5 elements
 	//
 	// [valkey.io]: https://valkey.io/commands/sdiffstore/
-	SDiffStore(destination string, keys []string) (Result[int64], error)
+	SDiffStore(destination string, keys []string) (int64, error)
 
 	// SInter gets the intersection of all the given sets.
 	//
@@ -205,7 +201,7 @@ type SetCommands interface {
 	//   // Output: 2 - Two elements were stored at "my_set", and those elements are the intersection of "set1" and "set2".
 	//
 	// [valkey.io]: https://valkey.io/commands/sinterstore/
-	SInterStore(destination string, keys []string) (Result[int64], error)
+	SInterStore(destination string, keys []string) (int64, error)
 
 	// SInterCard gets the cardinality of the intersection of all the given sets.
 	//
@@ -220,18 +216,17 @@ type SetCommands interface {
 	//   keys - The keys of the sets to intersect.
 	//
 	// Return value:
-	//   A Result[int64] containing the cardinality of the intersection result.
-	//   If one or more sets do not exist, 0 is returned.
+	//   The cardinality of the intersection result. If one or more sets do not exist, `0` is returned.
 	//
 	// Example:
 	//   result, err := client.SInterCard([]string{"set1", "set2"})
-	//   // result.Value(): 2
+	//   // result: 2
 	//   // Indicates that the intersection of "set1" and "set2" contains 2 elements
 	//   result, err := client.SInterCard([]string{"set1", "nonExistingSet"})
-	//   // result.Value(): 0
+	//   // result: 0
 	//
 	// [valkey.io]: https://valkey.io/commands/sintercard/
-	SInterCard(keys []string) (Result[int64], error)
+	SInterCard(keys []string) (int64, error)
 
 	// SInterCardLimit gets the cardinality of the intersection of all the given sets, up to the specified limit.
 	//
@@ -247,18 +242,18 @@ type SetCommands interface {
 	//   limit - The limit for the intersection cardinality value.
 	//
 	// Return value:
-	//   A Result[int64] containing the cardinality of the intersection result, or the limit if reached.
-	//   If one or more sets do not exist, 0 is returned.
+	//   The cardinality of the intersection result, or the limit if reached.
+	//   If one or more sets do not exist, `0` is returned.
 	//   If the intersection cardinality reaches 'limit' partway through the computation, returns 'limit' as the cardinality.
 	//
 	// Example:
 	//   result, err := client.SInterCardLimit([]string{"set1", "set2"}, 3)
-	//   // result.Value(): 2
+	//   // result: 2
 	//   // Indicates that the intersection of "set1" and "set2" contains 2 elements (or at least 3 if the actual
 	//   // intersection is larger)
 	//
 	// [valkey.io]: https://valkey.io/commands/sintercard/
-	SInterCardLimit(keys []string, limit int64) (Result[int64], error)
+	SInterCardLimit(keys []string, limit int64) (int64, error)
 
 	// SRandMember returns a random element from the set value stored at key.
 	//
@@ -310,7 +305,7 @@ type SetCommands interface {
 	//   key - The key of the set.
 	//
 	// Return value:
-	//   A []Result[bool] containing whether each member is a member of the set stored at key.
+	//   A []bool containing whether each member is a member of the set stored at key.
 	//
 	// Example:
 	//	 client.SAdd("myKey", []string{"one", "two"})
@@ -323,7 +318,7 @@ type SetCommands interface {
 	//   // err: nil
 	//
 	// [valkey.io]: https://valkey.io/commands/smismember/
-	SMIsMember(key string, members []string) ([]Result[bool], error)
+	SMIsMember(key string, members []string) ([]bool, error)
 
 	// SUnionStore stores the members of the union of all given sets specified by `keys` into a new set at `destination`.
 	//
@@ -341,12 +336,12 @@ type SetCommands interface {
 	// Example:
 	//   result, err := client.SUnionStore("my_set", []string{"set1", "set2"})
 	//   if err != nil {
-	//       fmt.Println(result.Value())
+	//       fmt.Println(result)
 	//   }
 	//   // Output: 2 - Two elements were stored at "my_set", and those elements are the union of "set1" and "set2".
 	//
 	// [valkey.io]: https://valkey.io/commands/sunionstore/
-	SUnionStore(destination string, keys []string) (Result[int64], error)
+	SUnionStore(destination string, keys []string) (int64, error)
 
 	// SUnion gets the union of all the given sets.
 	//
@@ -429,7 +424,7 @@ type SetCommands interface {
 	//   cursor - The cursor that points to the next iteration of results.
 	//            A value of `"0"` indicates the start of the search.
 	//            For Valkey 8.0 and above, negative cursors are treated like the initial cursor("0").
-	//   options - [BaseScanOptions]
+	//   options - [options.BaseScanOptions]
 	//
 	// Return value:
 	//  An array of the cursor and the subset of the set held by `key`. The first element is always the `cursor` and
@@ -440,7 +435,7 @@ type SetCommands interface {
 	//	 // assume "key" contains a set
 	//   resCursor resCol, err := client.sscan("key", "0", opts)
 	//   for resCursor != "0" {
-	//   	opts := api.NewBaseScanOptionsBuilder().SetMatch("*")
+	//   	opts := options.NewBaseScanOptionsBuilder().SetMatch("*")
 	// 	 	resCursor, resCol, err = client.sscan("key", "0", opts)
 	//   	fmt.Println("Cursor: ", resCursor.Value())
 	//   	fmt.Println("Members: ", resCol.Value())
@@ -454,7 +449,7 @@ type SetCommands interface {
 	//   // Members:  ['47', '122', '1', '53', '10', '14', '80']
 	//
 	// [valkey.io]: https://valkey.io/commands/sscan/
-	SScanWithOptions(key string, cursor string, options *BaseScanOptions) (Result[string], []Result[string], error)
+	SScanWithOptions(key string, cursor string, options *options.BaseScanOptions) (Result[string], []Result[string], error)
 
 	// Moves `member` from the set at `source` to the set at `destination`, removing it from the source set.
 	// Creates a new destination set if needed. The operation is atomic.
@@ -476,5 +471,5 @@ type SetCommands interface {
 	//   fmt.Println(moved.Value()) // Output: true
 	//
 	// [valkey.io]: https://valkey.io/commands/smove/
-	SMove(source string, destination string, member string) (Result[bool], error)
+	SMove(source string, destination string, member string) (bool, error)
 }

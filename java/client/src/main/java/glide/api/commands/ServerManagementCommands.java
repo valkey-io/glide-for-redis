@@ -89,7 +89,8 @@ public interface ServerManagementCommands {
     CompletableFuture<String> configResetStat();
 
     /**
-     * Get the values of configuration parameters.
+     * Get the values of configuration parameters.<br>
+     * Starting from server version 7, command supports multiple parameters.
      *
      * @see <a href="https://valkey.io/commands/config-get/">valkey.io</a> for details.
      * @param parameters An <code>array</code> of configuration parameter names to retrieve values
@@ -105,7 +106,8 @@ public interface ServerManagementCommands {
     CompletableFuture<Map<String, String>> configGet(String[] parameters);
 
     /**
-     * Sets configuration parameters to the specified values.
+     * Sets configuration parameters to the specified values.<br>
+     * Starting from server version 7, command supports multiple parameters.
      *
      * @see <a href="https://valkey.io/commands/config-set/">valkey.io</a> for details.
      * @param parameters A <code>map</code> consisting of configuration parameters and their

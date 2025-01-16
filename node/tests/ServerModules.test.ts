@@ -11,6 +11,7 @@ import {
 } from "@jest/globals";
 import { v4 as uuidv4 } from "uuid";
 import {
+    ClusterTransaction,
     ConditionalChange,
     convertGlideRecordToRecord,
     Decoder,
@@ -36,6 +37,9 @@ import {
     getClientConfigurationOption,
     getServerVersion,
     parseEndpoints,
+    transactionMultiJson,
+    transactionMultiJsonForArrCommands,
+    validateTransactionResponse,
 } from "./TestUtilities";
 
 const TIMEOUT = 50000;
@@ -1034,158 +1038,148 @@ describe("Server Module Tests", () => {
                 ).toEqual("integer");
             });
 
-            it.each([ProtocolVersion.RESP2, ProtocolVersion.RESP3])(
-                "json.clear tests",
-                async () => {
-                    client = await GlideClusterClient.createClient(
-                        getClientConfigurationOption(
-                            cluster.getAddresses(),
-                            protocol,
-                        ),
-                    );
-                    const key = uuidv4();
-                    const jsonValue = {
-                        obj: { a: 1, b: 2 },
-                        arr: [1, 2, 3],
-                        str: "foo",
-                        bool: true,
-                        int: 42,
-                        float: 3.14,
+            it("json.clear tests", async () => {
+                client = await GlideClusterClient.createClient(
+                    getClientConfigurationOption(
+                        cluster.getAddresses(),
+                        protocol,
+                    ),
+                );
+                const key = uuidv4();
+                const jsonValue = {
+                    obj: { a: 1, b: 2 },
+                    arr: [1, 2, 3],
+                    str: "foo",
+                    bool: true,
+                    int: 42,
+                    float: 3.14,
+                    nullVal: null,
+                };
+
+                expect(
+                    await GlideJson.set(
+                        client,
+                        key,
+                        "$",
+                        JSON.stringify(jsonValue),
+                    ),
+                ).toBe("OK");
+
+                expect(
+                    await GlideJson.clear(client, key, { path: "$.*" }),
+                ).toBe(6);
+
+                const result = await GlideJson.get(client, key, {
+                    path: ["$"],
+                });
+
+                expect(JSON.parse(result as string)).toEqual([
+                    {
+                        obj: {},
+                        arr: [],
+                        str: "",
+                        bool: false,
+                        int: 0,
+                        float: 0.0,
                         nullVal: null,
-                    };
+                    },
+                ]);
 
-                    expect(
-                        await GlideJson.set(
-                            client,
-                            key,
-                            "$",
-                            JSON.stringify(jsonValue),
-                        ),
-                    ).toBe("OK");
+                expect(
+                    await GlideJson.clear(client, key, { path: "$.*" }),
+                ).toBe(0);
 
-                    expect(
-                        await GlideJson.clear(client, key, { path: "$.*" }),
-                    ).toBe(6);
+                expect(
+                    await GlideJson.set(
+                        client,
+                        key,
+                        "$",
+                        JSON.stringify(jsonValue),
+                    ),
+                ).toBe("OK");
 
-                    const result = await GlideJson.get(client, key, {
-                        path: ["$"],
-                    });
+                expect(await GlideJson.clear(client, key, { path: "*" })).toBe(
+                    6,
+                );
 
-                    expect(JSON.parse(result as string)).toEqual([
-                        {
-                            obj: {},
-                            arr: [],
-                            str: "",
-                            bool: false,
-                            int: 0,
-                            float: 0.0,
-                            nullVal: null,
-                        },
-                    ]);
+                const jsonValue2 = {
+                    a: 1,
+                    b: { a: [5, 6, 7], b: { a: true } },
+                    c: { a: "value", b: { a: 3.5 } },
+                    d: { a: { foo: "foo" } },
+                    nullVal: null,
+                };
+                expect(
+                    await GlideJson.set(
+                        client,
+                        key,
+                        "$",
+                        JSON.stringify(jsonValue2),
+                    ),
+                ).toBe("OK");
 
-                    expect(
-                        await GlideJson.clear(client, key, { path: "$.*" }),
-                    ).toBe(0);
+                expect(
+                    await GlideJson.clear(client, key, {
+                        path: "b.a[1:3]",
+                    }),
+                ).toBe(2);
 
-                    expect(
-                        await GlideJson.set(
-                            client,
-                            key,
-                            "$",
-                            JSON.stringify(jsonValue),
-                        ),
-                    ).toBe("OK");
+                expect(
+                    await GlideJson.clear(client, key, {
+                        path: "b.a[1:3]",
+                    }),
+                ).toBe(0);
 
-                    expect(
-                        await GlideJson.clear(client, key, { path: "*" }),
-                    ).toBe(6);
+                expect(
+                    JSON.parse(
+                        (await GlideJson.get(client, key, {
+                            path: ["$..a"],
+                        })) as string,
+                    ),
+                ).toEqual([1, [5, 0, 0], true, "value", 3.5, { foo: "foo" }]);
 
-                    const jsonValue2 = {
-                        a: 1,
-                        b: { a: [5, 6, 7], b: { a: true } },
-                        c: { a: "value", b: { a: 3.5 } },
-                        d: { a: { foo: "foo" } },
-                        nullVal: null,
-                    };
-                    expect(
-                        await GlideJson.set(
-                            client,
-                            key,
-                            "$",
-                            JSON.stringify(jsonValue2),
-                        ),
-                    ).toBe("OK");
+                expect(
+                    await GlideJson.clear(client, key, { path: "..a" }),
+                ).toBe(6);
 
-                    expect(
-                        await GlideJson.clear(client, key, {
-                            path: "b.a[1:3]",
-                        }),
-                    ).toBe(2);
+                expect(
+                    JSON.parse(
+                        (await GlideJson.get(client, key, {
+                            path: ["$..a"],
+                        })) as string,
+                    ),
+                ).toEqual([0, [], false, "", 0.0, {}]);
 
-                    expect(
-                        await GlideJson.clear(client, key, {
-                            path: "b.a[1:3]",
-                        }),
-                    ).toBe(0);
+                expect(
+                    await GlideJson.clear(client, key, { path: "$..a" }),
+                ).toBe(0);
 
-                    expect(
-                        JSON.parse(
-                            (await GlideJson.get(client, key, {
-                                path: ["$..a"],
-                            })) as string,
-                        ),
-                    ).toEqual([
-                        1,
-                        [5, 0, 0],
-                        true,
-                        "value",
-                        3.5,
-                        { foo: "foo" },
-                    ]);
+                // Path doesn't exist
+                expect(
+                    await GlideJson.clear(client, key, { path: "$.path" }),
+                ).toBe(0);
 
-                    expect(
-                        await GlideJson.clear(client, key, { path: "..a" }),
-                    ).toBe(6);
+                expect(
+                    await GlideJson.clear(client, key, { path: "path" }),
+                ).toBe(0);
 
-                    expect(
-                        JSON.parse(
-                            (await GlideJson.get(client, key, {
-                                path: ["$..a"],
-                            })) as string,
-                        ),
-                    ).toEqual([0, [], false, "", 0.0, {}]);
+                // Key doesn't exist
+                await expect(
+                    GlideJson.clear(client, "non_existing_key"),
+                ).rejects.toThrow(RequestError);
 
-                    expect(
-                        await GlideJson.clear(client, key, { path: "$..a" }),
-                    ).toBe(0);
+                await expect(
+                    GlideJson.clear(client, "non_existing_key", {
+                        path: "$",
+                    }),
+                ).rejects.toThrow(RequestError);
 
-                    // Path doesn't exist
-                    expect(
-                        await GlideJson.clear(client, key, { path: "$.path" }),
-                    ).toBe(0);
-
-                    expect(
-                        await GlideJson.clear(client, key, { path: "path" }),
-                    ).toBe(0);
-
-                    // Key doesn't exist
-                    await expect(
-                        GlideJson.clear(client, "non_existing_key"),
-                    ).rejects.toThrow(RequestError);
-
-                    await expect(
-                        GlideJson.clear(client, "non_existing_key", {
-                            path: "$",
-                        }),
-                    ).rejects.toThrow(RequestError);
-
-                    await expect(
-                        GlideJson.clear(client, "non_existing_key", {
-                            path: ".",
-                        }),
-                    ).rejects.toThrow(RequestError);
-                },
-            );
+                await expect(
+                    GlideJson.clear(client, "non_existing_key", {
+                        path: ".",
+                    }),
+                ).rejects.toThrow(RequestError);
+            });
 
             it("json.resp tests", async () => {
                 client = await GlideClusterClient.createClient(
@@ -2068,269 +2062,290 @@ describe("Server Module Tests", () => {
                 ).toBe("0"); // 0 * 10.2 = 0
             });
 
-            it.each([ProtocolVersion.RESP2, ProtocolVersion.RESP3])(
-                "json.debug tests",
-                async (protocol) => {
-                    client = await GlideClusterClient.createClient(
-                        getClientConfigurationOption(
-                            cluster.getAddresses(),
-                            protocol,
-                        ),
+            it("json.debug tests", async () => {
+                client = await GlideClusterClient.createClient(
+                    getClientConfigurationOption(
+                        cluster.getAddresses(),
+                        protocol,
+                    ),
+                );
+                const key = uuidv4();
+                const jsonValue =
+                    '{ "key1": 1, "key2": 3.5, "key3": {"nested_key": {"key1": [4, 5]}}, "key4":' +
+                    ' [1, 2, 3], "key5": 0, "key6": "hello", "key7": null, "key8":' +
+                    ' {"nested_key": {"key1": 3.5953862697246314e307}}, "key9":' +
+                    ' 3.5953862697246314e307, "key10": true }';
+                // setup
+                expect(await GlideJson.set(client, key, "$", jsonValue)).toBe(
+                    "OK",
+                );
+
+                expect(
+                    await GlideJson.debugFields(client, key, {
+                        path: "$.key1",
+                    }),
+                ).toEqual([1]);
+
+                expect(
+                    await GlideJson.debugFields(client, key, {
+                        path: "$.key3.nested_key.key1",
+                    }),
+                ).toEqual([2]);
+
+                expect(
+                    await GlideJson.debugMemory(client, key, {
+                        path: "$.key4[2]",
+                    }),
+                ).toEqual([16]);
+
+                expect(
+                    await GlideJson.debugMemory(client, key, {
+                        path: ".key6",
+                    }),
+                ).toEqual(16);
+
+                expect(await GlideJson.debugMemory(client, key)).toEqual(504);
+
+                expect(await GlideJson.debugFields(client, key)).toEqual(19);
+
+                // testing binary input
+                expect(
+                    await GlideJson.debugMemory(client, Buffer.from(key)),
+                ).toEqual(504);
+
+                expect(
+                    await GlideJson.debugFields(client, Buffer.from(key)),
+                ).toEqual(19);
+            });
+
+            it("json.objlen tests", async () => {
+                client = await GlideClusterClient.createClient(
+                    getClientConfigurationOption(
+                        cluster.getAddresses(),
+                        protocol,
+                    ),
+                );
+                const key = uuidv4();
+                const jsonValue = {
+                    a: 1.0,
+                    b: { a: { x: 1, y: 2 }, b: 2.5, c: true },
+                };
+
+                // setup
+                expect(
+                    await GlideJson.set(
+                        client,
+                        key,
+                        "$",
+                        JSON.stringify(jsonValue),
+                    ),
+                ).toBe("OK");
+
+                expect(
+                    await GlideJson.objlen(client, key, { path: "$" }),
+                ).toEqual([2]);
+
+                expect(
+                    await GlideJson.objlen(client, key, { path: "." }),
+                ).toEqual(2);
+
+                expect(
+                    await GlideJson.objlen(client, key, { path: "$.." }),
+                ).toEqual([2, 3, 2]);
+
+                expect(
+                    await GlideJson.objlen(client, key, { path: ".." }),
+                ).toEqual(2);
+
+                expect(
+                    await GlideJson.objlen(client, key, { path: "$..b" }),
+                ).toEqual([3, null]);
+
+                expect(
+                    await GlideJson.objlen(client, key, { path: "..b" }),
+                ).toEqual(3);
+
+                expect(
+                    await GlideJson.objlen(client, Buffer.from(key), {
+                        path: Buffer.from("..a"),
+                    }),
+                ).toEqual(2);
+
+                expect(await GlideJson.objlen(client, key)).toEqual(2);
+
+                // path doesn't exist
+                expect(
+                    await GlideJson.objlen(client, key, {
+                        path: "$.non_existing_path",
+                    }),
+                ).toEqual([]);
+
+                await expect(
+                    GlideJson.objlen(client, key, {
+                        path: "non_existing_path",
+                    }),
+                ).rejects.toThrow(RequestError);
+
+                // Value at path isnt an object
+                expect(
+                    await GlideJson.objlen(client, key, {
+                        path: "$.non_existing_path",
+                    }),
+                ).toEqual([]);
+
+                await expect(
+                    GlideJson.objlen(client, key, { path: ".a" }),
+                ).rejects.toThrow(RequestError);
+
+                // Non-existing key
+                expect(
+                    await GlideJson.objlen(client, "non_existing_key", {
+                        path: "$",
+                    }),
+                ).toBeNull();
+
+                expect(
+                    await GlideJson.objlen(client, "non_existing_key", {
+                        path: ".",
+                    }),
+                ).toBeNull();
+
+                expect(
+                    await GlideJson.set(
+                        client,
+                        key,
+                        "$",
+                        '{"a": 1, "b": 2, "c":3, "d":4}',
+                    ),
+                ).toBe("OK");
+                expect(await GlideJson.objlen(client, key)).toEqual(4);
+            });
+
+            it("json.objkeys tests", async () => {
+                client = await GlideClusterClient.createClient(
+                    getClientConfigurationOption(
+                        cluster.getAddresses(),
+                        protocol,
+                    ),
+                );
+                const key = uuidv4();
+                const jsonValue = {
+                    a: 1.0,
+                    b: { a: { x: 1, y: 2 }, b: 2.5, c: true },
+                };
+
+                // setup
+                expect(
+                    await GlideJson.set(
+                        client,
+                        key,
+                        "$",
+                        JSON.stringify(jsonValue),
+                    ),
+                ).toBe("OK");
+
+                expect(
+                    await GlideJson.objkeys(client, key, { path: "$" }),
+                ).toEqual([["a", "b"]]);
+
+                expect(
+                    await GlideJson.objkeys(client, key, {
+                        path: ".",
+                        decoder: Decoder.Bytes,
+                    }),
+                ).toEqual([Buffer.from("a"), Buffer.from("b")]);
+
+                expect(
+                    await GlideJson.objkeys(client, Buffer.from(key), {
+                        path: Buffer.from("$.."),
+                    }),
+                ).toEqual([
+                    ["a", "b"],
+                    ["a", "b", "c"],
+                    ["x", "y"],
+                ]);
+
+                expect(
+                    await GlideJson.objkeys(client, key, { path: ".." }),
+                ).toEqual(["a", "b"]);
+
+                expect(
+                    await GlideJson.objkeys(client, key, { path: "$..b" }),
+                ).toEqual([["a", "b", "c"], []]);
+
+                expect(
+                    await GlideJson.objkeys(client, key, { path: "..b" }),
+                ).toEqual(["a", "b", "c"]);
+
+                // path doesn't exist
+                expect(
+                    await GlideJson.objkeys(client, key, {
+                        path: "$.non_existing_path",
+                    }),
+                ).toEqual([]);
+
+                expect(
+                    await GlideJson.objkeys(client, key, {
+                        path: "non_existing_path",
+                    }),
+                ).toBeNull();
+
+                // Value at path isnt an object
+                expect(
+                    await GlideJson.objkeys(client, key, { path: "$.a" }),
+                ).toEqual([[]]);
+
+                await expect(
+                    GlideJson.objkeys(client, key, { path: ".a" }),
+                ).rejects.toThrow(RequestError);
+
+                // Non-existing key
+                expect(
+                    await GlideJson.objkeys(client, "non_existing_key", {
+                        path: "$",
+                    }),
+                ).toBeNull();
+
+                expect(
+                    await GlideJson.objkeys(client, "non_existing_key", {
+                        path: ".",
+                    }),
+                ).toBeNull();
+            });
+
+            it("can send GlideMultiJson transactions for ARR commands", async () => {
+                client = await GlideClusterClient.createClient(
+                    getClientConfigurationOption(
+                        cluster.getAddresses(),
+                        protocol,
+                    ),
+                );
+                const clusterTransaction = new ClusterTransaction();
+                const expectedRes =
+                    await transactionMultiJsonForArrCommands(
+                        clusterTransaction,
                     );
-                    const key = uuidv4();
-                    const jsonValue =
-                        '{ "key1": 1, "key2": 3.5, "key3": {"nested_key": {"key1": [4, 5]}}, "key4":' +
-                        ' [1, 2, 3], "key5": 0, "key6": "hello", "key7": null, "key8":' +
-                        ' {"nested_key": {"key1": 3.5953862697246314e307}}, "key9":' +
-                        ' 3.5953862697246314e307, "key10": true }';
-                    // setup
-                    expect(
-                        await GlideJson.set(client, key, "$", jsonValue),
-                    ).toBe("OK");
+                const result = await client.exec(clusterTransaction);
 
-                    expect(
-                        await GlideJson.debugFields(client, key, {
-                            path: "$.key1",
-                        }),
-                    ).toEqual([1]);
+                validateTransactionResponse(result, expectedRes);
+                client.close();
+            });
 
-                    expect(
-                        await GlideJson.debugFields(client, key, {
-                            path: "$.key3.nested_key.key1",
-                        }),
-                    ).toEqual([2]);
+            it("can send GlideMultiJson transactions general commands", async () => {
+                client = await GlideClusterClient.createClient(
+                    getClientConfigurationOption(
+                        cluster.getAddresses(),
+                        protocol,
+                    ),
+                );
+                const clusterTransaction = new ClusterTransaction();
+                const expectedRes =
+                    await transactionMultiJson(clusterTransaction);
+                const result = await client.exec(clusterTransaction);
 
-                    expect(
-                        await GlideJson.debugMemory(client, key, {
-                            path: "$.key4[2]",
-                        }),
-                    ).toEqual([16]);
-
-                    expect(
-                        await GlideJson.debugMemory(client, key, {
-                            path: ".key6",
-                        }),
-                    ).toEqual(16);
-
-                    expect(await GlideJson.debugMemory(client, key)).toEqual(
-                        504,
-                    );
-
-                    expect(await GlideJson.debugFields(client, key)).toEqual(
-                        19,
-                    );
-
-                    // testing binary input
-                    expect(
-                        await GlideJson.debugMemory(client, Buffer.from(key)),
-                    ).toEqual(504);
-
-                    expect(
-                        await GlideJson.debugFields(client, Buffer.from(key)),
-                    ).toEqual(19);
-                },
-            );
-
-            it.each([ProtocolVersion.RESP2, ProtocolVersion.RESP3])(
-                "json.objlen tests",
-                async (protocol) => {
-                    client = await GlideClusterClient.createClient(
-                        getClientConfigurationOption(
-                            cluster.getAddresses(),
-                            protocol,
-                        ),
-                    );
-                    const key = uuidv4();
-                    const jsonValue = {
-                        a: 1.0,
-                        b: { a: { x: 1, y: 2 }, b: 2.5, c: true },
-                    };
-
-                    // setup
-                    expect(
-                        await GlideJson.set(
-                            client,
-                            key,
-                            "$",
-                            JSON.stringify(jsonValue),
-                        ),
-                    ).toBe("OK");
-
-                    expect(
-                        await GlideJson.objlen(client, key, { path: "$" }),
-                    ).toEqual([2]);
-
-                    expect(
-                        await GlideJson.objlen(client, key, { path: "." }),
-                    ).toEqual(2);
-
-                    expect(
-                        await GlideJson.objlen(client, key, { path: "$.." }),
-                    ).toEqual([2, 3, 2]);
-
-                    expect(
-                        await GlideJson.objlen(client, key, { path: ".." }),
-                    ).toEqual(2);
-
-                    expect(
-                        await GlideJson.objlen(client, key, { path: "$..b" }),
-                    ).toEqual([3, null]);
-
-                    expect(
-                        await GlideJson.objlen(client, key, { path: "..b" }),
-                    ).toEqual(3);
-
-                    expect(
-                        await GlideJson.objlen(client, Buffer.from(key), {
-                            path: Buffer.from("..a"),
-                        }),
-                    ).toEqual(2);
-
-                    expect(await GlideJson.objlen(client, key)).toEqual(2);
-
-                    // path doesn't exist
-                    expect(
-                        await GlideJson.objlen(client, key, {
-                            path: "$.non_existing_path",
-                        }),
-                    ).toEqual([]);
-
-                    await expect(
-                        GlideJson.objlen(client, key, {
-                            path: "non_existing_path",
-                        }),
-                    ).rejects.toThrow(RequestError);
-
-                    // Value at path isnt an object
-                    expect(
-                        await GlideJson.objlen(client, key, {
-                            path: "$.non_existing_path",
-                        }),
-                    ).toEqual([]);
-
-                    await expect(
-                        GlideJson.objlen(client, key, { path: ".a" }),
-                    ).rejects.toThrow(RequestError);
-
-                    // Non-existing key
-                    expect(
-                        await GlideJson.objlen(client, "non_existing_key", {
-                            path: "$",
-                        }),
-                    ).toBeNull();
-
-                    expect(
-                        await GlideJson.objlen(client, "non_existing_key", {
-                            path: ".",
-                        }),
-                    ).toBeNull();
-
-                    expect(
-                        await GlideJson.set(
-                            client,
-                            key,
-                            "$",
-                            '{"a": 1, "b": 2, "c":3, "d":4}',
-                        ),
-                    ).toBe("OK");
-                    expect(await GlideJson.objlen(client, key)).toEqual(4);
-                },
-            );
-
-            it.each([ProtocolVersion.RESP2, ProtocolVersion.RESP3])(
-                "json.objkeys tests",
-                async (protocol) => {
-                    client = await GlideClusterClient.createClient(
-                        getClientConfigurationOption(
-                            cluster.getAddresses(),
-                            protocol,
-                        ),
-                    );
-                    const key = uuidv4();
-                    const jsonValue = {
-                        a: 1.0,
-                        b: { a: { x: 1, y: 2 }, b: 2.5, c: true },
-                    };
-
-                    // setup
-                    expect(
-                        await GlideJson.set(
-                            client,
-                            key,
-                            "$",
-                            JSON.stringify(jsonValue),
-                        ),
-                    ).toBe("OK");
-
-                    expect(
-                        await GlideJson.objkeys(client, key, { path: "$" }),
-                    ).toEqual([["a", "b"]]);
-
-                    expect(
-                        await GlideJson.objkeys(client, key, {
-                            path: ".",
-                            decoder: Decoder.Bytes,
-                        }),
-                    ).toEqual([Buffer.from("a"), Buffer.from("b")]);
-
-                    expect(
-                        await GlideJson.objkeys(client, Buffer.from(key), {
-                            path: Buffer.from("$.."),
-                        }),
-                    ).toEqual([
-                        ["a", "b"],
-                        ["a", "b", "c"],
-                        ["x", "y"],
-                    ]);
-
-                    expect(
-                        await GlideJson.objkeys(client, key, { path: ".." }),
-                    ).toEqual(["a", "b"]);
-
-                    expect(
-                        await GlideJson.objkeys(client, key, { path: "$..b" }),
-                    ).toEqual([["a", "b", "c"], []]);
-
-                    expect(
-                        await GlideJson.objkeys(client, key, { path: "..b" }),
-                    ).toEqual(["a", "b", "c"]);
-
-                    // path doesn't exist
-                    expect(
-                        await GlideJson.objkeys(client, key, {
-                            path: "$.non_existing_path",
-                        }),
-                    ).toEqual([]);
-
-                    expect(
-                        await GlideJson.objkeys(client, key, {
-                            path: "non_existing_path",
-                        }),
-                    ).toBeNull();
-
-                    // Value at path isnt an object
-                    expect(
-                        await GlideJson.objkeys(client, key, { path: "$.a" }),
-                    ).toEqual([[]]);
-
-                    await expect(
-                        GlideJson.objkeys(client, key, { path: ".a" }),
-                    ).rejects.toThrow(RequestError);
-
-                    // Non-existing key
-                    expect(
-                        await GlideJson.objkeys(client, "non_existing_key", {
-                            path: "$",
-                        }),
-                    ).toBeNull();
-
-                    expect(
-                        await GlideJson.objkeys(client, "non_existing_key", {
-                            path: ".",
-                        }),
-                    ).toBeNull();
-                },
-            );
+                validateTransactionResponse(result, expectedRes);
+                client.close();
+            });
         },
     );
 

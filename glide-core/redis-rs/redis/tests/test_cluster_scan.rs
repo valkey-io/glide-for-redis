@@ -1178,7 +1178,7 @@ mod test_cluster_scan_async {
         for key in excepted_keys.iter() {
             assert!(keys.contains(key));
         }
-        assert!(keys.len() > 0);
+        assert!(!keys.is_empty());
     }
 
     #[tokio::test]

@@ -28,7 +28,7 @@ dependencies {
     implementation group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
 }
 
-run.dependsOn ':client:buildRustRelease'
+run.dependsOn ':client:buildRust'
 
 application {
     // Define the main class for the application.

@@ -2,6 +2,7 @@
  * Copyright Valkey GLIDE Project Contributors - SPDX Identifier: Apache-2.0
  */
 
+import { ClusterTransaction, Transaction } from "src/Transaction";
 import { BaseClient, DecoderOption, GlideString } from "../BaseClient";
 import { ConditionalChange } from "../Commands";
 import { GlideClient } from "../GlideClient";
@@ -263,7 +264,7 @@ export class GlideJson {
      * await GlideJson.set(client, "doc", "$", '[[], ["a"], ["a", "b"]]');
      * const result = await GlideJson.arrinsert(client, "doc", "$[*]", 0, ['"c"', '{"key": "value"}', "true", "null", '["bar"]']);
      * console.log(result); // Output: [5, 6, 7]
-     * const doc = await json.get(client, "doc");
+     * const doc = await GlideJson.get(client, "doc");
      * console.log(doc); // Output: '[["c",{"key":"value"},true,null,["bar"]],["c",{"key":"value"},true,null,["bar"],"a"],["c",{"key":"value"},true,null,["bar"],"a","b"]]'
      * ```
      * @example
@@ -271,7 +272,7 @@ export class GlideJson {
      * await GlideJson.set(client, "doc", "$", '[[], ["a"], ["a", "b"]]');
      * const result = await GlideJson.arrinsert(client, "doc", ".", 0, ['"c"'])
      * console.log(result); // Output: 4
-     * const doc = await json.get(client, "doc");
+     * const doc = await GlideJson.get(client, "doc");
      * console.log(doc); // Output: '[\"c\",[],[\"a\"],[\"a\",\"b\"]]'
      * ```
      */
@@ -721,13 +722,13 @@ export class GlideJson {
     /**
      * Retrieve the JSON value at the specified `path` within the JSON document stored at `key`.
      * The returning result is in the Valkey or Redis OSS Serialization Protocol (RESP).
-     * JSON null is mapped to the RESP Null Bulk String.
-     * JSON Booleans are mapped to RESP Simple string.
-     * JSON integers are mapped to RESP Integers.
-     * JSON doubles are mapped to RESP Bulk Strings.
-     * JSON strings are mapped to RESP Bulk Strings.
-     * JSON arrays are represented as RESP arrays, where the first element is the simple string [, followed by the array's elements.
-     * JSON objects are represented as RESP object, where the first element is the simple string {, followed by key-value pairs, each of which is a RESP bulk string.
+     * - JSON null is mapped to the RESP Null Bulk String.
+     * - JSON Booleans are mapped to RESP Simple string.
+     * - JSON integers are mapped to RESP Integers.
+     * - JSON doubles are mapped to RESP Bulk Strings.
+     * - JSON strings are mapped to RESP Bulk Strings.
+     * - JSON arrays are represented as RESP arrays, where the first element is the simple string [, followed by the array's elements.
+     * - JSON objects are represented as RESP object, where the first element is the simple string {, followed by key-value pairs, each of which is a RESP bulk string.
      *
      * @param client - The client to execute the command.
      * @param key - The key of the JSON document.
@@ -974,7 +975,7 @@ export class GlideJson {
      * ```typescript
      * console.log(await GlideJson.set(client, "doc", "$", '[1, 2.3, "foo", true, null, {}, [], {a:1, b:2}, [1, 2, 3]]'));
      * // Output: 'OK' - Indicates successful setting of the value at path '$' in the key stored at `doc`.
-     * console.log(await GlideJson.debugMemory(client, "doc", {path: "$[*]"});
+     * console.log(await GlideJson.debugFields(client, "doc", {path: "$[*]"});
      * // Output: [1, 1, 1, 1, 1, 0, 0, 2, 3]
      * ```
      */
@@ -1155,5 +1156,775 @@ export class GlideJson {
         }
 
         return _executeCommand(client, args, options);
+    }
+}
+
+/**
+ * Transaction implementation for JSON module. Transactions allow the execution of a group of
+ * commands in a single step. See {@link Transaction} and {@link ClusterTransaction}.
+ *
+ * @example
+ * ```typescript
+ * const transaction = new Transaction();
+ * GlideMultiJson.set(transaction, "doc", ".", '{"a": 1.0, "b": 2}');
+ * GlideMultiJson.get(transaction, "doc");
+ * const result = await client.exec(transaction);
+ *
+ * console.log(result[0]); // Output: 'OK' - result of GlideMultiJson.set()
+ * console.log(result[1]); // Output: '{"a": 1.0, "b": 2}' - result of GlideMultiJson.get()
+ * ```
+ */
+export class GlideMultiJson {
+    /**
+     * Sets the JSON value at the specified `path` stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param path - Represents the path within the JSON document where the value will be set.
+     *      The key will be modified only if `value` is added as the last child in the specified `path`, or if the specified `path` acts as the parent of a new child being added.
+     * @param value - The value to set at the specific path, in JSON formatted bytes or str.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `conditionalChange` - Set the value only if the given condition is met (within the key or path).
+     *      Equivalent to [`XX` | `NX`] in the module API.
+     *
+     * Command Response - If the value is successfully set, returns `"OK"`.
+     *       If `value` isn't set because of `conditionalChange`, returns `null`.
+     */
+    static set(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        path: GlideString,
+        value: GlideString,
+        options?: { conditionalChange: ConditionalChange },
+    ): Transaction | ClusterTransaction {
+        const args: GlideString[] = ["JSON.SET", key, path, value];
+
+        if (options?.conditionalChange !== undefined) {
+            args.push(options.conditionalChange);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Retrieves the JSON value at the specified `paths` stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) Options for formatting the byte representation of the JSON data. See {@link JsonGetOptions}.
+     *
+     * Command Response -
+     *   - If one path is given:
+     *     - For JSONPath (path starts with `$`):
+     *       - Returns a stringified JSON list of bytes replies for every possible path,
+     *         or a byte string representation of an empty array, if path doesn't exist.
+     *         If `key` doesn't exist, returns `null`.
+     *     - For legacy path (path doesn't start with `$`):
+     *         Returns a byte string representation of the value in `path`.
+     *         If `path` doesn't exist, an error is raised.
+     *         If `key` doesn't exist, returns `null`.
+     *  - If multiple paths are given:
+     *         Returns a stringified JSON object in bytes, in which each path is a key, and it's corresponding value, is the value as if the path was executed in the command as a single path.
+     * In case of multiple paths, and `paths` are a mix of both JSONPath and legacy path, the command behaves as if all are JSONPath paths.
+     */
+    static get(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: JsonGetOptions,
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.GET", key];
+
+        if (options) {
+            const optionArgs = _jsonGetOptionsToArgs(options);
+            args.push(...optionArgs);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Retrieves the JSON values at the specified `path` stored at multiple `keys`.
+     *
+     * @remarks When in cluster mode, all keys in the transaction must be mapped to the same slot.
+     *
+     * @param client - The client to execute the command.
+     * @param keys - The keys of the JSON documents.
+     * @param path - The path within the JSON documents.
+     *
+     * Command Response -
+     * - For JSONPath (path starts with `$`):
+     *       Returns a stringified JSON list replies for every possible path, or a string representation
+     *       of an empty array, if path doesn't exist.
+     * - For legacy path (path doesn't start with `$`):
+     *       Returns a string representation of the value in `path`. If `path` doesn't exist,
+     *       the corresponding array element will be `null`.
+     * - If a `key` doesn't exist, the corresponding array element will be `null`.
+     */
+    static mget(
+        transaction: Transaction | ClusterTransaction,
+        keys: GlideString[],
+        path: GlideString,
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.MGET", ...keys, path];
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Inserts one or more values into the array at the specified `path` within the JSON
+     * document stored at `key`, before the given `index`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param path - The path within the JSON document.
+     * @param index - The array index before which values are inserted.
+     * @param values - The JSON values to be inserted into the array.
+     *     JSON string values must be wrapped with quotes. For example, to insert `"foo"`, pass `"\"foo\""`.
+     *
+     * Command Response -
+     * - For JSONPath (path starts with `$`):
+     *       Returns an array with a list of integers for every possible path,
+     *       indicating the new length of the array, or `null` for JSON values matching
+     *       the path that are not an array. If `path` does not exist, an empty array
+     *       will be returned.
+     * - For legacy path (path doesn't start with `$`):
+     *       Returns an integer representing the new length of the array. If multiple paths are
+     *       matched, returns the length of the first modified array. If `path` doesn't
+     *       exist or the value at `path` is not an array, an error is raised.
+     * - If the index is out of bounds or `key` doesn't exist, an error is raised.
+     */
+    static arrinsert(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        path: GlideString,
+        index: number,
+        values: GlideString[],
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.ARRINSERT", key, path, index.toString(), ...values];
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Pops an element from the array located at `path` in the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) See {@link JsonArrPopOptions}.
+     *
+     * Command Response -
+     * - For JSONPath (path starts with `$`):
+     *       Returns an array with a strings for every possible path, representing the popped JSON
+     *       values, or `null` for JSON values matching the path that are not an array
+     *       or an empty array.
+     * - For legacy path (path doesn't start with `$`):
+     *       Returns a string representing the popped JSON value, or `null` if the
+     *       array at `path` is empty. If multiple paths are matched, the value from
+     *       the first matching array that is not empty is returned. If `path` doesn't
+     *       exist or the value at `path` is not an array, an error is raised.
+     * - If the index is out of bounds or `key` doesn't exist, an error is raised.
+     */
+    static arrpop(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: JsonArrPopOptions,
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.ARRPOP", key];
+        if (options?.path) args.push(options?.path);
+        if (options && "index" in options && options.index)
+            args.push(options?.index.toString());
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Retrieves the length of the array at the specified `path` within the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: The path within the JSON document. Defaults to the root (`"."`) if not specified.
+     *
+     * Command Response -
+     * - For JSONPath (path starts with `$`):
+     *       Returns an array with a list of integers for every possible path,
+     *       indicating the length of the array, or `null` for JSON values matching
+     *       the path that are not an array. If `path` does not exist, an empty array
+     *       will be returned.
+     * - For legacy path (path doesn't start with `$`):
+     *       Returns an integer representing the length of the array. If multiple paths are
+     *       matched, returns the length of the first matching array. If `path` doesn't
+     *       exist or the value at `path` is not an array, an error is raised.
+     * - If the index is out of bounds or `key` doesn't exist, an error is raised.
+     */
+    static arrlen(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.ARRLEN", key];
+        if (options?.path) args.push(options?.path);
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Trims an array at the specified `path` within the JSON document stored at `key` so that it becomes a subarray [start, end], both inclusive.
+     * If `start` < 0, it is treated as 0.
+     * If `end` >= size (size of the array), it is treated as size-1.
+     * If `start` >= size or `start` > `end`, the array is emptied and 0 is returned.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param path - The path within the JSON document.
+     * @param start - The start index, inclusive.
+     * @param end - The end index, inclusive.
+     *
+     * Command Response -
+     *     - For JSONPath (`path` starts with `$`):
+     *       - Returns a list of integer replies for every possible path, indicating the new length of the array,
+     *         or `null` for JSON values matching the path that are not an array.
+     *       - If the array is empty, its corresponding return value is 0.
+     *       - If `path` doesn't exist, an empty array will be returned.
+     *       - If an index argument is out of bounds, an error is raised.
+     *     - For legacy path (`path` doesn't start with `$`):
+     *       - Returns an integer representing the new length of the array.
+     *       - If the array is empty, its corresponding return value is 0.
+     *       - If multiple paths match, the length of the first trimmed array match is returned.
+     *       - If `path` doesn't exist, or the value at `path` is not an array, an error is raised.
+     *       - If an index argument is out of bounds, an error is raised.
+     */
+    static arrtrim(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        path: GlideString,
+        start: number,
+        end: number,
+    ): Transaction | ClusterTransaction {
+        const args: GlideString[] = [
+            "JSON.ARRTRIM",
+            key,
+            path,
+            start.toString(),
+            end.toString(),
+        ];
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Searches for the first occurrence of a `scalar` JSON value in the arrays at the `path`.
+     * Out of range errors are treated by rounding the index to the array's `start` and `end.
+     * If `start` > `end`, return `-1` (not found).
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param path - The path within the JSON document.
+     * @param scalar - The scalar value to search for.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `start`: The start index, inclusive. Default to 0 if not provided.
+     * - (Optional) `end`: The end index, exclusive. Default to 0 if not provided.
+     *                     0 or -1 means the last element is included.
+     * Command Response -
+     * - For JSONPath (path starts with `$`):
+     *       Returns an array with a list of integers for every possible path,
+     *       indicating the index of the matching element. The value is `-1` if not found.
+     *       If a value is not an array, its corresponding return value is `null`.
+     * - For legacy path (path doesn't start with `$`):
+     *       Returns an integer representing the index of matching element, or `-1` if
+     *       not found. If the value at the `path` is not an array, an error is raised.
+     */
+    static arrindex(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        path: GlideString,
+        scalar: GlideString | number | boolean | null,
+        options?: { start: number; end?: number },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.ARRINDEX", key, path];
+
+        if (typeof scalar === `number`) {
+            args.push(scalar.toString());
+        } else if (typeof scalar === `boolean`) {
+            args.push(scalar ? `true` : `false`);
+        } else if (scalar !== null) {
+            args.push(scalar);
+        } else {
+            args.push(`null`);
+        }
+
+        if (options?.start !== undefined) args.push(options?.start.toString());
+        if (options?.end !== undefined) args.push(options?.end.toString());
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Toggles a Boolean value stored at the specified `path` within the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: The path within the JSON document. Defaults to the root (`"."`) if not specified.
+     *
+     * Command Response - For JSONPath (`path` starts with `$`), returns a list of boolean replies for every possible path, with the toggled boolean value,
+     * or `null` for JSON values matching the path that are not boolean.
+     * - For legacy path (`path` doesn't starts with `$`), returns the value of the toggled boolean in `path`.
+     * - Note that when sending legacy path syntax, If `path` doesn't exist or the value at `path` isn't a boolean, an error is raised.
+     */
+    static toggle(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.TOGGLE", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Deletes the JSON value at the specified `path` within the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: If `null`, deletes the entire JSON document at `key`.
+     *
+     * Command Response - The number of elements removed. If `key` or `path` doesn't exist, returns 0.
+     */
+    static del(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.DEL", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Deletes the JSON value at the specified `path` within the JSON document stored at `key`. This command is
+     * an alias of {@link del}.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: If `null`, deletes the entire JSON document at `key`.
+     *
+     * Command Response - The number of elements removed. If `key` or `path` doesn't exist, returns 0.
+     */
+    static forget(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.FORGET", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Reports the type of values at the given path.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: Defaults to root (`"."`) if not provided.
+     *
+     * Command Response -
+     *     - For JSONPath (path starts with `$`):
+     *       - Returns an array of strings that represents the type of value at each path.
+     *         The type is one of "null", "boolean", "string", "number", "integer", "object" and "array".
+     *       - If a path does not exist, its corresponding return value is `null`.
+     *       - Empty array if the document key does not exist.
+     *     - For legacy path (path doesn't start with `$`):
+     *       - String that represents the type of the value.
+     *       - `null` if the document key does not exist.
+     *       - `null` if the JSON path is invalid or does not exist.
+     */
+    static type(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.TYPE", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Clears arrays or objects at the specified JSON path in the document stored at `key`.
+     * Numeric values are set to `0`, boolean values are set to `false`, and string values are converted to empty strings.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: The JSON path to the arrays or objects to be cleared. Defaults to root if not provided.
+     *
+     * Command Response - The number of containers cleared, numeric values zeroed, and booleans toggled to `false`,
+     * and string values converted to empty strings.
+     * If `path` doesn't exist, or the value at `path` is already empty (e.g., an empty array, object, or string), `0` is returned.
+     * If `key doesn't exist, an error is raised.
+     */
+    static clear(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.CLEAR", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Retrieve the JSON value at the specified `path` within the JSON document stored at `key`.
+     * The returning result is in the Valkey or Redis OSS Serialization Protocol (RESP).
+     * - JSON null is mapped to the RESP Null Bulk String.
+     * - JSON Booleans are mapped to RESP Simple string.
+     * - JSON integers are mapped to RESP Integers.
+     * - JSON doubles are mapped to RESP Bulk Strings.
+     * - JSON strings are mapped to RESP Bulk Strings.
+     * - JSON arrays are represented as RESP arrays, where the first element is the simple string [, followed by the array's elements.
+     * - JSON objects are represented as RESP object, where the first element is the simple string {, followed by key-value pairs, each of which is a RESP bulk string.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: The path within the JSON document, defaults to root (`"."`) if not provided.
+     *
+     * Command Response -
+     *     - For JSONPath (path starts with `$`):
+     *       - Returns an array of replies for every possible path, indicating the RESP form of the JSON value.
+     *         If `path` doesn't exist, returns an empty array.
+     *     - For legacy path (path doesn't start with `$`):
+     *       - Returns a single reply for the JSON value at the specified `path`, in its RESP form.
+     *         If multiple paths match, the value of the first JSON value match is returned. If `path` doesn't exist, an error is raised.
+     *     - If `key` doesn't exist, `null` is returned.
+     */
+    static resp(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.RESP", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Returns the length of the JSON string value stored at the specified `path` within
+     * the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: The path within the JSON document, Defaults to root (`"."`) if not provided.
+     *
+     * Command Response -
+     *     - For JSONPath (path starts with `$`):
+     *       - Returns a list of integer replies for every possible path, indicating the length of
+     *         the JSON string value, or <code>null</code> for JSON values matching the path that
+     *         are not string.
+     *     - For legacy path (path doesn't start with `$`):
+     *       - Returns the length of the JSON value at `path` or `null` if `key` doesn't exist.
+     *       - If multiple paths match, the length of the first matched string is returned.
+     *       - If the JSON value at`path` is not a string or if `path` doesn't exist, an error is raised.
+     *     - If `key` doesn't exist, `null` is returned.
+     */
+    static strlen(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.STRLEN", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Appends the specified `value` to the string stored at the specified `path` within the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param value - The value to append to the string. Must be wrapped with single quotes. For example, to append "foo", pass '"foo"'.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: The path within the JSON document, defaults to root (`"."`) if not provided.
+     *
+     * Command Response -
+     *     - For JSONPath (path starts with `$`):
+     *       - Returns a list of integer replies for every possible path, indicating the length of the resulting string after appending `value`,
+     *         or None for JSON values matching the path that are not string.
+     *       - If `key` doesn't exist, an error is raised.
+     *     - For legacy path (path doesn't start with `$`):
+     *       - Returns the length of the resulting string after appending `value` to the string at `path`.
+     *       - If multiple paths match, the length of the last updated string is returned.
+     *       - If the JSON value at `path` is not a string of if `path` doesn't exist, an error is raised.
+     *       - If `key` doesn't exist, an error is raised.
+     */
+    static strappend(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        value: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.STRAPPEND", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        args.push(value);
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Appends one or more `values` to the JSON array at the specified `path` within the JSON
+     * document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param path - The path within the JSON document.
+     * @param values - The JSON values to be appended to the array.
+     *     JSON string values must be wrapped with quotes. For example, to append `"foo"`, pass `"\"foo\""`.
+     *
+     * Command Response -
+     * - For JSONPath (path starts with `$`):
+     *       Returns an array with a list of integers for every possible path,
+     *       indicating the new length of the array, or `null` for JSON values matching
+     *       the path that are not an array. If `path` does not exist, an empty array
+     *       will be returned.
+     * - For legacy path (path doesn't start with `$`):
+     *       Returns an integer representing the new length of the array. If multiple paths are
+     *       matched, returns the length of the first modified array. If `path` doesn't
+     *       exist or the value at `path` is not an array, an error is raised.
+     * - If the index is out of bounds or `key` doesn't exist, an error is raised.
+     */
+    static arrappend(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        path: GlideString,
+        values: GlideString[],
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.ARRAPPEND", key, path, ...values];
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Reports memory usage in bytes of a JSON object at the specified `path` within the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param value - The value to append to the string. Must be wrapped with single quotes. For example, to append "foo", pass '"foo"'.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: The path within the JSON document, returns total memory usage if no path is given.
+     *
+     * Command Response -
+     *     - For JSONPath (path starts with `$`):
+     *       - Returns an array of numbers for every possible path, indicating the memory usage.
+     *         If `path` does not exist, an empty array will be returned.
+     *     - For legacy path (path doesn't start with `$`):
+     *       - Returns an integer representing the memory usage. If multiple paths are matched,
+     *         returns the data of the first matching object. If `path` doesn't exist, an error is raised.
+     *     - If `key` doesn't exist, returns `null`.
+     */
+    static debugMemory(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.DEBUG", "MEMORY", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Reports the number of fields at the specified `path` within the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param value - The value to append to the string. Must be wrapped with single quotes. For example, to append "foo", pass '"foo"'.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: The path within the JSON document, returns total number of fields if no path is given.
+     *
+     * Command Response -
+     *     - For JSONPath (path starts with `$`):
+     *       - Returns an array of numbers for every possible path, indicating the number of fields.
+     *         If `path` does not exist, an empty array will be returned.
+     *     - For legacy path (path doesn't start with `$`):
+     *       - Returns an integer representing the memory usage. If multiple paths are matched,
+     *         returns the data of the first matching object. If `path` doesn't exist, an error is raised.
+     *     - If `key` doesn't exist, returns `null`.
+     */
+    static debugFields(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.DEBUG", "FIELDS", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Increments or decrements the JSON value(s) at the specified `path` by `number` within the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param path - The path within the JSON document.
+     * @param num - The number to increment or decrement by.
+     *
+     * Command Response -
+     *     - For JSONPath (path starts with `$`):
+     *       - Returns a string representation of an array of strings, indicating the new values after incrementing for each matched `path`.
+     *         If a value is not a number, its corresponding return value will be `null`.
+     *         If `path` doesn't exist, a byte string representation of an empty array will be returned.
+     *     - For legacy path (path doesn't start with `$`):
+     *       - Returns a string representation of the resulting value after the increment or decrement.
+     *         If multiple paths match, the result of the last updated value is returned.
+     *         If the value at the `path` is not a number or `path` doesn't exist, an error is raised.
+     *     - If `key` does not exist, an error is raised.
+     *     - If the result is out of the range of 64-bit IEEE double, an error is raised.
+     */
+    static numincrby(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        path: GlideString,
+        num: number,
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.NUMINCRBY", key, path, num.toString()];
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Multiplies the JSON value(s) at the specified `path` by `number` within the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param path - The path within the JSON document.
+     * @param num - The number to multiply by.
+     *
+     * Command Response -
+     *     - For JSONPath (path starts with `$`):
+     *       - Returns a GlideString representation of an array of strings, indicating the new values after multiplication for each matched `path`.
+     *         If a value is not a number, its corresponding return value will be `null`.
+     *         If `path` doesn't exist, a byte string representation of an empty array will be returned.
+     *     - For legacy path (path doesn't start with `$`):
+     *       - Returns a GlideString representation of the resulting value after multiplication.
+     *         If multiple paths match, the result of the last updated value is returned.
+     *         If the value at the `path` is not a number or `path` doesn't exist, an error is raised.
+     *     - If `key` does not exist, an error is raised.
+     *     - If the result is out of the range of 64-bit IEEE double, an error is raised.
+     */
+    static nummultby(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        path: GlideString,
+        num: number,
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.NUMMULTBY", key, path, num.toString()];
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Retrieves the number of key-value pairs in the object stored at the specified `path` within the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: The path within the JSON document, Defaults to root (`"."`) if not provided.
+     *
+     * Command Response - ReturnTypeJson<number>:
+     *    - For JSONPath (`path` starts with `$`):
+     *      - Returns a list of integer replies for every possible path, indicating the length of the object,
+     *        or `null` for JSON values matching the path that are not an object.
+     *      - If `path` doesn't exist, an empty array will be returned.
+     *    - For legacy path (`path` doesn't starts with `$`):
+     *      - Returns the length of the object at `path`.
+     *      - If multiple paths match, the length of the first object match is returned.
+     *      - If the JSON value at `path` is not an object or if `path` doesn't exist, an error is raised.
+     *    - If `key` doesn't exist, `null` is returned.
+     */
+    static objlen(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.OBJLEN", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
+    }
+
+    /**
+     * Retrieves key names in the object values at the specified `path` within the JSON document stored at `key`.
+     *
+     * @param transaction - A transaction to add commands to.
+     * @param key - The key of the JSON document.
+     * @param options - (Optional) Additional parameters:
+     * - (Optional) `path`: The path within the JSON document where the key names will be retrieved. Defaults to root (`"."`) if not provided.
+     *
+     * Command Response - ReturnTypeJson<GlideString[]>:
+     *    - For JSONPath (`path` starts with `$`):
+     *      - Returns a list of arrays containing key names for each matching object.
+     *      - If a value matching the path is not an object, an empty array is returned.
+     *      - If `path` doesn't exist, an empty array is returned.
+     *    - For legacy path (`path` starts with `.`):
+     *      - Returns a list of key names for the object value matching the path.
+     *      - If multiple objects match the path, the key names of the first object is returned.
+     *      - If a value matching the path is not an object, an error is raised.
+     *      - If `path` doesn't exist, `null` is returned.
+     *    - If `key` doesn't exist, `null` is returned.
+     */
+    static objkeys(
+        transaction: Transaction | ClusterTransaction,
+        key: GlideString,
+        options?: { path: GlideString },
+    ): Transaction | ClusterTransaction {
+        const args = ["JSON.OBJKEYS", key];
+
+        if (options) {
+            args.push(options.path);
+        }
+
+        return transaction.customCommand(args);
     }
 }

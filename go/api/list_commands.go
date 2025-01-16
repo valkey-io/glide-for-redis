@@ -2,11 +2,11 @@
 
 package api
 
-// Supports commands and transactions for the "List Commands" group for standalone and cluster clients.
+// Supports commands and transactions for the "List" group of commands for standalone and cluster clients.
 //
 // See [valkey.io] for details.
 //
-// [valkey.io]: https://valkey.io/commands/?group=list
+// [valkey.io]: https://valkey.io/commands/#list
 type ListCommands interface {
 	// Inserts all the specified values at the head of the list stored at key. elements are inserted one after the other to the
 	// head of the list, from the leftmost element to the rightmost element. If key does not exist, it is created as an empty
@@ -19,15 +19,14 @@ type ListCommands interface {
 	//  elements - The elements to insert at the head of the list stored at key.
 	//
 	// Return value:
-	//  A api.Result[int64] containing the length of the list after the push operation.
+	//  The length of the list after the push operation.
 	//
 	// For example:
 	//  result, err := client.LPush("my_list", []string{"value1", "value2"})
-	//  result.Value(): 2
-	//  result.IsNil(): false
+	//  result: 2
 	//
 	// [valkey.io]: https://valkey.io/commands/lpush/
-	LPush(key string, elements []string) (Result[int64], error)
+	LPush(key string, elements []string) (int64, error)
 
 	// Removes and returns the first elements of the list stored at key. The command pops a single element from the beginning
 	// of the list.
@@ -183,15 +182,14 @@ type ListCommands interface {
 	//  elements - The elements to insert at the tail of the list stored at key.
 	//
 	// Return value:
-	//  The Result[int64] containing the length of the list after the push operation.
+	//  The length of the list after the push operation.
 	//
 	// For example:
 	//  result, err := client.RPush("my_list", []string{"a", "b", "c", "d", "e", "e", "e"})
-	//  result.Value(): 7
-	//  result.IsNil(): false
+	//  result: 7
 	//
 	// [valkey.io]: https://valkey.io/commands/rpush/
-	RPush(key string, elements []string) (Result[int64], error)
+	RPush(key string, elements []string) (int64, error)
 
 	// Returns the specified elements of the list stored at key.
 	// The offsets start and end are zero-based indexes, with 0 being the first element of the list, 1 being the next element
@@ -262,19 +260,18 @@ type ListCommands interface {
 	//  end   - The end of the range.
 	//
 	// Return value:
-	//  The Result[string] containing always "OK".
-	// If start exceeds the end of the list, or if start is greater than end, the result will be an empty list (which causes
-	// key to be removed).
+	//  Always `"OK"`.
+	//  If start exceeds the end of the list, or if start is greater than end, the result will be an empty list (which causes
+	//  key to be removed).
 	//  If end exceeds the actual end of the list, it will be treated like the last element of the list.
-	//  If key does not exist, OK will be returned without changes to the database.
+	//  If key does not exist, `"OK"` will be returned without changes to the database.
 	//
 	// For example:
 	//  result, err := client.LTrim("my_list", 0, 1)
-	//  result.Value(): "OK"
-	//  result.IsNil(): false
+	//  result: "OK"
 	//
 	// [valkey.io]: https://valkey.io/commands/ltrim/
-	LTrim(key string, start int64, end int64) (Result[string], error)
+	LTrim(key string, start int64, end int64) (string, error)
 
 	// Returns the length of the list stored at key.
 	//
@@ -284,16 +281,15 @@ type ListCommands interface {
 	//  key - The key of the list.
 	//
 	// Return value:
-	//  The Result[int64] containing the length of the list at key.
-	//  If key does not exist, it is interpreted as an empty list and 0 is returned.
+	//  The length of the list at `key`.
+	//  If `key` does not exist, it is interpreted as an empty list and `0` is returned.
 	//
 	// For example:
 	//  result, err := client.LLen("my_list")
-	//  result.Value(): int64(3) // Indicates that there are 3 elements in the list.
-	//  result.IsNil(): false
+	//  result: 3 // Indicates that there are 3 elements in the list.
 	//
 	// [valkey.io]: https://valkey.io/commands/llen/
-	LLen(key string) (Result[int64], error)
+	LLen(key string) (int64, error)
 
 	// Removes the first count occurrences of elements equal to element from the list stored at key.
 	// If count is positive: Removes elements equal to element moving from head to tail.
@@ -309,16 +305,15 @@ type ListCommands interface {
 	//  element - The element to remove from the list.
 	//
 	// Return value:
-	//  The Result[int64] containing the number of the removed elements.
-	//  If key does not exist, 0 is returned.
+	//  The number of the removed elements.
+	//  If `key` does not exist, `0` is returned.
 	//
 	// For example:
 	//  result, err := client.LRem("my_list", 2, "value")
-	//  result.Value(): int64(2)
-	//  result.IsNil(): false
+	//  result: 2
 	//
 	// [valkey.io]: https://valkey.io/commands/lrem/
-	LRem(key string, count int64, element string) (Result[int64], error)
+	LRem(key string, count int64, element string) (int64, error)
 
 	// Removes and returns the last elements of the list stored at key.
 	// The command pops a single element from the end of the list.
@@ -375,17 +370,17 @@ type ListCommands interface {
 	//  element        - The new element to insert.
 	//
 	// Return value:
-	//  The Result[int64] containing the list length after a successful insert operation.
-	//  If the key doesn't exist returns -1.
-	//  If the pivot wasn't found, returns 0.
+	//  The list length after a successful insert operation.
+	//  If the `key` doesn't exist returns `-1`.
+	//  If the `pivot` wasn't found, returns `0`.
 	//
 	// For example:
 	//  "my_list": {"Hello", "Wprld"}
 	//  result, err := client.LInsert("my_list", api.Before, "World", "There")
-	//  result.Value(): 3
+	//  result: 3
 	//
 	// [valkey.io]: https://valkey.io/commands/linsert/
-	LInsert(key string, insertPosition InsertPosition, pivot string, element string) (Result[int64], error)
+	LInsert(key string, insertPosition InsertPosition, pivot string, element string) (int64, error)
 
 	// Pops an element from the head of the first list that is non-empty, with the given keys being checked in the order that
 	// they are given.
@@ -451,15 +446,15 @@ type ListCommands interface {
 	//  elements - The elements to insert at the tail of the list stored at key.
 	//
 	// Return value:
-	//  The Result[int64] containing the length of the list after the push operation.
+	//  The length of the list after the push operation.
 	//
 	// For example:
 	//  my_list: {"value1", "value2"}
 	//  result, err := client.RPushX("my_list", []string{"value3", value4})
-	//  result.Value(): 4
+	//  result: 4
 	//
 	// [valkey.io]: https://valkey.io/commands/rpushx/
-	RPushX(key string, elements []string) (Result[int64], error)
+	RPushX(key string, elements []string) (int64, error)
 
 	// Inserts all the specified values at the head of the list stored at key, only if key exists and holds a list. If key is
 	// not a list, this performs no operation.
@@ -471,15 +466,15 @@ type ListCommands interface {
 	//  elements - The elements to insert at the head of the list stored at key.
 	//
 	// Return value:
-	//  The Result[int64] containing the length of the list after the push operation.
+	//  The length of the list after the push operation.
 	//
 	// For example:
 	//  my_list: {"value1", "value2"}
 	//  result, err := client.LPushX("my_list", []string{"value3", value4})
-	//  result.Value(): 4
+	//  result: 4
 	//
 	// [valkey.io]: https://valkey.io/commands/rpushx/
-	LPushX(key string, elements []string) (Result[int64], error)
+	LPushX(key string, elements []string) (int64, error)
 
 	// Pops one element from the first non-empty list from the provided keys.
 	//
@@ -607,14 +602,14 @@ type ListCommands interface {
 	//  element - The element to be set.
 	//
 	// Return value:
-	//  A Result[string] containing "OK".
+	//  `"OK"`.
 	//
 	// For example:
 	//  result, err: client.LSet("my_list", int64(1), "two")
-	//  result.Value(): "OK"
+	//  result: "OK"
 	//
 	// [valkey.io]: https://valkey.io/commands/lset/
-	LSet(key string, index int64, element string) (Result[string], error)
+	LSet(key string, index int64, element string) (string, error)
 
 	// Atomically pops and removes the left/right-most element to the list stored at source depending on whereFrom, and pushes
 	// the element at the first/last element of the list stored at destination depending on whereTo.

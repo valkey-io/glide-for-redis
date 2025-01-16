@@ -1309,7 +1309,7 @@ where
                 .extend_connection_map(connection_map);
             if let Err(err) = Self::refresh_slots_and_subscriptions_with_retries(
                 inner.clone(),
-                &RefreshPolicy::Throttable,
+                &RefreshPolicy::NotThrottable,
             )
             .await
             {
@@ -3009,7 +3009,7 @@ where
     }
 }
 
-async fn calculate_topology_from_random_nodes<'a, C>(
+async fn calculate_topology_from_random_nodes<C>(
     inner: &Core<C>,
     num_of_nodes_to_query: usize,
     curr_retry: usize,

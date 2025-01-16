@@ -102,8 +102,8 @@ jobs:
             - name: Install & build & test
               working-directory: go
               run: |
-                  LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GITHUB_WORKSPACE/go/target/release/deps/
-                  make install-tools-go${{ matrix.go }} build unit-test integ-test
+                  make install-tools-go${{ matrix.go }} build
+                  make -k unit-test integ-test
 
             - uses: ./.github/workflows/test-benchmark
               with:
@@ -118,6 +118,7 @@ jobs:
                   path: |
                       utils/clusters/**
                       benchmarks/results/**
+                      go/reports/**
 
     lint:
         timeout-minutes: 10
@@ -205,8 +206,8 @@ jobs:
             - name: Install & build & test
               working-directory: go
               run: |
-                  LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GITHUB_WORKSPACE/go/target/release/deps/
-                  make install-tools-go${{ matrix.go }} build unit-test integ-test
+                  make install-tools-go${{ matrix.go }} build
+                  make -k unit-test integ-test
 
             - name: Upload test reports
               if: always()
@@ -217,6 +218,7 @@ jobs:
                   path: |
                       utils/clusters/**
                       benchmarks/results/**
+                      go/reports/**
 
     test-modules:
         if: (github.repository_owner == 'valkey-io' && github.event_name == 'workflow_dispatch') || github.event.pull_request.head.repo.owner.login == 'valkey-io'
@@ -239,10 +241,13 @@ jobs:
             - name: Build and test
               working-directory: ./go
               run: |
-                  make install-tools-go1.20.0
-                  LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GITHUB_WORKSPACE/go/target/release/deps/
-                  make build
-                  make modules-test cluster-endpoints=${{ secrets.MEMDB_MODULES_ENDPOINT }} tls=true
+                  make install-tools-go1.20.0 build modules-test cluster-endpoints=${{ secrets.MEMDB_MODULES_ENDPOINT }} tls=true
 
-            # TODO:
-            # Upload test reports
+            - name: Upload test reports
+              if: always()
+              continue-on-error: true
+              uses: actions/upload-artifact@v4
+              with:
+                  name: test-reports-modules
+                  path: |
+                      go/reports/**

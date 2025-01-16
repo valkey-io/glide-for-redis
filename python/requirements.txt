@@ -1,12 +1,5 @@
-async-timeout==4.0.2;python_version<"3.11"
-maturin==0.14.17 # higher version break the needs structure changes, the name of the project is not the same as the package name, and the naming both glide create a circular dependency - TODO: fix this 
-pytest
-pytest-asyncio
-typing_extensions==4.8.0;python_version<"3.11"
-pytest-html
-black >= 24.3.0
-flake8 == 5.0
-isort == 5.10
-mypy == 1.13.0
-mypy-protobuf == 3.5
-packaging >= 22.0
+# Note: The main location for tracking dependencies is pyproject.toml. This file is used only for the ORT process. When adding a dependency, make sure to add it both to this file and to pyproject.toml. 
+# Once issue https://github.com/aboutcode-org/python-inspector/issues/197 is resolved, this file can be removed.
+async-timeout>=4.0.2
+typing-extensions>=4.8.0
+protobuf>=3.20

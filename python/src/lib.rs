@@ -11,6 +11,7 @@ use pyo3::types::{PyAny, PyBool, PyBytes, PyDict, PyFloat, PyList, PySet, PyStri
 use pyo3::Python;
 use redis::Value;
 use std::collections::HashMap;
+use std::ptr::from_mut;
 use std::sync::Arc;
 
 pub const DEFAULT_TIMEOUT_IN_MILLISECONDS: u32 =
@@ -263,7 +264,7 @@ fn glide(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     /// Should NOT be used in production.
     pub fn create_leaked_value(message: String) -> usize {
         let value = Value::SimpleString(message);
-        Box::leak(Box::new(value)) as *mut Value as usize
+        from_mut(Box::leak(Box::new(value))) as usize
     }
 
     #[pyfunction]
@@ -276,7 +277,7 @@ fn glide(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
                 Bytes::from(bytes.to_vec())
             })
             .collect();
-        Box::leak(Box::new(bytes_vec)) as *mut Vec<Bytes> as usize
+        from_mut(Box::leak(Box::new(bytes_vec))) as usize
     }
     Ok(())
 }

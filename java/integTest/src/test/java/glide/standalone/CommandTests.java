@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.junit.jupiter.api.Named.named;
 
 import glide.api.GlideClient;
 import glide.api.models.GlideString;
@@ -53,6 +54,7 @@ import glide.api.models.commands.InfoOptions.Section;
 import glide.api.models.commands.ScriptOptions;
 import glide.api.models.commands.ScriptOptionsGlideString;
 import glide.api.models.commands.scan.ScanOptions;
+import glide.api.models.configuration.ProtocolVersion;
 import glide.api.models.exceptions.RequestException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -65,58 +67,63 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Stream;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.ArrayUtils;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 @Timeout(10) // seconds
 public class CommandTests {
 
     private static final String INITIAL_VALUE = "VALUE";
 
-    private static GlideClient regularClient = null;
-
-    @BeforeAll
     @SneakyThrows
-    public static void init() {
-        regularClient =
-                GlideClient.createClient(commonClientConfig().requestTimeout(7000).build()).get();
+    public static Stream<Arguments> getClients() {
+        return Stream.of(
+                Arguments.of(
+                        named(
+                                "RESP2",
+                                GlideClient.createClient(
+                                                commonClientConfig()
+                                                        .requestTimeout(7000)
+                                                        .protocol(ProtocolVersion.RESP2)
+                                                        .build())
+                                        .get())),
+                Arguments.of(
+                        named(
+                                "RESP3",
+                                GlideClient.createClient(
+                                                commonClientConfig()
+                                                        .requestTimeout(7000)
+                                                        .protocol(ProtocolVersion.RESP3)
+                                                        .build())
+                                        .get())));
     }
 
-    @AfterAll
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public static void teardown() {
-        regularClient.close();
-    }
-
-    @AfterEach
-    @SneakyThrows
-    public void cleanup() {
-        regularClient.flushall().get();
-    }
-
-    @Test
-    @SneakyThrows
-    public void custom_command_info() {
+    public void custom_command_info(GlideClient regularClient) {
         Object data = regularClient.customCommand(new String[] {"info"}).get();
         assertTrue(((String) data).contains("# Stats"));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void custom_command_info_binary() {
+    public void custom_command_info_binary(GlideClient regularClient) {
         Object data = regularClient.customCommand(new GlideString[] {gs("info")}).get();
         assertInstanceOf(GlideString.class, data);
         assertTrue(data.toString().contains("# Stats"));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void custom_command_del_returns_a_number() {
+    public void custom_command_del_returns_a_number(GlideClient regularClient) {
         String key = "custom_command_del_returns_a_number";
         regularClient.set(key, INITIAL_VALUE).get();
         var del = regularClient.customCommand(new String[] {"DEL", key}).get();
@@ -125,39 +132,44 @@ public class CommandTests {
         assertNull(data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void ping() {
+    public void ping(GlideClient regularClient) {
         String data = regularClient.ping().get();
         assertEquals("PONG", data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void ping_with_message() {
+    public void ping_with_message(GlideClient regularClient) {
         String data = regularClient.ping("H3LL0").get();
         assertEquals("H3LL0", data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void ping_binary_with_message() {
+    public void ping_binary_with_message(GlideClient regularClient) {
         GlideString data = regularClient.ping(gs("H3LL0")).get();
         assertEquals(gs("H3LL0"), data);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_without_options() {
+    public void info_without_options(GlideClient regularClient) {
         String data = regularClient.info().get();
         for (String section : DEFAULT_INFO_SECTIONS) {
             assertTrue(data.contains("# " + section), "Section " + section + " is missing");
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_with_multiple_options() {
+    public void info_with_multiple_options(GlideClient regularClient) {
         Section[] sections = {CLUSTER};
         if (SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0")) {
             sections = concatenateArrays(sections, new Section[] {CPU, MEMORY});
@@ -170,18 +182,20 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void info_with_everything_option() {
+    public void info_with_everything_option(GlideClient regularClient) {
         String data = regularClient.info(new Section[] {EVERYTHING}).get();
         for (String section : EVERYTHING_INFO_SECTIONS) {
             assertTrue(data.contains("# " + section), "Section " + section + " is missing");
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void simple_select_test() {
+    public void simple_select_test(GlideClient regularClient) {
         assertEquals(OK, regularClient.select(0).get());
 
         String key = UUID.randomUUID().toString();
@@ -195,17 +209,19 @@ public class CommandTests {
         assertEquals(value, regularClient.get(key).get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void select_test_gives_error() {
+    public void select_test_gives_error(GlideClient regularClient) {
         ExecutionException e =
                 assertThrows(ExecutionException.class, () -> regularClient.select(-1).get());
         assertInstanceOf(RequestException.class, e.getCause());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void move() {
+    public void move(GlideClient regularClient) {
         String key1 = UUID.randomUUID().toString();
         String key2 = UUID.randomUUID().toString();
         String value1 = UUID.randomUUID().toString();
@@ -233,9 +249,10 @@ public class CommandTests {
         assertInstanceOf(RequestException.class, e.getCause());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void move_binary() {
+    public void move_binary(GlideClient regularClient) {
         GlideString key1 = gs(UUID.randomUUID().toString());
         GlideString key2 = gs(UUID.randomUUID().toString());
         GlideString value1 = gs(UUID.randomUUID().toString());
@@ -263,16 +280,18 @@ public class CommandTests {
         assertInstanceOf(RequestException.class, e.getCause());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void clientId() {
+    public void clientId(GlideClient regularClient) {
         var id = regularClient.clientId().get();
         assertTrue(id > 0);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void clientGetName() {
+    public void clientGetName(GlideClient regularClient) {
         // TODO replace with the corresponding command once implemented
         regularClient.customCommand(new String[] {"client", "setname", "clientGetName"}).get();
 
@@ -281,9 +300,10 @@ public class CommandTests {
         assertEquals("clientGetName", name);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void config_reset_stat() {
+    public void config_reset_stat(GlideClient regularClient) {
         String data = regularClient.info(new Section[] {STATS}).get();
         long value_before = getValueFromInfo(data, "total_net_input_bytes");
 
@@ -295,9 +315,10 @@ public class CommandTests {
         assertTrue(value_after < value_before);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void config_rewrite_non_existent_config_file() {
+    public void config_rewrite_non_existent_config_file(GlideClient regularClient) {
         var info = regularClient.info(new Section[] {SERVER}).get();
         var configFile = parseInfoResponseToMap(info).get("config_file");
 
@@ -310,9 +331,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configGet_with_no_args_returns_error() {
+    public void configGet_with_no_args_returns_error(GlideClient regularClient) {
         var exception =
                 assertThrows(
                         ExecutionException.class, () -> regularClient.configGet(new String[] {}).get());
@@ -320,18 +342,20 @@ public class CommandTests {
         assertTrue(exception.getCause().getMessage().contains("wrong number of arguments"));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configGet_with_wildcard() {
+    public void configGet_with_wildcard(GlideClient regularClient) {
         var data = regularClient.configGet(new String[] {"*file"}).get();
         assertTrue(data.size() > 5);
         assertTrue(data.containsKey("pidfile"));
         assertTrue(data.containsKey("logfile"));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configGet_with_multiple_params() {
+    public void configGet_with_multiple_params(GlideClient regularClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
         var data = regularClient.configGet(new String[] {"pidfile", "logfile"}).get();
         assertAll(
@@ -340,9 +364,10 @@ public class CommandTests {
                 () -> assertTrue(data.containsKey("logfile")));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configSet_with_unknown_parameter_returns_error() {
+    public void configSet_with_unknown_parameter_returns_error(GlideClient regularClient) {
         var exception =
                 assertThrows(
                         ExecutionException.class,
@@ -350,9 +375,10 @@ public class CommandTests {
         assertInstanceOf(RequestException.class, exception.getCause());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void configSet_a_parameter() {
+    public void configSet_a_parameter(GlideClient regularClient) {
         var oldValue = regularClient.configGet(new String[] {"maxclients"}).get().get("maxclients");
 
         var response = regularClient.configSet(Map.of("maxclients", "42")).get();
@@ -365,8 +391,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void echo() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void echo(GlideClient regularClient) {
         String message = "GLIDE";
         String response = regularClient.echo(message).get();
         assertEquals(message, response);
@@ -376,16 +403,18 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void echo_gs() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void echo_gs(GlideClient regularClient) {
         byte[] message = {(byte) 0x01, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x02};
         GlideString response = regularClient.echo(gs(message)).get();
         assertEquals(gs(message), response);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void time() {
+    public void time(GlideClient regularClient) {
         // Take the time now, convert to 10 digits and subtract 1 second
         long now = Instant.now().getEpochSecond() - 1L;
         String[] result = regularClient.time().get();
@@ -398,17 +427,19 @@ public class CommandTests {
         assertTrue(Long.parseLong(result[1]) < 1000000);
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void lastsave() {
+    public void lastsave(GlideClient regularClient) {
         long result = regularClient.lastsave().get();
         var yesterday = Instant.now().minus(1, ChronoUnit.DAYS);
         assertTrue(Instant.ofEpochSecond(result).isAfter(yesterday));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void lolwut_lolwut() {
+    public void lolwut_lolwut(GlideClient regularClient) {
         var response = regularClient.lolwut().get();
         System.out.printf("%nLOLWUT standalone client standard response%n%s%n", response);
         assertTrue(response.contains("Redis ver. " + SERVER_VERSION));
@@ -428,9 +459,10 @@ public class CommandTests {
         assertTrue(response.contains("Redis ver. " + SERVER_VERSION));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void dbsize_and_flushdb() {
+    public void dbsize_and_flushdb(GlideClient regularClient) {
         assertEquals(OK, regularClient.flushall().get());
         assertEquals(OK, regularClient.select(0).get());
 
@@ -467,9 +499,10 @@ public class CommandTests {
         assertEquals(0L, regularClient.dbsize().get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void objectFreq() {
+    public void objectFreq(GlideClient regularClient) {
         String key = UUID.randomUUID().toString();
         String maxmemoryPolicy = "maxmemory-policy";
         String oldPolicy =
@@ -483,9 +516,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void flushall() {
+    public void flushall(GlideClient regularClient) {
         if (SERVER_VERSION.isGreaterThanOrEqualTo("6.2.0")) {
             assertEquals(OK, regularClient.flushall(SYNC).get());
         } else {
@@ -504,8 +538,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void function_commands() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void function_commands(GlideClient regularClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         assertEquals(OK, regularClient.functionFlush(SYNC).get());
@@ -591,8 +626,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void function_commands_binary() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void function_commands_binary(GlideClient regularClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         assertEquals(OK, regularClient.functionFlush(SYNC).get());
@@ -690,9 +726,10 @@ public class CommandTests {
         assertEquals(OK, regularClient.functionFlush(ASYNC).get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void copy() {
+    public void copy(GlideClient regularClient) {
         assumeTrue(
                 SERVER_VERSION.isGreaterThanOrEqualTo("6.2.0"), "This feature added in version 6.2.0");
         // setup
@@ -740,9 +777,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionKill_no_write() {
+    public void functionKill_no_write(GlideClient regularClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String libName = "functionKill_no_write";
@@ -790,9 +828,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionKillBinary_no_write() {
+    public void functionKillBinary_no_write(GlideClient regularClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         GlideString libName = gs("functionKillBinary_no_write");
@@ -841,9 +880,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionKill_write_function() {
+    public void functionKill_write_function(GlideClient regularClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String libName = "functionKill_write_function";
@@ -906,9 +946,10 @@ public class CommandTests {
     }
 
     @Timeout(20)
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionKillBinary_write_function() {
+    public void functionKillBinary_write_function(GlideClient regularClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         GlideString libName = gs("functionKill_write_function");
@@ -971,9 +1012,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionStats() {
+    public void functionStats(GlideClient regularClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         String libName = "functionStats";
@@ -1009,9 +1051,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void functionStatsBinary() {
+    public void functionStatsBinary(GlideClient regularClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         GlideString libName = gs("functionStats");
@@ -1052,9 +1095,10 @@ public class CommandTests {
         }
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void function_dump_and_restore() {
+    public void function_dump_and_restore(GlideClient regularClient) {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"), "This feature added in version 7");
 
         assertEquals(OK, regularClient.functionFlush(SYNC).get());
@@ -1120,8 +1164,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void randomkey() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void randomkey(GlideClient regularClient) {
         String key1 = "{key}" + UUID.randomUUID();
         String key2 = "{key}" + UUID.randomUUID();
 
@@ -1137,8 +1182,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void randomKeyBinary() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void randomKeyBinary(GlideClient regularClient) {
         GlideString key1 = gs("{key}" + UUID.randomUUID());
         GlideString key2 = gs("{key}" + UUID.randomUUID());
 
@@ -1153,9 +1199,10 @@ public class CommandTests {
         assertNull(regularClient.randomKeyBinary().get());
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scan() {
+    public void scan(GlideClient regularClient) {
         String initialCursor = "0";
 
         int numberKeys = 500;
@@ -1211,9 +1258,10 @@ public class CommandTests {
         keys.forEach((key, value) -> assertTrue(ArrayUtils.contains(finalKeysFound, key)));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scan_binary() {
+    public void scan_binary(GlideClient regularClient) {
         GlideString initialCursor = gs("0");
 
         int numberKeys = 500;
@@ -1270,9 +1318,10 @@ public class CommandTests {
         keys.forEach((key, value) -> assertTrue(ArrayUtils.contains(finalKeysFound, key)));
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scan_with_options() {
+    public void scan_with_options(GlideClient regularClient) {
         String initialCursor = "0";
         String matchPattern = UUID.randomUUID().toString();
 
@@ -1358,9 +1407,10 @@ public class CommandTests {
         } while (!hashCursor.equals("0")); // 0 is returned for the cursor of the last iteration.
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scan_binary_with_options() {
+    public void scan_binary_with_options(GlideClient regularClient) {
         GlideString initialCursor = gs("0");
         String matchPattern = UUID.randomUUID().toString();
 
@@ -1448,8 +1498,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void invokeScript_test() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void invokeScript_test(GlideClient regularClient) {
         String key1 = UUID.randomUUID().toString();
         String key2 = UUID.randomUUID().toString();
 
@@ -1487,8 +1538,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void script_large_keys_and_or_args() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void script_large_keys_and_or_args(GlideClient regularClient) {
         String str1 = "0".repeat(1 << 12); // 4k
         String str2 = "0".repeat(1 << 12); // 4k
 
@@ -1530,8 +1582,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void invokeScript_gs_test() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void invokeScript_gs_test(GlideClient regularClient) {
         GlideString key1 = gs(UUID.randomUUID().toString());
         GlideString key2 = gs(UUID.randomUUID().toString());
 
@@ -1573,7 +1626,7 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    public void scriptExists() {
+    public void scriptExists(GlideClient regularClient) {
         Script script1 = new Script("return 'Hello'", true);
         Script script2 = new Script("return 'World'", true);
         Boolean[] expected = new Boolean[] {true, false, false};
@@ -1594,9 +1647,10 @@ public class CommandTests {
         script2.close();
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scriptExistsBinary() {
+    public void scriptExistsBinary(GlideClient regularClient) {
         Script script1 = new Script(gs("return 'Hello'"), true);
         Script script2 = new Script(gs("return 'World'"), true);
         Boolean[] expected = new Boolean[] {true, false, false};
@@ -1617,9 +1671,10 @@ public class CommandTests {
         script2.close();
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scriptFlush() {
+    public void scriptFlush(GlideClient regularClient) {
         Script script = new Script("return 'Hello'", true);
 
         // Load script
@@ -1644,9 +1699,10 @@ public class CommandTests {
         script.close();
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("getClients")
     @SneakyThrows
-    public void scriptKill() {
+    public void scriptKill(GlideClient regularClient) {
         // Verify that script_kill raises an error when no script is running
         ExecutionException executionException =
                 assertThrows(ExecutionException.class, () -> regularClient.scriptKill().get());
@@ -1703,8 +1759,9 @@ public class CommandTests {
     }
 
     @SneakyThrows
-    @Test
-    public void scriptKill_unkillable() {
+    @ParameterizedTest
+    @MethodSource("getClients")
+    public void scriptKill_unkillable(GlideClient regularClient) {
         String key = UUID.randomUUID().toString();
         String code = createLongRunningLuaScript(6, false);
         Script script = new Script(code, false);
