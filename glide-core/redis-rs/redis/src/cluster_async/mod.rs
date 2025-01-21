@@ -2703,19 +2703,13 @@ where
                 }
 
                 // Remove this address from refresh_addresses_done
-                inner
-                    .conn_lock
-                    .write()
-                    .expect(MUTEX_READ_ERR)
+                conn_lock_write
                     .refresh_conn_state
                     .refresh_addresses_done
                     .remove(&address);
 
                 // Remove this entry from refresh_address_in_progress
-                if let Some(_) = inner
-                    .conn_lock
-                    .write()
-                    .expect(MUTEX_READ_ERR)
+                if let Some(_) = conn_lock_write
                     .refresh_conn_state
                     .refresh_address_in_progress
                     .remove(&address)
