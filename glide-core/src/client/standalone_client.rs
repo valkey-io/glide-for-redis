@@ -31,6 +31,10 @@ enum ReadFrom {
         client_az: String,
         last_read_replica_index: Arc<AtomicUsize>,
     },
+    AZAffinityAllNodes {
+        client_az: String,
+        last_read_replica_index: Arc<AtomicUsize>,
+    },
 }
 
 #[derive(Debug)]
@@ -129,7 +133,7 @@ impl StandaloneClient {
         let pubsub_addr = &connection_request.addresses[pubsub_node_index];
         let discover_az = matches!(
             connection_request.read_from,
-            Some(ClientReadFrom::AZAffinity(_))
+            Some(ClientReadFrom::AZAffinity(_)) | Some(ClientReadFrom::AZAffinityAllNodes(_))
         );
 
         let connection_timeout = to_duration(
@@ -306,6 +310,63 @@ impl StandaloneClient {
         }
     }
 
+    async fn round_robin_read_from_replica_az_awareness_all_nodes(
+        &self,
+        latest_read_replica_index: &Arc<AtomicUsize>,
+        client_az: String,
+    ) -> &ReconnectingConnection {
+        let initial_index = latest_read_replica_index.load(Ordering::Relaxed);
+        let mut retries = 0usize;
+
+        // Step 1: Try to find a replica in the same AZ
+        loop {
+            retries = retries.saturating_add(1);
+            // Looped through all replicas; no connected replica found in the same AZ.
+            if retries >= self.inner.nodes.len() {
+                break;
+            }
+
+            // Calculate index based on initial index and check count.
+            let index = (initial_index + retries) % self.inner.nodes.len();
+            let replica = &self.inner.nodes[index];
+
+            // Attempt to get a connection and retrieve the replica's AZ.
+            if let Ok(connection) = replica.get_connection().await {
+                if let Some(replica_az) = connection.get_az().as_deref() {
+                    if replica_az == client_az {
+                        // Update `latest_used_replica` with the index of this replica.
+                        let _ = latest_read_replica_index.compare_exchange_weak(
+                            initial_index,
+                            index,
+                            Ordering::Relaxed,
+                            Ordering::Relaxed,
+                        );
+                        return replica;
+                    }
+                }
+            }
+        }
+
+        // Step 2: Check if primary is in the same AZ
+        let primary = self.get_primary_connection();
+        if let Ok(connection) = primary.get_connection().await {
+            if let Some(primary_az) = connection.get_az().as_deref() {
+                if primary_az == client_az {
+                    return primary;
+                }
+            }
+        }
+
+        // Step 3: Fall back to any available replica using round-robin
+        let replica = self.round_robin_read_from_replica(latest_read_replica_index);
+        if replica as *const _ != primary as *const _ {
+            return replica;
+        }
+
+        // Step 4: Final fallback - use primary
+        return primary;
+    }
+
     async fn get_connection(&self, readonly: bool) -> &ReconnectingConnection {
         if self.inner.nodes.len() == 1 || !readonly {
             return self.get_primary_connection();
@@ -321,6 +382,16 @@ impl StandaloneClient {
                 last_read_replica_index,
             } => {
                 self.round_robin_read_from_replica_az_awareness(
+                    last_read_replica_index,
+                    client_az.to_string(),
+                )
+                .await
+            }
+            ReadFrom::AZAffinityAllNodes {
+                client_az,
+                last_read_replica_index,
+            } => {
+                self.round_robin_read_from_replica_az_awareness_all_nodes(
                     last_read_replica_index,
                     client_az.to_string(),
                 )
@@ -605,6 +676,10 @@ fn get_read_from(read_from: Option<super::ReadFrom>) -> ReadFrom {
             latest_read_replica_index: Default::default(),
         },
         Some(super::ReadFrom::AZAffinity(az)) => ReadFrom::AZAffinity {
+            client_az: az,
+            last_read_replica_index: Default::default(),
+        },
+        Some(super::ReadFrom::AZAffinityAllNodes(az)) => ReadFrom::AZAffinityAllNodes {
             client_az: az,
             last_read_replica_index: Default::default(),
         },
