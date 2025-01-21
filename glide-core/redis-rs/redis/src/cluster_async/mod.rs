@@ -1445,21 +1445,21 @@ where
                 .refresh_addresses_started
                 .insert(address_clone_for_task.clone());
 
+            let node_option = if check_existing_conn {
+                let connections_container = inner_clone.conn_lock.read().expect(MUTEX_READ_ERR);
+                connections_container
+                    .connection_map()
+                    .get(&address_clone_for_task)
+                    .map(|node| node.value().clone())
+            } else {
+                None
+            };
+
             let handle = tokio::spawn(async move {
                 info!(
-                    "Refreshing connection task to {:?} started",
+                    "refreshing connection task to {:?} started",
                     address_clone_for_task
                 );
-
-                let node_option = if check_existing_conn {
-                    let connections_container = inner_clone.conn_lock.read().expect(MUTEX_READ_ERR);
-                    connections_container
-                        .connection_map()
-                        .get(&address_clone_for_task)
-                        .map(|node| node.value().clone())
-                } else {
-                    None
-                };
 
                 let mut cluster_params = inner_clone
                     .cluster_params
@@ -1556,7 +1556,7 @@ where
                 .refresh_address_in_progress
                 .insert(address.clone(), RefreshTaskState::new(handle));
         }
-        debug!("refresh connection tasks initiated");
+        debug!("trigger_refresh_connection_tasks: Done");
     }
 
     async fn aggregate_results(
