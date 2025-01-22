@@ -2709,10 +2709,11 @@ where
                     .remove(&address);
 
                 // Remove this entry from refresh_address_in_progress
-                if let Some(_) = conn_lock_write
+                if conn_lock_write
                     .refresh_conn_state
                     .refresh_address_in_progress
                     .remove(&address)
+                    .is_some()
                 {
                     debug!(
                         "update_refreshed_connection: Successfully removed refresh state for address: {}",
