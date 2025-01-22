@@ -82,15 +82,15 @@ unit-test:
 	mkdir -p reports
 	set -o pipefail; \
 	LD_LIBRARY_PATH=$(shell find . -name libglide_rs.so|grep -w release|tail -1|xargs dirname|xargs readlink -f):${LD_LIBRARY_PATH} \
-	go test -v -race ./... -skip TestGlideTestSuite $(if $(test-filter), -run $(test-filter)) \
+	go test -v -race ./... -skip TestGlideTestSuite $(if $(test-filter), -testify.m $(test-filter)) \
 	| tee >(go tool test2json -t -p github.com/valkey-io/valkey-glide/go/glide/utils | go-test-report -o reports/unit-tests.html -t unit-test > /dev/null)
 
 # integration tests - run subtask with skipping modules tests
-integ-test: export TEST_FILTER = -skip TestGlideTestSuite/TestModule $(if $(test-filter), -run $(test-filter))
+integ-test: export TEST_FILTER = -skip TestGlideTestSuite/TestModule $(if $(test-filter), -testify.m $(test-filter))
 integ-test: __it
 
 # modules tests - run substask with default filter
-modules-test: export TEST_FILTER = $(if $(test-filter), -run $(test-filter), -run TestGlideTestSuite/TestModule)
+modules-test: export TEST_FILTER = $(if $(test-filter), -run $(test-filter), -testify.m TestGlideTestSuite/TestModule)
 modules-test: __it
 
 __it:

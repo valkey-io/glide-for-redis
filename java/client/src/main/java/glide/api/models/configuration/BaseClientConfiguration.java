@@ -66,6 +66,12 @@ public abstract class BaseClientConfiguration {
      */
     private final ThreadPoolResource threadPoolResource;
 
+    /**
+     * Serialization protocol to be used with the server. If not set, {@link ProtocolVersion#RESP3}
+     * will be used.
+     */
+    private final ProtocolVersion protocol;
+
     public abstract BaseSubscriptionConfiguration getSubscriptionConfiguration();
 
     /**

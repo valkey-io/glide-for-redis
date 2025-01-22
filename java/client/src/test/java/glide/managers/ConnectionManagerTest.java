@@ -28,6 +28,7 @@ import glide.api.models.configuration.BackoffStrategy;
 import glide.api.models.configuration.GlideClientConfiguration;
 import glide.api.models.configuration.GlideClusterClientConfiguration;
 import glide.api.models.configuration.NodeAddress;
+import glide.api.models.configuration.ProtocolVersion;
 import glide.api.models.configuration.ReadFrom;
 import glide.api.models.configuration.ServerCredentials;
 import glide.api.models.configuration.StandaloneSubscriptionConfiguration;
@@ -146,6 +147,7 @@ public class ConnectionManagerTest {
                                         .build())
                         .databaseId(DATABASE_ID)
                         .clientName(CLIENT_NAME)
+                        .protocol(ProtocolVersion.RESP3)
                         .subscriptionConfiguration(
                                 StandaloneSubscriptionConfiguration.builder()
                                         .subscription(EXACT, gs("channel_1"))
@@ -180,6 +182,7 @@ public class ConnectionManagerTest {
                                         .build())
                         .setDatabaseId(DATABASE_ID)
                         .setClientName(CLIENT_NAME)
+                        .setProtocol(ConnectionRequestOuterClass.ProtocolVersion.RESP3)
                         .setPubsubSubscriptions(
                                 PubSubSubscriptions.newBuilder()
                                         .putAllChannelsOrPatternsByType(

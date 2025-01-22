@@ -271,9 +271,9 @@ func (suite *GlideTestSuite) runWithClients(clients []api.BaseClient, test func(
 	}
 }
 
-func (suite *GlideTestSuite) verifyOK(result api.Result[string], err error) {
+func (suite *GlideTestSuite) verifyOK(result string, err error) {
 	assert.Nil(suite.T(), err)
-	assert.Equal(suite.T(), api.OK, result.Value())
+	assert.Equal(suite.T(), api.OK, result)
 }
 
 func (suite *GlideTestSuite) SkipIfServerVersionLowerThanBy(version string) {

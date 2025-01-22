@@ -7,22 +7,27 @@ plugins {
     id 'io.freefair.lombok' version '8.6'
     id 'com.github.spotbugs' version '6.0.18'
     id 'com.google.osdetector' version '1.7.3'
+    id 'com.gradleup.shadow' version '8.3.5'
 }
 
 repositories {
     mavenCentral()
 }
 
+configurations {
+    testImplementation { extendsFrom shadow }
+}
+
 dependencies {
     implementation group: 'com.google.protobuf', name: 'protobuf-java', version: '4.29.1'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.13.0'
+    shadow group: 'org.apache.commons', name: 'commons-lang3', version: '3.13.0'
 
-    implementation group: 'io.netty', name: 'netty-handler', version: '4.1.115.Final'
+    shadow group: 'io.netty', name: 'netty-handler', version: '4.1.115.Final'
     // https://github.com/netty/netty/wiki/Native-transports
     // At the moment, Windows is not supported
-    implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: '4.1.115.Final', classifier: 'linux-x86_64'
-    implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: '4.1.115.Final', classifier: 'linux-aarch_64'
-    implementation group: 'io.netty', name: 'netty-transport-native-kqueue', version: '4.1.115.Final', classifier: 'osx-aarch_64'
+    shadow group: 'io.netty', name: 'netty-transport-native-epoll', version: '4.1.115.Final', classifier: 'linux-x86_64'
+    shadow group: 'io.netty', name: 'netty-transport-native-epoll', version: '4.1.115.Final', classifier: 'linux-aarch_64'
+    shadow group: 'io.netty', name: 'netty-transport-native-kqueue', version: '4.1.115.Final', classifier: 'osx-aarch_64'
 
     // junit
     testImplementation group: 'org.mockito', name: 'mockito-inline', version: '3.12.4'
@@ -130,8 +135,6 @@ tasks.register('copyNativeLib', Copy) {
     into sourceSets.main.output.resourcesDir
 }
 
-def defaultReleaseVersion = "255.255.255";
-
 delombok.dependsOn('compileJava')
 jar.dependsOn('copyNativeLib')
 javadoc.dependsOn('copyNativeLib')
@@ -155,13 +158,26 @@ sourceSets {
     }
 }
 
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    archiveClassifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allSource
+    exclude 'glide/models' // exclude protobuf files
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
-            from components.java
+            from components.shadow
+            artifact javadocJar
+            artifact sourcesJar
             groupId = 'io.valkey'
             artifactId = 'valkey-glide'
-            version = System.getenv("GLIDE_RELEASE_VERSION") ?: defaultReleaseVersion;
+            version = System.getenv("GLIDE_RELEASE_VERSION") ?: project.ext.defaultReleaseVersion
             pom {
                 name = 'valkey-glide'
                 description = 'General Language Independent Driver for the Enterprise (GLIDE) for Valkey'
@@ -193,6 +209,10 @@ publishing {
     }
 }
 
+tasks.withType(GenerateModuleMetadata) {
+    dependsOn jar, shadowJar
+}
+
 java {
     modularity.inferModulePath = true
     withSourcesJar()
@@ -220,6 +240,11 @@ tasks.withType(Test) {
 }
 
 jar {
+    archiveClassifier = osdetector.classifier
+}
+
+shadowJar {
+    dependsOn('copyNativeLib')
     archiveClassifier = osdetector.classifier
 }
 

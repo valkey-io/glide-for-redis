@@ -278,3 +278,80 @@ func (listDirection ListDirection) toString() (string, error) {
 		return "", &RequestError{"Invalid list direction"}
 	}
 }
+
+// Optional arguments to Restore(key string, ttl int64, value string, option *RestoreOptions)
+//
+// Note IDLETIME and FREQ modifiers cannot be set at the same time.
+//
+// [valkey.io]: https://valkey.io/commands/restore/
+type RestoreOptions struct {
+	// Subcommand string to replace existing key.
+	replace string
+	// Subcommand string to represent absolute timestamp (in milliseconds) for TTL.
+	absTTL string
+	// It represents the idletime/frequency of object.
+	eviction Eviction
+}
+
+func NewRestoreOptionsBuilder() *RestoreOptions {
+	return &RestoreOptions{}
+}
+
+const (
+	// Subcommand string to replace existing key.
+	Replace_keyword = "REPLACE"
+
+	// Subcommand string to represent absolute timestamp (in milliseconds) for TTL.
+	ABSTTL_keyword string = "ABSTTL"
+)
+
+// Custom setter methods to replace existing key.
+func (restoreOption *RestoreOptions) SetReplace() *RestoreOptions {
+	restoreOption.replace = Replace_keyword
+	return restoreOption
+}
+
+// Custom setter methods to represent absolute timestamp (in milliseconds) for TTL.
+func (restoreOption *RestoreOptions) SetABSTTL() *RestoreOptions {
+	restoreOption.absTTL = ABSTTL_keyword
+	return restoreOption
+}
+
+// For eviction purpose, you may use IDLETIME or FREQ modifiers.
+type Eviction struct {
+	// It represent IDLETIME or FREQ.
+	Type EvictionType
+	// It represents count(int) of the idletime/frequency of object.
+	Count int64
+}
+
+type EvictionType string
+
+const (
+	// It represents the idletime of object
+	IDLETIME EvictionType = "IDLETIME"
+	// It represents the frequency of object
+	FREQ EvictionType = "FREQ"
+)
+
+// Custom setter methods set the idletime/frequency of object.
+func (restoreOption *RestoreOptions) SetEviction(evictionType EvictionType, count int64) *RestoreOptions {
+	restoreOption.eviction.Type = evictionType
+	restoreOption.eviction.Count = count
+	return restoreOption
+}
+
+func (opts *RestoreOptions) toArgs() ([]string, error) {
+	args := []string{}
+	var err error
+	if opts.replace != "" {
+		args = append(args, string(opts.replace))
+	}
+	if opts.absTTL != "" {
+		args = append(args, string(opts.absTTL))
+	}
+	if (opts.eviction != Eviction{}) {
+		args = append(args, string(opts.eviction.Type), utils.IntToString(opts.eviction.Count))
+	}
+	return args, err
+}

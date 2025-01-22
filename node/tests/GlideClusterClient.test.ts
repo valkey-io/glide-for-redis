@@ -33,8 +33,8 @@ import {
     Script,
     SlotKeyTypes,
     SortOrder,
-    convertRecordToGlideRecord,
     convertGlideRecordToRecord,
+    convertRecordToGlideRecord,
 } from "..";
 import { ValkeyCluster } from "../../utils/TestUtils";
 import { runBaseTests } from "./SharedTests";
@@ -2216,8 +2216,10 @@ describe("GlideClusterClient", () => {
                             getClientConfigurationOption(
                                 azCluster.getAddresses(),
                                 protocol,
+                                { requestTimeout: 3000 },
                             ),
                         );
+
                     await client_for_config_set.configResetStat();
                     await client_for_config_set.configSet(
                         { "availability-zone": az },
@@ -2245,6 +2247,7 @@ describe("GlideClusterClient", () => {
                                 azCluster.getAddresses(),
                                 protocol,
                                 {
+                                    requestTimeout: 3000,
                                     readFrom: "AZAffinity",
                                     clientAz: az,
                                 },
@@ -2317,6 +2320,7 @@ describe("GlideClusterClient", () => {
                             getClientConfigurationOption(
                                 azCluster.getAddresses(),
                                 protocol,
+                                { requestTimeout: 3000 },
                             ),
                         );
 
@@ -2339,6 +2343,7 @@ describe("GlideClusterClient", () => {
                                 azCluster.getAddresses(),
                                 protocol,
                                 {
+                                    requestTimeout: 3000,
                                     readFrom: "AZAffinity",
                                     clientAz: az,
                                 },
@@ -2408,7 +2413,7 @@ describe("GlideClusterClient", () => {
                                 {
                                     readFrom: "AZAffinity",
                                     clientAz: "non-existing-az",
-                                    requestTimeout: 2000,
+                                    requestTimeout: 3000,
                                 },
                             ),
                         );

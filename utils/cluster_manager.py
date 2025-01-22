@@ -364,7 +364,7 @@ def start_server(
         )
         version_output = result.stdout
         version_match = re.search(
-            r"(?:Redis|Valkey) server v=(\d+\.\d+\.\d+)", version_output, re.IGNORECASE
+            r"server v=(\d+\.\d+\.\d+)", version_output, re.IGNORECASE
         )
         if version_match:
             return tuple(map(int, version_match.group(1).split(".")))

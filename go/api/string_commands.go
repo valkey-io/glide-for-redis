@@ -17,21 +17,19 @@ type StringCommands interface {
 	//  value - The value to store with the given key.
 	//
 	// Return value:
-	//  A api.Result[string] containing "OK" response on success.
+	//  `"OK"` response on success.
 	//
 	// For example:
 	//	result, err := client.Set("key", "value")
-	//  result.Value() : "OK"
-	//  result.IsNil() : false
+	//  result: "OK"
 	//
 	// [valkey.io]: https://valkey.io/commands/set/
-	Set(key string, value string) (Result[string], error)
+	Set(key string, value string) (string, error)
 
 	// SetWithOptions sets the given key with the given value using the given options. The return value is dependent on the
 	// passed options. If the value is successfully set, "OK" is returned. If value isn't set because of [OnlyIfExists] or
 	// [OnlyIfDoesNotExist] conditions, api.CreateNilStringResult() is returned. If [SetOptions#ReturnOldValue] is
-	// set, the old
-	// value is returned.
+	// set, the old value is returned.
 	//
 	// See [valkey.io] for details.
 	//
@@ -143,15 +141,14 @@ type StringCommands interface {
 	//  keyValueMap - A key-value map consisting of keys and their respective values to set.
 	//
 	// Return value:
-	//  A Result[string] containing "OK" on success.
+	//  `"OK"` on success.
 	//
 	// For example:
 	//	result, err := client.MSet(map[string]string{"key1": "value1", "key2": "value2"})
-	//  result.Value(): "OK"
-	//  result.IsNil(): false
+	//  result: "OK"
 	//
 	// [valkey.io]: https://valkey.io/commands/mset/
-	MSet(keyValueMap map[string]string) (Result[string], error)
+	MSet(keyValueMap map[string]string) (string, error)
 
 	// Retrieves the values of multiple keys.
 	//
@@ -197,7 +194,7 @@ type StringCommands interface {
 	//  keyValueMap - A key-value map consisting of keys and their respective values to set.
 	//
 	// Return value:
-	//  A Result[bool] containing true, if all keys were set. false, if no key was set.
+	//  A bool containing true, if all keys were set. false, if no key was set.
 	//
 	// For example:
 	//  1. result, err := client.MSetNX(map[string]string{"key1": "value1", "key2": "value2"})
@@ -209,7 +206,7 @@ type StringCommands interface {
 	//     result.IsNil(): false
 	//
 	// [valkey.io]: https://valkey.io/commands/msetnx/
-	MSetNX(keyValueMap map[string]string) (Result[bool], error)
+	MSetNX(keyValueMap map[string]string) (bool, error)
 
 	// Increments the number stored at key by one. If key does not exist, it is set to 0 before performing the operation.
 	//
@@ -219,16 +216,15 @@ type StringCommands interface {
 	//  key - The key to increment its value.
 	//
 	// Return value:
-	//  The Result[int64] of key after the increment.
+	//  The value of `key` after the increment.
 	//
 	// For example:
 	//  key: 1
 	//  result, err := client.Incr("key");
-	//  result.Value(): 2
-	//  result.IsNil(): false
+	//  result: 2
 	//
 	// [valkey.io]: https://valkey.io/commands/incr/
-	Incr(key string) (Result[int64], error)
+	Incr(key string) (int64, error)
 
 	// Increments the number stored at key by amount. If key does not exist, it is set to 0 before performing the operation.
 	//
@@ -239,19 +235,18 @@ type StringCommands interface {
 	//  amount - The amount to increment.
 	//
 	// Return value:
-	//  The Result[int64] of key after the increment.
+	//  The value of `key` after the increment.
 	//
 	// For example:
 	//  key: 1
 	//  result, err := client.IncrBy("key", 2)
-	//  result.Value(): 3
-	//  result.IsNil(): false
+	//  result: 3
 	//
 	// [valkey.io]: https://valkey.io/commands/incrby/
-	IncrBy(key string, amount int64) (Result[int64], error)
+	IncrBy(key string, amount int64) (int64, error)
 
 	// Increments the string representing a floating point number stored at key by amount. By using a negative increment value,
-	// the result is that the value stored at key is decremented. If key does not exist, it is set to 0 before performing the
+	// the result is that the value stored at key is decremented. If key does not exist, it is set to `0` before performing the
 	// operation.
 	//
 	// See [valkey.io] for details.
@@ -261,16 +256,15 @@ type StringCommands interface {
 	//  amount - The amount to increment.
 	//
 	// Return value:
-	//  The Result[float64] of key after the increment.
+	//  The value of key after the increment.
 	//
 	// For example:
 	//  key: 1
 	//  result, err := client.IncrBy("key", 0.5)
-	//  result.Value(): 1.5
-	//  result.IsNil(): false
+	//  result: 1.5
 	//
 	// [valkey.io]: https://valkey.io/commands/incrbyfloat/
-	IncrByFloat(key string, amount float64) (Result[float64], error)
+	IncrByFloat(key string, amount float64) (float64, error)
 
 	// Decrements the number stored at key by one. If key does not exist, it is set to 0 before performing the operation.
 	//
@@ -280,16 +274,15 @@ type StringCommands interface {
 	//  key - The key to decrement its value.
 	//
 	// Return value:
-	//  The Result[int64] of key after the decrement.
+	//  The value of `key` after the decrement.
 	//
 	// For example:
 	//  key: 1
 	//  result, err := client.Decr("key")
-	//  result.Value(): 0
-	//  result.IsNil(): false
+	//  result: 0
 	//
 	// [valkey.io]: https://valkey.io/commands/decr/
-	Decr(key string) (Result[int64], error)
+	Decr(key string) (int64, error)
 
 	// Decrements the number stored at code by amount. If key does not exist, it is set to 0 before performing the operation.
 	//
@@ -300,16 +293,15 @@ type StringCommands interface {
 	//  amount - The amount to decrement.
 	//
 	// Return value:
-	//  The Result[int64] of key after the decrement.
+	//  The value of `key` after the decrement.
 	//
 	// For example:
 	//  key: 1
 	//  result, err := client.DecrBy("key", 2)
-	//  result.Value(): -1
-	//  result.IsNil(): false
+	//  result: -1
 	//
 	// [valkey.io]: https://valkey.io/commands/decrby/
-	DecrBy(key string, amount int64) (Result[int64], error)
+	DecrBy(key string, amount int64) (int64, error)
 
 	// Returns the length of the string value stored at key.
 	//
@@ -319,17 +311,16 @@ type StringCommands interface {
 	//  key - The key to check its length.
 	//
 	// Return value:
-	//  The length of the string value stored at key as Result[int64].
-	//  If key does not exist, it is treated as an empty string, and the command returns Result[int64] containing 0 .
+	//  The length of the string value stored at `key`.
+	//  If key does not exist, it is treated as an empty string, and the command returns `0`.
 	//
 	// For example:
 	//  key: value
 	//  result, err := client.Strlen("key")
-	//  result.Value(): 5
-	//  result.IsNil(): false
+	//  result: 5
 	//
 	// [valkey.io]: https://valkey.io/commands/strlen/
-	Strlen(key string) (Result[int64], error)
+	Strlen(key string) (int64, error)
 
 	// Overwrites part of the string stored at key, starting at the specified byte's offset, for the entire length of value.
 	// If the offset is larger than the current length of the string at key, the string is padded with zero bytes to make
@@ -344,12 +335,11 @@ type StringCommands interface {
 	//  value  - The string written with offset.
 	//
 	// Return value:
-	//  The length of the string stored at key after it was modified as Result[int64].
+	//  The length of the string stored at `key` after it was modified.
 	//
 	// For example:
 	//  1. result, err := client.SetRange("key", 6, "GLIDE");
-	//     result.Value(): 11 (New key created with length of 11 bytes)
-	//     result.IsNil(): false
+	//     result: 11 (New key created with length of 11 bytes)
 	//     value, err  := client.Get("key")
 	//     value.Value(): "\x00\x00\x00\x00\x00\x00GLIDE"
 	//  2. "key": "愛" (value char takes 3 bytes)
@@ -357,12 +347,12 @@ type StringCommands interface {
 	//     result.Value(): �a� // (becomes an invalid UTF-8 string)
 	//
 	// [valkey.io]: https://valkey.io/commands/setrange/
-	SetRange(key string, offset int, value string) (Result[int64], error)
+	SetRange(key string, offset int, value string) (int64, error)
 
 	// Returns the substring of the string value stored at key, determined by the byte's offsets start and end (both are
 	// inclusive).
-	// Negative offsets can be used in order to provide an offset starting from the end of the string. So -1 means the last
-	// character, -2 the penultimate and so forth.
+	// Negative offsets can be used in order to provide an offset starting from the end of the string. So `-1` means the last
+	// character, `-2` the penultimate and so forth.
 	//
 	// See [valkey.io] for details.
 	//
@@ -372,24 +362,20 @@ type StringCommands interface {
 	//  end   - The ending offset.
 	//
 	// Return value:
-	//  A Result[string] containing substring extracted from the value stored at key.
-	//  A [api.NilResult[string]] (api.CreateNilStringResult()) is returned if the offset is out of bounds.
+	//  A substring extracted from the value stored at key. Returns empty string if the offset is out of bounds.
 	//
 	// For example:
 	//  1. mykey: "This is a string"
 	//     result, err := client.GetRange("mykey", 0, 3)
-	//     result.Value(): "This"
-	//     result.IsNil(): false
+	//     result: "This"
 	//     result, err := client.GetRange("mykey", -3, -1)
-	//     result.Value(): "ing" (extracted last 3 characters of a string)
-	//     result.IsNil(): false
+	//     result: "ing" (extracted last 3 characters of a string)
 	//  2. "key": "愛" (value char takes 3 bytes)
 	//     result, err = client.GetRange("key", 0, 1)
-	//     result.Value(): "�" (returns an invalid UTF-8 string)
-	//     result.IsNil(): false
+	//     result: "�" (returns an invalid UTF-8 string)
 	//
 	// [valkey.io]: https://valkey.io/commands/getrange/
-	GetRange(key string, start int, end int) (Result[string], error)
+	GetRange(key string, start int, end int) (string, error)
 
 	// Appends a value to a key. If key does not exist it is created and set as an empty string, so APPEND will be similar to
 	// SET in this special case.
@@ -401,15 +387,14 @@ type StringCommands interface {
 	//  value - The value to append.
 	//
 	// Return value:
-	//  The Result[int64] containing the length of the string after appending the value.
+	//  The length of the string after appending the value.
 	//
 	// For example:
 	//  result, err := client.Append("key", "value")
-	//  result.Value(): 5
-	//  result.IsNil(): false
+	//  result: 5
 	//
 	// [valkey.io]: https://valkey.io/commands/append/
-	Append(key string, value string) (Result[int64], error)
+	Append(key string, value string) (int64, error)
 
 	// Returns the longest common subsequence between strings stored at key1 and key2.
 	//
@@ -429,17 +414,16 @@ type StringCommands interface {
 	//  key2 - The key that stores the second string.
 	//
 	// Return value:
-	//  A Result[string] containing the longest common subsequence between the 2 strings.
-	//  A Result[string] containing empty String is returned if the keys do not exist or have no common subsequences.
+	//  The longest common subsequence between the 2 strings.
+	//  An empty string is returned if the keys do not exist or have no common subsequences.
 	//
 	// For example:
 	//  testKey1: foo, testKey2: fao
 	//  result, err := client.LCS("testKey1", "testKey2")
-	//  result.Value(): "fo"
-	//  result.IsNil(): false
+	//  result: "fo"
 	//
 	// [valkey.io]: https://valkey.io/commands/lcs/
-	LCS(key1 string, key2 string) (Result[string], error)
+	LCS(key1 string, key2 string) (string, error)
 
 	// GetDel gets the value associated with the given key and deletes the key.
 	//

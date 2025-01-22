@@ -1,14 +1,16 @@
 plugins {
     id 'java-library'
+    id "com.google.osdetector" version "1.7.3"
 }
 
 repositories {
     mavenCentral()
+    mavenLocal()
 }
 
 dependencies {
     // client
-    implementation project(':client')
+    implementation group: 'io.valkey', name: 'valkey-glide', version: project.ext.defaultReleaseVersion, classifier: osdetector.classifier
 
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.13.0'
     implementation 'com.google.code.gson:gson:2.10.1'
@@ -129,7 +131,7 @@ clearDirs.finalizedBy 'startStandalone'
 clearDirs.finalizedBy 'startCluster'
 clearDirs.finalizedBy 'startClusterForAz'
 test.finalizedBy 'stopAllAfterTests'
-test.dependsOn ':client:buildRust'
+compileTestJava.dependsOn ':client:publishToMavenLocal'
 
 tasks.withType(Test) {
     doFirst {

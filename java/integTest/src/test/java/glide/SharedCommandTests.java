@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.junit.jupiter.api.Named.named;
 
 import glide.api.BaseClient;
 import glide.api.GlideClient;
@@ -101,8 +102,10 @@ import glide.api.models.commands.stream.StreamReadGroupOptions;
 import glide.api.models.commands.stream.StreamReadOptions;
 import glide.api.models.commands.stream.StreamTrimOptions.MaxLen;
 import glide.api.models.commands.stream.StreamTrimOptions.MinId;
+import glide.api.models.configuration.ProtocolVersion;
 import glide.api.models.exceptions.RequestException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -122,6 +125,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -131,10 +135,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 @Timeout(10) // seconds
 public class SharedCommandTests {
 
-    private static GlideClient standaloneClient = null;
-    private static GlideClusterClient clusterClient = null;
-
-    @Getter private static List<Arguments> clients;
+    @Getter private static final List<Arguments> clients = new ArrayList<>();
 
     private static final String KEY_NAME = "key";
     private static final String INITIAL_VALUE = "VALUE";
@@ -143,21 +144,31 @@ public class SharedCommandTests {
     @BeforeAll
     @SneakyThrows
     public static void init() {
-        standaloneClient =
-                GlideClient.createClient(commonClientConfig().requestTimeout(5000).build()).get();
+        for (var protocol : ProtocolVersion.values()) {
+            var standaloneClient =
+                    GlideClient.createClient(
+                                    commonClientConfig().requestTimeout(5000).protocol(protocol).build())
+                            .get();
 
-        clusterClient =
-                GlideClusterClient.createClient(commonClusterClientConfig().requestTimeout(5000).build())
-                        .get();
+            var clusterClient =
+                    GlideClusterClient.createClient(
+                                    commonClusterClientConfig().requestTimeout(5000).protocol(protocol).build())
+                            .get();
 
-        clients = List.of(Arguments.of(standaloneClient), Arguments.of(clusterClient));
+            clients.addAll(
+                    List.of(
+                            Arguments.of(named("standalone " + protocol, standaloneClient)),
+                            Arguments.of(named("cluster " + protocol, clusterClient))));
+        }
     }
 
     @AfterAll
     @SneakyThrows
+    @SuppressWarnings("unchecked")
     public static void teardown() {
-        standaloneClient.close();
-        clusterClient.close();
+        for (var client : clients) {
+            ((Named<BaseClient>) client.get()[0]).getPayload().close();
+        }
     }
 
     @SneakyThrows
@@ -366,7 +377,6 @@ public class SharedCommandTests {
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("getClients")
     public void getex(BaseClient client) {
-
         assumeTrue(
                 SERVER_VERSION.isGreaterThanOrEqualTo("6.2.0"), "This feature added in version 6.2.0");
 
@@ -413,7 +423,6 @@ public class SharedCommandTests {
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("getClients")
     public void getex_binary(BaseClient client) {
-
         assumeTrue(
                 SERVER_VERSION.isGreaterThanOrEqualTo("6.2.0"), "This feature added in version 6.2.0");
 
@@ -460,7 +469,7 @@ public class SharedCommandTests {
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("getClients")
     public void set_only_if_exists_overwrite(BaseClient client) {
-        String key = "set_only_if_exists_overwrite";
+        String key = UUID.randomUUID().toString();
         SetOptions options = SetOptions.builder().conditionalSet(ONLY_IF_EXISTS).build();
         client.set(key, INITIAL_VALUE).get();
         client.set(key, ANOTHER_VALUE, options).get();
@@ -472,7 +481,7 @@ public class SharedCommandTests {
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("getClients")
     public void set_only_if_exists_missing_key(BaseClient client) {
-        String key = "set_only_if_exists_missing_key";
+        String key = UUID.randomUUID().toString();
         SetOptions options = SetOptions.builder().conditionalSet(ONLY_IF_EXISTS).build();
         client.set(key, ANOTHER_VALUE, options).get();
         String data = client.get(key).get();
@@ -483,7 +492,7 @@ public class SharedCommandTests {
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("getClients")
     public void set_only_if_does_not_exists_missing_key(BaseClient client) {
-        String key = "set_only_if_does_not_exists_missing_key";
+        String key = UUID.randomUUID().toString();
         SetOptions options = SetOptions.builder().conditionalSet(ONLY_IF_DOES_NOT_EXIST).build();
         client.set(key, ANOTHER_VALUE, options).get();
         String data = client.get(key).get();
@@ -494,7 +503,7 @@ public class SharedCommandTests {
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("getClients")
     public void set_get_binary_data(BaseClient client) {
-        GlideString key = gs("set_get_binary_data_key");
+        GlideString key = gs(UUID.randomUUID().toString());
         byte[] binvalue = {(byte) 0x01, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x02};
         assertEquals(client.set(key, gs(binvalue)).get(), "OK");
         GlideString data = client.get(key).get();
@@ -506,7 +515,7 @@ public class SharedCommandTests {
     @MethodSource("getClients")
     public void set_get_binary_data_with_options(BaseClient client) {
         SetOptions options = SetOptions.builder().conditionalSet(ONLY_IF_DOES_NOT_EXIST).build();
-        GlideString key = gs("set_get_binary_data_with_options");
+        GlideString key = gs(UUID.randomUUID().toString());
         byte[] binvalue = {(byte) 0x01, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x02};
         assertEquals(client.set(key, gs(binvalue), options).get(), "OK");
         GlideString data = client.get(key).get();
@@ -517,7 +526,7 @@ public class SharedCommandTests {
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("getClients")
     public void set_only_if_does_not_exists_existing_key(BaseClient client) {
-        String key = "set_only_if_does_not_exists_existing_key";
+        String key = UUID.randomUUID().toString();
         SetOptions options = SetOptions.builder().conditionalSet(ONLY_IF_DOES_NOT_EXIST).build();
         client.set(key, INITIAL_VALUE).get();
         client.set(key, ANOTHER_VALUE, options).get();
@@ -529,7 +538,7 @@ public class SharedCommandTests {
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("getClients")
     public void set_value_with_ttl_and_update_value_with_keeping_ttl(BaseClient client) {
-        String key = "set_value_with_ttl_and_update_value_with_keeping_ttl";
+        String key = UUID.randomUUID().toString();
         SetOptions options = SetOptions.builder().expiry(Milliseconds(2000L)).build();
         client.set(key, INITIAL_VALUE, options).get();
         String data = client.get(key).get();
@@ -550,7 +559,7 @@ public class SharedCommandTests {
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("getClients")
     public void set_value_with_ttl_and_update_value_with_new_ttl(BaseClient client) {
-        String key = "set_value_with_ttl_and_update_value_with_new_ttl";
+        String key = UUID.randomUUID().toString();
         SetOptions options = SetOptions.builder().expiry(Milliseconds(100500L)).build();
         client.set(key, INITIAL_VALUE, options).get();
         String data = client.get(key).get();
@@ -571,7 +580,7 @@ public class SharedCommandTests {
     @ParameterizedTest(autoCloseArguments = false)
     @MethodSource("getClients")
     public void set_expired_value(BaseClient client) {
-        String key = "set_expired_value";
+        String key = UUID.randomUUID().toString();
         SetOptions options =
                 SetOptions.builder()
                         // expiration is in the past
@@ -972,7 +981,8 @@ public class SharedCommandTests {
         byte[] nonUTF8Bytes = new byte[] {(byte) 0xEE};
         GlideString key = gs(nonUTF8Bytes);
         GlideString hashKey = gs(UUID.randomUUID().toString());
-        GlideString hashNonUTF8Key = gs(new byte[] {(byte) 0xDD});
+        GlideString hashNonUTF8Key =
+                gs(new byte[] {(byte) 0xDD}).concat(gs(UUID.randomUUID().toString()));
         GlideString value = gs(nonUTF8Bytes);
         String stringField = "field";
         Map<GlideString, GlideString> fieldValueMap = Map.of(gs(stringField), value);
@@ -1005,7 +1015,7 @@ public class SharedCommandTests {
     public void non_UTF8_GlideString_map_with_double(BaseClient client) {
         byte[] nonUTF8Bytes = new byte[] {(byte) 0xEE};
         GlideString key = gs(UUID.randomUUID().toString());
-        GlideString nonUTF8Key = gs(new byte[] {(byte) 0xEF});
+        GlideString nonUTF8Key = gs(new byte[] {(byte) 0xEF}).concat(gs(UUID.randomUUID().toString()));
         Map<GlideString, Double> membersScores =
                 Map.of(gs(nonUTF8Bytes), 1.0, gs("two"), 2.0, gs("three"), 3.0);
 
@@ -1034,7 +1044,7 @@ public class SharedCommandTests {
     public void non_UTF8_GlideString_nested_array(BaseClient client) {
         byte[] nonUTF8Bytes = new byte[] {(byte) 0xEE};
         GlideString key = gs(UUID.randomUUID().toString());
-        GlideString nonUTF8Key = gs(new byte[] {(byte) 0xFF});
+        GlideString nonUTF8Key = gs(new byte[] {(byte) 0xFF}).concat(gs(UUID.randomUUID().toString()));
         GlideString field = gs(nonUTF8Bytes);
         GlideString value1 = gs(nonUTF8Bytes);
         GlideString value2 = gs("foobar");
@@ -1071,7 +1081,7 @@ public class SharedCommandTests {
     public void non_UTF8_GlideString_map_with_geospatial(BaseClient client) {
         byte[] nonUTF8Bytes = new byte[] {(byte) 0xEE};
         GlideString key = gs(UUID.randomUUID().toString());
-        GlideString nonUTF8Key = gs(new byte[] {(byte) 0xDF});
+        GlideString nonUTF8Key = gs(new byte[] {(byte) 0xDF}).concat(gs(UUID.randomUUID().toString()));
         Map<GlideString, GeospatialData> membersToCoordinates = new HashMap<>();
         membersToCoordinates.put(gs(nonUTF8Bytes), new GeospatialData(13.361389, 38.115556));
         membersToCoordinates.put(gs("Catania"), new GeospatialData(15.087269, 37.502669));
@@ -1122,7 +1132,7 @@ public class SharedCommandTests {
         assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("7.0.0"));
         byte[] nonUTF8Bytes = new byte[] {(byte) 0xEE};
         GlideString key = gs(UUID.randomUUID().toString());
-        GlideString nonUTF8Key = gs(new byte[] {(byte) 0xFE});
+        GlideString nonUTF8Key = gs(new byte[] {(byte) 0xFE}).concat(gs(UUID.randomUUID().toString()));
         GlideString[] lpushArgs = {gs(nonUTF8Bytes), gs("two")};
 
         // Testing map of arrays using byte[] that cannot be converted to UTF-8 Strings.
@@ -1620,8 +1630,8 @@ public class SharedCommandTests {
         byte[] binvalue1 = {(byte) 0x01, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x02};
         byte[] binvalue2 = {(byte) 0xFF, (byte) 0x66, (byte) 0xFF, (byte) 0xAF, (byte) 0x22};
 
-        GlideString key1 = gs(binvalue1);
-        GlideString key2 = gs(binvalue2);
+        GlideString key1 = gs(binvalue1).concat(gs(UUID.randomUUID().toString()));
+        GlideString key2 = gs(binvalue2).concat(gs(UUID.randomUUID().toString()));
 
         // key does not exist
         assertNull(client.hrandfield(key1).get());
@@ -8070,11 +8080,6 @@ public class SharedCommandTests {
         Object[][] pending_results_extended =
                 client.xpending(key, groupName, InfRangeBound.MIN, InfRangeBound.MAX, 10L).get();
 
-        System.out.println("xpending result:");
-        for (int i = 0; i < pending_results_extended.length; i++) {
-            System.out.println(pending_results_extended[i][0]);
-        }
-
         // because of idle time return, we have to remove it from the expected results
         // and check it separately
         assertArrayEquals(
@@ -8109,9 +8114,6 @@ public class SharedCommandTests {
                         .get();
         assertNotNull(claimResults);
         assertEquals(claimResults.size(), 2);
-        for (var e : claimResults.entrySet()) {
-            System.out.println("Key: " + e.getKey().getString());
-        }
 
         assertNotNull(claimResults.get(streamid_5));
         assertNotNull(claimResults.get(streamid_3));
@@ -12539,27 +12541,22 @@ public class SharedCommandTests {
         if (client instanceof GlideClusterClient) {
             assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("8.0.0"), "This feature added in version 8");
         }
-        String setKey1 = "{setKey}1";
-        String setKey2 = "{setKey}2";
-        String setKey3 = "{setKey}3";
-        String setKey4 = "{setKey}4";
-        String setKey5 = "{setKey}5";
-        String[] setKeys = new String[] {setKey1, setKey2, setKey3, setKey4, setKey5};
-        String listKey = "{setKey}listKey";
-        String storeKey = "{setKey}storeKey";
+        String prefix = "{setKey}-" + UUID.randomUUID();
+        String listKey = prefix + "listKey";
+        String storeKey = prefix + "storeKey";
         String nameField = "name";
         String ageField = "age";
         String[] names = new String[] {"Alice", "Bob", "Charlie", "Dave", "Eve"};
         String[] namesSortedByAge = new String[] {"Dave", "Bob", "Alice", "Charlie", "Eve"};
         String[] ages = new String[] {"30", "25", "35", "20", "40"};
         String[] userIDs = new String[] {"3", "1", "5", "4", "2"};
-        String namePattern = "{setKey}*->name";
-        String agePattern = "{setKey}*->age";
+        String namePattern = prefix + "*->name";
+        String agePattern = prefix + "*->age";
         String missingListKey = "100000";
 
-        for (int i = 0; i < setKeys.length; i++) {
+        for (int i = 0; i < names.length; i++) {
             assertEquals(
-                    2, client.hset(setKeys[i], Map.of(nameField, names[i], ageField, ages[i])).get());
+                    2, client.hset(prefix + (i + 1), Map.of(nameField, names[i], ageField, ages[i])).get());
         }
 
         assertEquals(5, client.rpush(listKey, userIDs).get());
@@ -12722,14 +12719,15 @@ public class SharedCommandTests {
             assumeTrue(SERVER_VERSION.isGreaterThanOrEqualTo("8.0.0"), "This feature added in version 8");
         }
 
-        GlideString setKey1 = gs("{setKeyGs}1");
-        GlideString setKey2 = gs("{setKeyGs}2");
-        GlideString setKey3 = gs("{setKeyGs}3");
-        GlideString setKey4 = gs("{setKeyGs}4");
-        GlideString setKey5 = gs("{setKeyGs}5");
+        var prefix = UUID.randomUUID();
+        GlideString setKey1 = gs("{" + prefix + "}1");
+        GlideString setKey2 = gs("{" + prefix + "}2");
+        GlideString setKey3 = gs("{" + prefix + "}3");
+        GlideString setKey4 = gs("{" + prefix + "}4");
+        GlideString setKey5 = gs("{" + prefix + "}5");
         GlideString[] setKeys = new GlideString[] {setKey1, setKey2, setKey3, setKey4, setKey5};
-        GlideString listKey = gs("{setKeyGs}listKey");
-        GlideString storeKey = gs("{setKeyGs}storeKey");
+        GlideString listKey = gs("{" + prefix + "}listKey");
+        GlideString storeKey = gs("{" + prefix + "}storeKey");
         GlideString nameField = gs("name");
         GlideString ageField = gs("age");
         GlideString[] names =
@@ -12739,8 +12737,8 @@ public class SharedCommandTests {
                 new GlideString[] {gs("Dave"), gs("Bob"), gs("Alice"), gs("Charlie"), gs("Eve")};
         GlideString[] ages = new GlideString[] {gs("30"), gs("25"), gs("35"), gs("20"), gs("40")};
         GlideString[] userIDs = new GlideString[] {gs("3"), gs("1"), gs("5"), gs("4"), gs("2")};
-        GlideString namePattern = gs("{setKeyGs}*->name");
-        GlideString agePattern = gs("{setKeyGs}*->age");
+        GlideString namePattern = gs("{" + prefix + "}*->name");
+        GlideString agePattern = gs("{" + prefix + "}*->age");
         GlideString missingListKey = gs("100000");
 
         for (int i = 0; i < setKeys.length; i++) {
@@ -12804,7 +12802,10 @@ public class SharedCommandTests {
                 client
                         .sort(
                                 listKey,
-                                SortOptionsBinary.builder().alpha().getPattern(gs("{setKeyGs}missing")).build())
+                                SortOptionsBinary.builder()
+                                        .alpha()
+                                        .getPattern(gs("{" + prefix + "}missing"))
+                                        .build())
                         .get());
 
         // Missing key in the set
@@ -12867,7 +12868,10 @@ public class SharedCommandTests {
                     client
                             .sortReadOnly(
                                     listKey,
-                                    SortOptionsBinary.builder().alpha().getPattern(gs("{setKeyGs}missing")).build())
+                                    SortOptionsBinary.builder()
+                                            .alpha()
+                                            .getPattern(gs("{" + prefix + "}missing"))
+                                            .build())
                             .get());
 
             assertArrayEquals(

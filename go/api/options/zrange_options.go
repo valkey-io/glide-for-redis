@@ -14,6 +14,10 @@ type ZRangeQuery interface {
 	ToArgs() []string
 }
 
+type ZRemRangeQuery interface {
+	ToArgsRemRange() []string
+}
+
 // Queries a range of elements from a sorted set by theirs index.
 type RangeByIndex struct {
 	start, end int64
@@ -152,6 +156,10 @@ func (rbs *RangeByScore) ToArgs() []string {
 	return args
 }
 
+func (rbs *RangeByScore) ToArgsRemRange() []string {
+	return []string{string(rbs.start), string(rbs.end)}
+}
+
 // Queries a range of elements from a sorted set by theirs lexicographical order.
 //
 // Parameters:
@@ -184,6 +192,10 @@ func (rbl *RangeByLex) ToArgs() []string {
 		args = append(args, rbl.Limit.toArgs()...)
 	}
 	return args
+}
+
+func (rbl *RangeByLex) ToArgsRemRange() []string {
+	return []string{string(rbl.start), string(rbl.end)}
 }
 
 // Query for `ZRangeWithScores` in [SortedSetCommands]

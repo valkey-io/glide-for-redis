@@ -43,15 +43,15 @@ func (client *glideClient) CustomCommand(args []string) (interface{}, error) {
 	return handleInterfaceResponse(res)
 }
 
-func (client *glideClient) ConfigSet(parameters map[string]string) (Result[string], error) {
+func (client *glideClient) ConfigSet(parameters map[string]string) (string, error) {
 	result, err := client.executeCommand(C.ConfigSet, utils.MapToString(parameters))
 	if err != nil {
-		return CreateNilStringResult(), err
+		return "", err
 	}
 	return handleStringResponse(result)
 }
 
-func (client *glideClient) ConfigGet(args []string) (map[Result[string]]Result[string], error) {
+func (client *glideClient) ConfigGet(args []string) (map[string]string, error) {
 	res, err := client.executeCommand(C.ConfigGet, args)
 	if err != nil {
 		return nil, err
@@ -59,10 +59,10 @@ func (client *glideClient) ConfigGet(args []string) (map[Result[string]]Result[s
 	return handleStringToStringMapResponse(res)
 }
 
-func (client *glideClient) Select(index int64) (Result[string], error) {
+func (client *glideClient) Select(index int64) (string, error) {
 	result, err := client.executeCommand(C.Select, []string{utils.IntToString(index)})
 	if err != nil {
-		return CreateNilStringResult(), err
+		return "", err
 	}
 
 	return handleStringResponse(result)

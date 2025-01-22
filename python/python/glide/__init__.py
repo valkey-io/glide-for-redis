@@ -30,6 +30,7 @@ from glide.async_commands.core import (
     FunctionRestorePolicy,
     InfoSection,
     InsertPosition,
+    OnlyIfEqual,
     UpdateOptions,
 )
 from glide.async_commands.server_modules import ft, glide_json, json_transaction
@@ -225,6 +226,7 @@ __all__ = [
     "Script",
     "ScoreBoundary",
     "ConditionalChange",
+    "OnlyIfEqual",
     "ExpireOptions",
     "ExpiryGetEx",
     "ExpirySet",
