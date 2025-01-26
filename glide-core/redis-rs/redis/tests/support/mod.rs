@@ -225,17 +225,25 @@ impl RedisServer {
         modules: &[Module],
         spawner: F,
     ) -> RedisServer {
-        let mut redis_cmd = process::Command::new("redis-server");
+        // Check wether the server available is redis or valkey
+        let server_command = ["valkey-server", "redis-server"]
+            .iter()
+            .find(|cmd| which::which(cmd).is_ok())
+            .map(|&cmd| cmd)
+            .unwrap_or_else(|| {
+                panic!("Neither valkey-server nor redis-server exists in the system.")
+            });
+        let mut server_cmd = process::Command::new(server_command);
 
         if let Some(config_path) = config_file {
-            redis_cmd.arg(config_path);
+            server_cmd.arg(config_path);
         }
 
         // Load Redis Modules
         for module in modules {
             match module {
                 Module::Json => {
-                    redis_cmd
+                    server_cmd
                         .arg("--loadmodule")
                         .arg(env::var("REDIS_RS_REDIS_JSON_PATH").expect(
                         "Unable to find path to RedisJSON at REDIS_RS_REDIS_JSON_PATH, is it set?",
@@ -244,24 +252,24 @@ impl RedisServer {
             };
         }
 
-        redis_cmd
+        server_cmd
             .stdout(process::Stdio::null())
             .stderr(process::Stdio::null());
         let tempdir = tempfile::Builder::new()
             .prefix("redis")
             .tempdir()
             .expect("failed to create tempdir");
-        redis_cmd.arg("--logfile").arg(Self::log_file(&tempdir));
+        server_cmd.arg("--logfile").arg(Self::log_file(&tempdir));
         match addr {
             redis::ConnectionAddr::Tcp(ref bind, server_port) => {
-                redis_cmd
+                server_cmd
                     .arg("--port")
                     .arg(server_port.to_string())
                     .arg("--bind")
                     .arg(bind);
 
                 RedisServer {
-                    process: spawner(&mut redis_cmd),
+                    process: spawner(&mut server_cmd),
                     tempdir,
                     addr,
                     tls_paths: None,
@@ -273,7 +281,7 @@ impl RedisServer {
                 let auth_client = if mtls_enabled { "yes" } else { "no" };
 
                 // prepare redis with TLS
-                redis_cmd
+                server_cmd
                     .arg("--tls-port")
                     .arg(port.to_string())
                     .arg("--port")
@@ -300,20 +308,20 @@ impl RedisServer {
                 };
 
                 RedisServer {
-                    process: spawner(&mut redis_cmd),
+                    process: spawner(&mut server_cmd),
                     tempdir,
                     addr,
                     tls_paths: Some(tls_paths),
                 }
             }
             redis::ConnectionAddr::Unix(ref path) => {
-                redis_cmd
+                server_cmd
                     .arg("--port")
                     .arg("0")
                     .arg("--unixsocket")
                     .arg(path);
                 RedisServer {
-                    process: spawner(&mut redis_cmd),
+                    process: spawner(&mut server_cmd),
                     tempdir,
                     addr,
                     tls_paths: None,

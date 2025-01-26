@@ -217,7 +217,13 @@ impl RedisCluster {
             ));
         }
 
-        let mut cmd = process::Command::new("redis-cli");
+        let cli_command = ["valkey-cli", "redis-cli"]
+            .iter()
+            .find(|cmd| which::which(cmd).is_ok())
+            .map(|&cmd| cmd)
+            .unwrap_or_else(|| panic!("Neither valkey-cli nor redis-cli exists in the system."));
+
+        let mut cmd = process::Command::new(cli_command);
         cmd.stdout(process::Stdio::null())
             .arg("--cluster")
             .arg("create")

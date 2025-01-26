@@ -14,13 +14,10 @@
         "prettier:format": "./node_modules/.bin/prettier --write . "
     },
     "dependencies": {
-        "child_process": "^1.0.2",
-        "find-free-ports": "^3.1.1",
-        "valkey-glide": "file:../../../node/build-ts/mjs"
+        "@valkey/valkey-glide": "file:../..",
+        "find-free-ports": "^3.1.1"
     },
     "devDependencies": {
-        "@types/node": "^22.8",
-        "prettier": "^3.3",
-        "typescript": "^5.6"
+        "prettier": "^3.3"
     }
 }
