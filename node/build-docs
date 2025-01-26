@@ -1,0 +1,17 @@
+#!/bin/bash
+npm install --save-dev typedoc
+
+typedoc src/BaseClient.ts                   \
+        src/Transaction.ts                  \
+        src/GlideClient.ts                  \
+        src/GlideClusterClient.ts           \
+        src/Errors.ts                       \
+        src/Commands.ts                     \
+        src/Logger.ts                       \
+        src/server-modules/GlideFt.ts       \
+        src/server-modules/FtOptions.ts     \
+        src/server-modules/GlideJson.ts     \
+        --plugin typedoc-plugin-markdown    \
+        --disableSources                    \
+        --includeHierarchySummary           \
+        --out ../docs/markdown/node/

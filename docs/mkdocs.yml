@@ -1,0 +1,90 @@
+site_name: GLIDE for Valkey - API Documentation
+repo_url: https://github.com/valkey-io/valkey-glide
+repo_name: GitHub
+docs_dir: markdown
+nav:
+  - Python:
+      - Client:
+          - Standalone: python/glide_client.md
+          - Cluster: python/glide_cluster_client.md
+          - Base: python/base_client.md
+          - CoreCommands: python/core.md
+          - ClusterCommands: python/cluster_commands.md
+          - StandaloneCommands: python/standalone_commands.md
+          - BaseTransaction: python/base_transaction.md
+          - Transaction (Standalone): python/standalone_transaction.md
+          - ClusterTransaction: python/cluster_transaction.md
+      - Exceptions: python/exceptions.md
+  - TypeScript:
+      - Client:
+          - Standalone: typescript/GlideClient/classes/GlideClient.md
+          - Cluster: typescript/GlideClusterClient/classes/GlideClusterClient.md
+          - Base: typescript/BaseClient/classes/BaseClient.md
+          - Transaction: typescript/Transaction/classes/Transaction.md
+      - Modules:
+          - JSON: typescript/server-modules/GlideJson/classes/GlideJson.md
+          - Vector Search: typescript/server-modules/GlideFt/classes/GlideFt.md
+      - Commands:
+          - BitFieldGet: typescript/Commands/classes/BitFieldGet.md
+          - BitFieldOverflow: typescript/Commands/classes/BitFieldOverflow.md
+          - BitOffset: typescript/Commands/classes/BitOffset.md
+          - SignedEncoding: typescript/Commands/classes/SignedEncoding.md
+          - BitFieldIncrBy: typescript/Commands/classes/BitFieldIncrBy.md
+          - BitFieldSet: typescript/Commands/classes/BitFieldSet.md
+          - BitOffsetMultiplier: typescript/Commands/classes/BitOffsetMultiplier.md
+          - UnsignedEncoding: typescript/Commands/classes/UnsignedEncoding.md
+      - Errors:
+          - ClosingError: typescript/Errors/classes/ClosingError.md
+          - ConfigurationError: typescript/Errors/classes/ConfigurationError.md
+          - ConnectionError: typescript/Errors/classes/ConnectionError.md
+          - ExecAbortError: typescript/Errors/classes/ExecAbortError.md
+          - RequestError: typescript/Errors/classes/RequestError.md
+          - TimeoutError: typescript/Errors/classes/TimeoutError.md
+          - ValkeyError: typescript/Errors/classes/ValkeyError.md
+      - Logger: typescript/Logger/classes/Logger.md
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+    - navigation.path
+    - navigation.footer
+    - navigation.top
+  highlightjs: true
+  font:
+    text: Roboto
+    code: Roboto Mono
+  palette:
+    scheme: slate
+    colour: black
+markdown_extensions:
+  - pymdownx.keys
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_root_heading: true
+  - search
+  - mkdocs-breadcrumbs-plugin:
+      delimiter: " / " # separator between sections
+      log_level: "CRITICAL" # "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+      exclude_paths:
+        - "docs/mkdocs/**"
+        - "docs/mkdocs" # avoid generating index.md
+      additional_index_folders:
+        - temp_dir
+      generate_home_index: false
+extra:
+  generator: false
+extra_css:
+  - style.css

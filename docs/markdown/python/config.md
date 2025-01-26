@@ -1,0 +1,10 @@
+::: glide.config.NodeAddress
+::: glide.config.ReadFrom
+::: glide.config.ProtocolVersion
+::: glide.config.BackoffStrategy
+::: glide.config.ServerCredentials
+::: glide.config.PeriodicChecksManualInterval
+::: glide.config.PeriodicChecksStatus
+::: glide.config.BaseClientConfiguration
+::: glide.config.GlideClientConfiguration
+::: glide.config.GlideClusterClientConfiguration

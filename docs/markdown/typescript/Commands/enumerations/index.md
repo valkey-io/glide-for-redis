@@ -1,0 +1,18 @@
+# Index of node/Commands/enumerations
+
+- [BitOverflowControl](/node/Commands/enumerations/BitOverflowControl/)
+- [BitmapIndexType](/node/Commands/enumerations/BitmapIndexType/)
+- [BitwiseOperation](/node/Commands/enumerations/BitwiseOperation/)
+- [ConditionalChange](/node/Commands/enumerations/ConditionalChange/)
+- [ExpireOptions](/node/Commands/enumerations/ExpireOptions/)
+- [FlushMode](/node/Commands/enumerations/FlushMode/)
+- [FunctionRestorePolicy](/node/Commands/enumerations/FunctionRestorePolicy/)
+- [GeoUnit](/node/Commands/enumerations/GeoUnit/)
+- [InfBoundary](/node/Commands/enumerations/InfBoundary/)
+- [InfoOptions](/node/Commands/enumerations/InfoOptions/)
+- [InsertPosition](/node/Commands/enumerations/InsertPosition/)
+- [ListDirection](/node/Commands/enumerations/ListDirection/)
+- [ScoreFilter](/node/Commands/enumerations/ScoreFilter/)
+- [SortOrder](/node/Commands/enumerations/SortOrder/)
+- [TimeUnit](/node/Commands/enumerations/TimeUnit/)
+- [UpdateByScore](/node/Commands/enumerations/UpdateByScore/)

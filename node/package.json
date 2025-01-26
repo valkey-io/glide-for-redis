@@ -31,6 +31,7 @@
         "build-protobuf": "npm run compile-protobuf-files && npm run fix-protobuf-file",
         "compile-protobuf-files": "cd src && pbjs -t static-module -o ProtobufMessage.js ../../glide-core/src/protobuf/*.proto && pbts -o ProtobufMessage.d.ts ProtobufMessage.js",
         "clean": "rm -rf build-ts rust-client/target docs glide-logs rust-client/glide-rs.*.node rust-client/index.* src/ProtobufMessage.*",
+        "docs": "npm run build && ./build-docs",
         "fix-protobuf-file": "replace 'this\\.encode\\(message, writer\\)\\.ldelim' 'this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim' src/ProtobufMessage.js",
         "test": "npm run build-test-utils && jest --verbose --testPathIgnorePatterns='ServerModules'",
         "test-dbg": "npm run build-test-utils && jest --runInBand",
@@ -61,6 +62,8 @@
         "semver": "^7.6.3",
         "ts-jest": "^29.2.5",
         "ts-node": "^10.9.2",
+        "typedoc": "^0.27.6",
+        "typedoc-plugin-markdown": "^4.4.1",
         "typescript": "^5.6.3",
         "uuid": "^11.0.3"
     },
