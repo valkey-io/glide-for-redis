@@ -8,9 +8,25 @@ const PORT_NUMBER = 4001;
 let server;
 let port;
 
-function flushallOnPort(port) {
+function checkCliAvailability(cli) {
+    return new Promise((resolve) => {
+        execFile(cli, ["--version"], (error) => {
+            resolve(!error);
+        });
+    });
+}
+
+async function flushallOnPort(port) {
+    const redisCliAvailable = await checkCliAvailability("redis-cli");
+    const valkeyCliAvailable = await checkCliAvailability("valkey-cli");
+
+    if (!redisCliAvailable && !valkeyCliAvailable) {
+        throw new Error("Neither redis-cli nor valkey-cli is available");
+    }
+
+    const cli = redisCliAvailable ? "valkey-cli" : "redis-cli";
     return new Promise((resolve, reject) => {
-        execFile("redis-cli", ["-p", port, "FLUSHALL"], (error, _, stderr) => {
+        execFile(cli, ["-p", port, "FLUSHALL"], (error, _, stderr) => {
             if (error) {
                 console.error(stderr);
                 reject(error);

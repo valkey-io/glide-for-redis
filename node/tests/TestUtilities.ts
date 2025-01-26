@@ -193,17 +193,39 @@ export async function GetAndSetRandomValue(client: Client) {
     expect(intoString(result)).toEqual(value);
 }
 
+function checkCliAvailability(cli: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        exec(`${cli} --version`, (error) => {
+            resolve(!error);
+        });
+    });
+}
+
 export function flushallOnPort(port: number): Promise<void> {
-    return new Promise<void>((resolve, reject) =>
-        exec(`redis-cli -p ${port} FLUSHALL`, (error, _, stderr) => {
-            if (error) {
-                console.error(stderr);
-                reject(error);
-            } else {
-                resolve();
-            }
-        }),
-    );
+    return new Promise<void>((resolve, reject) => {
+        checkCliAvailability("valkey-cli")
+            .then(async (redisCliAvailable) => {
+                const valkeyCliAvailable =
+                    await checkCliAvailability("redis-cli");
+
+                if (!redisCliAvailable && !valkeyCliAvailable) {
+                    throw new Error(
+                        "Neither redis-cli nor valkey-cli is available",
+                    );
+                }
+
+                const cli_1 = redisCliAvailable ? "valkey-cli" : "redis-cli";
+                exec(`${cli_1} -p ${port} FLUSHALL`, (error, _, stderr) => {
+                    if (error) {
+                        console.error(stderr);
+                        reject(error);
+                    } else {
+                        resolve();
+                    }
+                });
+            })
+            .catch(reject);
+    });
 }
 
 /**
