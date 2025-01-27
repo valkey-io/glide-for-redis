@@ -45,6 +45,7 @@ use crate::{
 use dashmap::DashMap;
 use pipeline_routing::{
     collect_pipeline_tasks, execute_pipeline_on_node, map_pipeline_to_nodes, route_for_pipeline,
+    PipelineResponses,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -283,6 +284,11 @@ where
         route: SingleNodeRoutingInfo,
     ) -> RedisResult<Vec<Value>> {
         let (sender, receiver) = oneshot::channel();
+        let connections: Vec<_> = {
+            let lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
+
+            lock.all_primary_connections().collect()
+        };
         self.0
             .send(Message {
                 cmd: CmdArg::Pipeline {
@@ -2106,20 +2112,60 @@ where
             .map_err(|err| (OperationTarget::Node { address }, err))
     }
 
-    /// Aggregates responses for multi-node commands and updates the `values_and_addresses` vector.
+    /// Aggregates pipeline responses for multi-node commands and updates the `pipeline_responses` vector.
+    ///
+    /// Pipeline commands with multi-node routing info, will be splitted into multiple pipelines, therefor, after executing each pipeline and storing the results in `pipeline_responses`,
+    /// the multi-node commands will contain more than one response (one for each sub-pipeline that contained the command). This responses must be aggregated into a single response, based on the proper response policy.
     ///
     /// This function processes the provided `response_policies`, which contain information about how responses
     /// from multiple nodes should be aggregated. For each policy:
-    /// - It collects responses and their source node addresses from the corresponding entry in `values_and_addresses`.
+    /// - It collects the multiple responses and their source node addresses from the corresponding entry in `pipeline_responses`.
     /// - Uses the routing information and optional response policy to aggregate the responses into a single result.
     ///
-    /// The aggregated result replaces the existing entries in `values_and_addresses` for the given command index.
+    /// The aggregated result replaces the existing entries in `pipeline_responses` for the given command index, changing the multiple responses to the command into a single aggregated response.
+    ///
+    /// After the execution of this function, all entries in `pipeline_responses` will contain a single response for each command.
+    ///
+    /// # Arguments
+    /// * `pipeline_responses` - A mutable reference to a vector of vectors, where each inner vector contains tuples of responses and their corresponding node addresses.
+    /// * `response_policies` - A vector of tuples, each containing:
+    ///     - The index of the command in the pipeline that has a multi-node routing info.
+    ///     - The routing information for the command.
+    ///     - An optional response policy that dictates how the responses should be aggregated.
+    ///
+    /// # Returns
+    /// * `Result<(), (OperationTarget, RedisError)>` - Returns `Ok(())` if the aggregation is successful, or an error tuple containing the operation target and the Redis error if it fails.
+    ///
+    /// # Example
+    /// Suppose we have a pipeline with multiple commands that were split and executed on different nodes.
+    /// This function will aggregate the responses for commands that were split across multiple nodes.
+    ///
+    /// ```rust,no_run
+    /// // Example pipeline with commands that might be split across nodes
+    /// let mut pipeline_responses = vec![
+    ///     vec![(Value::Int(1), "node1".to_string()), (Value::Int(2), "node2".to_string())],
+    ///     vec![(Value::Int(3), "node3".to_string())],
+    /// ];
+    /// let response_policies = vec![
+    ///     (0, MultipleNodeRoutingInfo::AllNodes, Some(ResponsePolicy::Aggregate(AggregateOp::Sum))),
+    ///     (1, MultipleNodeRoutingInfo::AllNodes, None),
+    /// ];
+    ///
+    /// // Aggregating the responses
+    /// aggregate_pipeline_multi_node_commands(&mut pipeline_responses, response_policies).await.unwrap();
+    ///
+    /// // After aggregation, pipeline_responses will be updated with aggregated results
+    /// assert_eq!(pipeline_responses[0], vec![(Value::Int(3), "".to_string())]);
+    /// assert_eq!(pipeline_responses[1], vec![(Value::Int(3), "".to_string())]);
+    /// ```
+    ///
+    /// This function is essential for handling multi-node commands in a Redis cluster, ensuring that responses from different nodes are correctly aggregated and processed.
     async fn aggregate_pipeline_multi_node_commands(
-        values_and_addresses: &mut [Vec<(Value, String)>],
+        pipeline_responses: &mut PipelineResponses,
         response_policies: Vec<(usize, MultipleNodeRoutingInfo, Option<ResponsePolicy>)>,
     ) -> Result<(), (OperationTarget, RedisError)> {
         for (index, routing_info, response_policy) in response_policies {
-            let response_receivers = values_and_addresses[index]
+            let response_receivers = pipeline_responses[index]
                 .iter()
                 .map(|(value, address)| {
                     let (sender, receiver) = oneshot::channel();
@@ -2133,7 +2179,7 @@ where
                     .await
                     .map_err(|err| (OperationTarget::FanOut, err))?;
 
-            values_and_addresses[index] = vec![(aggregated_response, "".to_string())];
+            pipeline_responses[index] = vec![(aggregated_response, "".to_string())];
         }
         Ok(())
     }
@@ -2167,14 +2213,14 @@ where
                         map_pipeline_to_nodes(&pipeline, core.clone())
                             .await
                             .map_err(|err| (OperationTarget::FanOut, err))?;
-                    // Stores responses along with their source node addresses for each pipeline command.
-                    //
-                    // The outer `Vec` represents the pipeline commands, and each inner `Vec` contains (response, address) pairs.
-                    // Since some commands can be executed across multiple nodes (e.g., multi-node commands), a single command
-                    // might produce multiple responses, each from a different node. By storing the responses with their
-                    // respective node addresses, we ensure that we have all the information needed to aggregate the results later.
-                    // This structure is essential for handling scenarios where responses from multiple nodes must be combined.
-                    let mut values_and_addresses = vec![Vec::new(); pipeline.len()];
+
+                    // Initialize `PipelineResponses` to store responses for each pipeline command.
+                    // This will be used to store the responses from the different sub-pipelines to the pipeline commands.
+                    // A command can have one or more responses (e.g MultiNode commands).
+                    // Each entry in `PipelineResponses` corresponds to a command in the original pipeline and contains
+                    // a vector of tuples where each tuple holds a response to the command and the address of the node that provided it.
+                    let mut pipeline_responses: PipelineResponses =
+                        vec![Vec::new(); pipeline.len()];
 
                     let mut final_responses: Vec<Value> = Vec::with_capacity(pipeline.len());
                     let mut join_set = tokio::task::JoinSet::new(); // Manage spawned tasks
@@ -2186,7 +2232,7 @@ where
 
                     // Wait for all spawned tasks to complete
                     let first_error =
-                        collect_pipeline_tasks(&mut join_set, &mut values_and_addresses).await?;
+                        collect_pipeline_tasks(&mut join_set, &mut pipeline_responses).await?;
 
                     // Check for errors
                     if let Some(first_error) = first_error {
@@ -2195,13 +2241,13 @@ where
 
                     // Process response policies after all tasks are complete
                     Self::aggregate_pipeline_multi_node_commands(
-                        &mut values_and_addresses,
+                        &mut pipeline_responses,
                         response_policies,
                     )
                     .await?;
 
                     // Collect final responses
-                    for mut value in values_and_addresses.into_iter() {
+                    for mut value in pipeline_responses.into_iter() {
                         // unwrap() is safe here because we know that the vector is not empty
                         final_responses.push(value.pop().unwrap().0);
                     }

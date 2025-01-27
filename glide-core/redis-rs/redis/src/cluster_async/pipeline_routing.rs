@@ -47,6 +47,15 @@ impl<C> NodePipelineContext<C> {
     }
 }
 
+// `NodeResponse` represents a response from a node along with its source node address.
+// `PipelineResponses` represents the responses for each pipeline command.
+// The outer `Vec` represents the pipeline commands, and each inner `Vec` contains (response, address) pairs.
+// Since some commands can be executed across multiple nodes (e.g., multi-node commands), a single command
+// might produce multiple responses, each from a different node. By storing the responses with their
+// respective node addresses, we ensure that we have all the information needed to aggregate the results later.
+type NodeResponse = (Value, String);
+pub type PipelineResponses = Vec<Vec<NodeResponse>>;
+
 /// Adds a command to the pipeline map for a specific node address.
 pub fn add_command_to_node_pipeline_map<C>(
     pipeline_map: &mut NodePipelineMap<C>,
@@ -380,11 +389,11 @@ pub async fn collect_pipeline_tasks(
     Ok(first_error)
 }
 
-// This function returns the rout for a given pipeline.
-// The function goes over the commands in the pipeline, checks that all key-based commands are routed to the same slot,
-// and returns the route for that specific node.
-// If the pipelines contains no key-base commands, the function returns None.
-// For non-anomic pipeline, the function will return None, regardless of the commands in it.
+/// This function returns the route for a given pipeline.
+/// The function goes over the commands in the pipeline, checks that all key-based commands are routed to the same slot,
+/// and returns the route for that specific node.
+/// If the pipeline contains no key-based commands, the function returns None.
+/// For non-atomic pipelines, the function will return None, regardless of the commands in it.
 pub fn route_for_pipeline(pipeline: &crate::Pipeline) -> RedisResult<Option<Route>> {
     fn route_for_command(cmd: &Cmd) -> Option<Route> {
         match cluster_routing::RoutingInfo::for_routable(cmd) {
