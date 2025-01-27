@@ -1673,11 +1673,6 @@ func (client *baseClient) RPush(key string, elements []string) (int64, error) {
 //
 //	The number of members that were added to the set, excluding members already present.
 //
-// For example:
-//
-//	result, err := client.SAdd("my_set", []string{"member1", "member2"})
-//	// result: 2
-//
 // [valkey.io]: https://valkey.io/commands/sadd/
 func (client *baseClient) SAdd(key string, members []string) (int64, error) {
 	result, err := client.executeCommand(C.SAdd, append([]string{key}, members...))
@@ -1700,11 +1695,6 @@ func (client *baseClient) SAdd(key string, members []string) (int64, error) {
 // Return value:
 //
 //	The number of members that were removed from the set, excluding non-existing members.
-//
-// For example:
-//
-//	result, err := client.SRem("my_set", []string{"member1", "member2"})
-//	// result: 2
 //
 // [valkey.io]: https://valkey.io/commands/srem/
 func (client *baseClient) SRem(key string, members []string) (int64, error) {
