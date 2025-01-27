@@ -4,26 +4,30 @@ import (
 	"fmt"
 )
 
-func ExampleGlideClient_SAdd() {
+func ExampleGlideClient_Set() {
 	var client *GlideClient = getExampleGlideClient() // example helper function
 
-	result, err := client.SAdd("my_set", []string{"member1", "member2"})
+	result, err := client.Set("my_key", "my_value")
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
 	fmt.Println(result)
 
-	// Output: 2
+	// Output: OK
 }
 
-func ExampleGlideClient_SRem() {
+func ExampleGlideClient_SetWithOptions() {
 	var client *GlideClient = getExampleGlideClient() // example helper function
 
-	result, err := client.SRem("my_set", []string{"member1", "member2"})
+	options := NewSetOptionsBuilder().
+		SetExpiry(NewExpiryBuilder().
+			SetType(Seconds).
+			SetCount(uint64(5)))
+	result, err := client.SetWithOptions("my_key", "my_value", options)
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
-	fmt.Println(result)
+	fmt.Println(result.Value())
 
-	// Output: 2
+	// Output: OK
 }
