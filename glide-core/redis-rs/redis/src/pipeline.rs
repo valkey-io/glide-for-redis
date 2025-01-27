@@ -12,6 +12,7 @@ pub struct Pipeline {
     commands: Vec<Cmd>,
     transaction_mode: bool,
     ignored_commands: HashSet<usize>,
+    is_sub_pipeline: bool,
 }
 
 /// A pipeline allows you to send multiple commands in one go to the
@@ -48,6 +49,7 @@ impl Pipeline {
             commands: Vec::with_capacity(capacity),
             transaction_mode: false,
             ignored_commands: HashSet::new(),
+            is_sub_pipeline: false,
         }
     }
 
@@ -67,6 +69,23 @@ impl Pipeline {
     #[inline]
     pub fn atomic(&mut self) -> &mut Pipeline {
         self.transaction_mode = true;
+        self
+    }
+
+    /// This enables sub-pipeline mode. In sub-pipeline mode, the whole pipeline is enclosed in
+    /// `MULTI`/`EXEC` and the return value is a nested array of results. This is useful when
+    /// you want to execute a pipeline inside another pipeline.
+    /// ```rust,no_run
+    /// # let client = redis::Client::open("redis://
+    /// 127.0.0.1/").unwrap();  
+    /// # let mut con = client.get_connection(None).unwrap();
+    /// let (k1, k2) : (i32, i32) = redis::pipe()
+    ///    .atomic()        
+    /// .cmd("SET").arg("key_1").arg(42).ignore()
+    ///
+    ///
+    pub fn sub_pipeline(&mut self) -> &mut Pipeline {
+        self.is_sub_pipeline = true;
         self
     }
 
@@ -220,6 +239,11 @@ impl Pipeline {
     /// Returns `true` if the pipeline contains no commands.
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
+    }
+
+    ///
+    pub fn is_sub_pipeline(&self) -> bool {
+        self.is_sub_pipeline
     }
 }
 

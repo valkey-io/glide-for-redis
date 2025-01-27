@@ -33,8 +33,10 @@ pub type NodePipelineMap<C> = HashMap<String, NodePipelineContext<C>>;
 
 impl<C> NodePipelineContext<C> {
     fn new(connection: C) -> Self {
+        let mut pipeline = Pipeline::new();
+        pipeline.sub_pipeline();
         Self {
-            pipeline: Pipeline::new(),
+            pipeline,
             connection,
             command_indices: Vec::new(),
         }

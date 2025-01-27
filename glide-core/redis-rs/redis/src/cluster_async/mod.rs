@@ -44,8 +44,8 @@ use crate::{
 };
 use dashmap::DashMap;
 use pipeline_routing::{
-    collect_pipeline_tasks, execute_pipeline_on_node, map_pipeline_to_nodes, route_for_pipeline,
-    PipelineResponses,
+    add_pipeline_result, collect_pipeline_tasks, execute_pipeline_on_node, map_pipeline_to_nodes,
+    route_for_pipeline, PipelineResponses,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -284,11 +284,6 @@ where
         route: SingleNodeRoutingInfo,
     ) -> RedisResult<Vec<Value>> {
         let (sender, receiver) = oneshot::channel();
-        let connections: Vec<_> = {
-            let lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
-
-            lock.all_primary_connections().collect()
-        };
         self.0
             .send(Message {
                 cmd: CmdArg::Pipeline {
@@ -2193,7 +2188,7 @@ where
                 count,
                 route,
             } => {
-                if pipeline.is_atomic() {
+                if pipeline.is_atomic() || pipeline.is_sub_pipeline() {
                     // If the pipeline is atomic (i.e., a transaction), we can send it as is, with no need to split it into sub-pipelines.
                     Self::try_pipeline_request(
                         pipeline,
@@ -2223,21 +2218,94 @@ where
                         vec![Vec::new(); pipeline.len()];
 
                     let mut final_responses: Vec<Value> = Vec::with_capacity(pipeline.len());
-                    let mut join_set = tokio::task::JoinSet::new(); // Manage spawned tasks
+                    //let mut join_set = tokio::task::JoinSet::new(); // Manage spawned tasks
+
+                    let mut receivers = Vec::new();
+                    let mut pending_requests = Vec::new();
+                    let mut addresses_and_indices = Vec::new();
 
                     for (address, node_context) in pipelines_by_connection {
-                        // Spawn a new task to execute the pipeline on the node
-                        join_set.spawn(execute_pipeline_on_node(address, node_context));
+                        let (sender, receiver) = oneshot::channel();
+                        let count = node_context.pipeline.len();
+                        receivers.push((Some(address.clone()), receiver));
+                        pending_requests.push(Some(PendingRequest {
+                            retry: 0,
+                            sender,
+                            info: RequestInfo {
+                                cmd: CmdArg::Pipeline {
+                                    pipeline: node_context.pipeline.into(),
+                                    offset: 0,
+                                    count,
+                                    route: InternalSingleNodeRouting::<C>::ByAddress(
+                                        address.clone(),
+                                    ),
+                                },
+                            },
+                        }));
+                        addresses_and_indices.push((address, node_context.command_indices));
                     }
 
+                    core.pending_requests
+                        .lock()
+                        .unwrap()
+                        .extend(pending_requests.into_iter().flatten());
+
+                    // Spawn a new task to execute the pipeline on the node
+                    // join_set.spawn(execute_pipeline_on_node(address, node_context));
+
+                    // Wait for all receivers to complete and collect the responses
+                    let responses: Vec<_> = futures::future::join_all(
+                        receivers.into_iter().map(|(_, receiver)| receiver),
+                    )
+                    .await
+                    .into_iter()
+                    .collect();
+
+                    // Process the responses and update the pipeline_responses
+                    for (i, response) in responses.into_iter().enumerate() {
+                        match response {
+                            Ok(Ok(Response::Multiple(values))) => {
+                                for ((index, inner_index), value) in
+                                    addresses_and_indices[i].1.iter().cloned().zip(values)
+                                {
+                                    add_pipeline_result(
+                                        &mut pipeline_responses,
+                                        index,
+                                        inner_index,
+                                        value,
+                                        addresses_and_indices[i].0.clone(),
+                                    );
+                                }
+                            }
+                            Ok(Err(err)) => {
+                                return Err((
+                                    OperationTarget::Node {
+                                        address: addresses_and_indices[i].0.clone(),
+                                    },
+                                    err,
+                                ));
+                            }
+                            _ => {
+                                return Err((
+                                    OperationTarget::Node {
+                                        address: addresses_and_indices[i].0.clone(),
+                                    },
+                                    RedisError::from((
+                                        ErrorKind::ResponseError,
+                                        "Failed to receive response",
+                                    )),
+                                ));
+                            }
+                        }
+                    }
                     // Wait for all spawned tasks to complete
-                    let first_error =
-                        collect_pipeline_tasks(&mut join_set, &mut pipeline_responses).await?;
+                    //let first_error =
+                    //   collect_pipeline_tasks(&mut join_set, &mut pipeline_responses).await?;
 
                     // Check for errors
-                    if let Some(first_error) = first_error {
-                        return Err(first_error);
-                    }
+                    //if let Some(first_error) = first_error {
+                    //   return Err(first_error);
+                    //}
 
                     // Process response policies after all tasks are complete
                     Self::aggregate_pipeline_multi_node_commands(
@@ -2255,6 +2323,7 @@ where
                     Ok(Response::Multiple(final_responses))
                 }
             }
+
             CmdArg::ClusterScan {
                 cluster_scan_args, ..
             } => {
