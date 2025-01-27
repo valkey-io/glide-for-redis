@@ -3,11 +3,30 @@
 package api
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/valkey-io/valkey-glide/go/glide/api/errors"
 	"github.com/valkey-io/valkey-glide/go/glide/utils"
 )
+
+type ScoreFilter string
+
+const (
+	MAX ScoreFilter = "MAX"
+	MIN ScoreFilter = "MIN"
+)
+
+func (scoreFilter ScoreFilter) toString() (string, error) {
+	switch scoreFilter {
+	case MAX:
+		return string(MAX), nil
+	case MIN:
+		return string(MIN), nil
+	default:
+		return "", fmt.Errorf("invalid score filter")
+	}
+}
 
 // SetOptions represents optional arguments for the [api.StringCommands.SetWithOptions] command.
 //

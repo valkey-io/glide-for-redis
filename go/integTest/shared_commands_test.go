@@ -7454,3 +7454,92 @@ func (suite *GlideTestSuite) TestXRangeAndXRevRange() {
 		assert.IsType(suite.T(), &errors.RequestError{}, err)
 	})
 }
+
+func (suite *GlideTestSuite) TestBZPopMax() {
+	if suite.serverVersion < "7.0.0" {
+		suite.T().Skip("This feature is added in version 5.0.0")
+	}
+	suite.runWithDefaultClients(func(client api.BaseClient) {
+		key1 := "{key}-1" + uuid.NewString()
+		key2 := "{key}-2" + uuid.NewString()
+
+		res1, err := client.BZPopMax([]string{key1}, float64(0.1))
+		assert.Nil(suite.T(), err)
+		assert.True(suite.T(), res1.IsNil())
+
+		membersScoreMap := map[string]float64{
+			"one":   1.0,
+			"two":   2.0,
+			"three": 3.0,
+		}
+
+		res2, err := client.ZAdd(key1, membersScoreMap)
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), int64(3), res2)
+
+		res3, err := client.BZPopMax([]string{key1}, float64(0.1))
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), api.KeyWithMemberAndScore{Key: key1, Member: "three", Score: 3.0}, res3.Value())
+	})
+}
+
+func (suite *GlideTestSuite) TestZMPop() {
+	if suite.serverVersion < "7.0.0" {
+		suite.T().Skip("This feature is added in version 7.0.0")
+	}
+
+	suite.runWithDefaultClients(func(client api.BaseClient) {
+		key1 := "{key}-1" + uuid.NewString()
+		key2 := "{key}-2" + uuid.NewString()
+		key3 := "{key}-3" + uuid.NewString()
+
+		res1, err := client.ZMPop([]string{key1}, api.MIN, 1)
+		assert.Nil(suite.T(), err)
+		assert.True(suite.T(), res1.IsNil())
+
+		membersScoreMap := map[string]float64{
+			"one":   1.0,
+			"two":   2.0,
+			"three": 3.0,
+		}
+		res2, err := client.ZAdd(key1, membersScoreMap)
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), int64(3), res2)
+
+		res3, err := client.ZAdd(key2, map[string]float64{
+			"four": 4.0,
+			"five": 5.0,
+		})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), int64(2), res3)
+
+		// Pop minimum values from key1
+		res4, err := client.ZMPop([]string{key1}, api.MIN, 2)
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), key1, res4.Value().Key)
+		assert.ElementsMatch(
+			suite.T(),
+			[]api.MemberAndScore{
+				{Member: "one", Score: 1.0},
+				{Member: "two", Score: 2.0},
+			},
+			res4.Value().MembersAndScores,
+		)
+
+		// Pop maximum value from key2
+		res5, err := client.ZMPop([]string{key2}, api.MAX, 1)
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), key2, res5.Value().Key)
+		assert.ElementsMatch(
+			suite.T(),
+			[]api.MemberAndScore{
+				{Member: "five", Score: 5.0},
+			},
+			res5.Value().MembersAndScores,
+		)
+
+		res6, err := client.ZMPop([]string{key3}, api.MIN, 1)
+		assert.Nil(suite.T(), err)
+		assert.True(suite.T(), res6.IsNil())
+	})
+}

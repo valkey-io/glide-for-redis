@@ -977,3 +977,59 @@ func handleXPendingDetailResponse(response *C.struct_CommandResponse) ([]XPendin
 
 	return pendingDetails, nil
 }
+
+func handleKeyWithArrayOfMembersAndScoresResponse(
+	response *C.struct_CommandResponse,
+) (Result[KeyWithArrayOfMembersAndScores], error) {
+	defer C.free_command_response(response)
+
+	if response.response_type == uint32(C.Null) {
+		return CreateNilKeyWithArrayOfMembersAndScoresResult(), nil
+	}
+
+	typeErr := checkResponseType(response, C.Array, true)
+	if typeErr != nil {
+		return CreateNilKeyWithArrayOfMembersAndScoresResult(), typeErr
+	}
+
+	slice, err := parseArray(response)
+	if err != nil {
+		return CreateNilKeyWithArrayOfMembersAndScoresResult(), err
+	}
+
+	arr := slice.([]interface{})
+	if len(arr) < 2 {
+		return CreateNilKeyWithArrayOfMembersAndScoresResult(), fmt.Errorf("unexpected response structure, insufficient elements")
+	}
+
+	key, ok := arr[0].(string)
+	if !ok {
+		return CreateNilKeyWithArrayOfMembersAndScoresResult(), fmt.Errorf("unexpected type for key: %T", arr[0])
+	}
+
+	converter := mapConverter[float64]{
+		next:     nil,
+		canBeNil: false, // Map cannot be nil in this case
+	}
+	converted, err := converter.convert(arr[1])
+	if err != nil {
+		return CreateNilKeyWithArrayOfMembersAndScoresResult(), err
+	}
+	res, ok := converted.(map[string]float64)
+	if !ok {
+		return CreateNilKeyWithArrayOfMembersAndScoresResult(), fmt.Errorf("unexpected type for members and scores: %T", converted)
+	}
+
+	memberAndScoreArray := make([]MemberAndScore, 0, len(res))
+	for k, v := range res {
+		memberAndScoreArray = append(memberAndScoreArray, MemberAndScore{
+			Member: k,
+			Score:  v,
+		})
+	}
+
+	return CreateKeyWithArrayOfMembersAndScoresResult(KeyWithArrayOfMembersAndScores{
+		Key:              key,
+		MembersAndScores: memberAndScoreArray,
+	}), nil
+}
