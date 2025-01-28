@@ -290,7 +290,7 @@ where
 
     /// Returns the node's connection in the same availability zone as `client_az`,
     /// checking replicas first, then primary, and falling back to any available node.
-    pub(crate) fn round_robin_read_from_replica_with_az_awareness_all_nodes(
+    pub(crate) fn round_robin_read_from_replica_with_az_awareness_replicas_and_primary(
         &self,
         slot_map_value: &SlotMapValue,
         client_az: String,
@@ -337,13 +337,7 @@ where
         }
 
         // Step 3: Fall back to any available replica using round-robin
-        if !addrs.replicas().is_empty() {
-            return self.round_robin_read_from_replica(slot_map_value);
-        }
-
-        // Step 4: Final fallback - use primary
-        self.connection_details_for_address(addrs.primary().as_str())
-            .map(|(address, connection_details)| (address, connection_details.conn))
+        self.round_robin_read_from_replica(slot_map_value)
     }
 
     fn lookup_route(&self, route: &Route) -> Option<ConnectionAndAddress<Connection>> {
@@ -369,8 +363,8 @@ where
                         slot_map_value,
                         az.to_string(),
                     ),
-                ReadFromReplicaStrategy::AZAffinityAllNodes(az) => self
-                    .round_robin_read_from_replica_with_az_awareness_all_nodes(
+                ReadFromReplicaStrategy::AZAffinityReplicasAndPrimary(az) => self
+                    .round_robin_read_from_replica_with_az_awareness_replicas_and_primary(
                         slot_map_value,
                         az.to_string(),
                     ),
@@ -382,8 +376,8 @@ where
                         slot_map_value,
                         az.to_string(),
                     ),
-                ReadFromReplicaStrategy::AZAffinityAllNodes(az) => self
-                    .round_robin_read_from_replica_with_az_awareness_all_nodes(
+                ReadFromReplicaStrategy::AZAffinityReplicasAndPrimary(az) => self
+                    .round_robin_read_from_replica_with_az_awareness_replicas_and_primary(
                         slot_map_value,
                         az.to_string(),
                     ),
@@ -956,8 +950,8 @@ mod tests {
         assert_eq!(addresses, vec![31, 31, 33, 33]);
     }
 
-    // Helper function to create a container with AZAffinityAllNodes strategy
-    fn create_container_with_az_affinity_all_nodes_strategy(
+    // Helper function to create a container with AZAffinityReplicasAndPrimary strategy
+    fn create_container_with_az_affinity_replicas_and_primary_strategy(
         use_management_connections: bool,
     ) -> ConnectionsContainer<usize> {
         let slot_map = SlotMap::new(
@@ -1015,7 +1009,7 @@ mod tests {
         ConnectionsContainer {
             slot_map,
             connection_map,
-            read_from_replica_strategy: ReadFromReplicaStrategy::AZAffinityAllNodes(
+            read_from_replica_strategy: ReadFromReplicaStrategy::AZAffinityReplicasAndPrimary(
                 "use-1a".to_string(),
             ),
             topology_hash: 0,
@@ -1023,9 +1017,9 @@ mod tests {
     }
 
     #[test]
-    fn get_connection_for_az_affinity_all_nodes_route() {
-        // Create a container with AZAffinityAllNodes strategy
-        let container = create_container_with_az_affinity_all_nodes_strategy(false);
+    fn get_connection_for_az_affinity_replicas_and_primary_route() {
+        // Create a container with AZAffinityReplicasAndPrimary strategy
+        let container = create_container_with_az_affinity_replicas_and_primary_strategy(false);
 
         // Slot number does not exist (slot 1001 wasn't assigned to any primary)
         assert!(container

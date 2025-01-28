@@ -288,7 +288,7 @@ mod standalone_client_tests {
     #[rstest]
     #[serial_test::serial]
     #[timeout(SHORT_STANDALONE_TEST_TIMEOUT)]
-    fn test_read_from_replica_az_affinity_all_nodes() {
+    fn test_read_from_replica_az_affinity_replicas_and_primary() {
         test_read_from_replica(ReadFromReplicaTestConfig {
             read_from: ReadFrom::AZAffinity,
             expected_primary_reads: 0,

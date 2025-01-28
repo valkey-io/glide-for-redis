@@ -303,8 +303,8 @@ mod cluster_async {
     }
 
     #[tokio::test]
-    async fn test_routing_by_slot_to_replica_with_az_affinity_all_nodes_strategy_to_half_replicas()
-    {
+    async fn test_routing_by_slot_to_replica_with_az_affinity_replicas_and_primary_strategy_to_half_replicas(
+    ) {
         // Skip test if version is less then Valkey 8.0
         if crate::engine_version_less_than("8.0").await {
             return;
@@ -343,7 +343,9 @@ mod cluster_async {
 
         let mut client = ClusterClient::builder(cluster_addresses.clone())
             .read_from(
-                redis::cluster_slotmap::ReadFromReplicaStrategy::AZAffinityAllNodes(az.clone()),
+                redis::cluster_slotmap::ReadFromReplicaStrategy::AZAffinityReplicasAndPrimary(
+                    az.clone(),
+                ),
             )
             .build()
             .unwrap()
@@ -490,7 +492,8 @@ mod cluster_async {
     }
 
     #[tokio::test]
-    async fn test_routing_by_slot_to_replica_with_az_affinity_all_nodes_strategy_to_all_replicas() {
+    async fn test_routing_by_slot_to_replica_with_az_affinity_replicas_and_primary_strategy_to_all_replicas(
+    ) {
         // Skip test if version is less then Valkey 8.0
         if crate::engine_version_less_than("8.0").await {
             return;
@@ -523,7 +526,9 @@ mod cluster_async {
 
         let mut client = ClusterClient::builder(cluster_addresses.clone())
             .read_from(
-                redis::cluster_slotmap::ReadFromReplicaStrategy::AZAffinityAllNodes(az.clone()),
+                redis::cluster_slotmap::ReadFromReplicaStrategy::AZAffinityReplicasAndPrimary(
+                    az.clone(),
+                ),
             )
             .build()
             .unwrap()
@@ -582,7 +587,7 @@ mod cluster_async {
     }
 
     #[tokio::test]
-    async fn test_az_affinity_all_nodes_prefers_local_primary() {
+    async fn test_az_affinity_replicas_and_primary_prefers_local_primary() {
         // Skip test if version is less than Valkey 8.0
         if crate::engine_version_less_than("8.0").await {
             return;
@@ -633,7 +638,7 @@ mod cluster_async {
 
         let mut client = ClusterClient::builder(cluster_addresses.clone())
             .read_from(
-                redis::cluster_slotmap::ReadFromReplicaStrategy::AZAffinityAllNodes(
+                redis::cluster_slotmap::ReadFromReplicaStrategy::AZAffinityReplicasAndPrimary(
                     client_az.clone(),
                 ),
             )

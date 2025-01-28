@@ -504,7 +504,7 @@ export type ReadFrom =
     | "AZAffinity"
     /** Spread the read requests among all nodes within the client's Availability Zone (AZ) in a round robin manner,
          prioritizing local replicas, then the local primary, and falling back to any replica or the primary if needed.*/
-    | "AZAffinityAllNodes";
+    | "AZAffinityReplicasAndPrimary";
 
 /**
  * Configuration settings for creating a client. Shared settings for standalone and cluster clients.
@@ -534,11 +534,11 @@ export type ReadFrom =
  *
  * ### Read Strategy
  *
- * - Use `readFrom` to specify the client's read strategy (e.g., primary, preferReplica, AZAffinity, AZAffinityAllNodes).
+ * - Use `readFrom` to specify the client's read strategy (e.g., primary, preferReplica, AZAffinity, AZAffinityReplicasAndPrimary).
  *
  * ### Availability Zone
  *
- * - Use `clientAz` to specify the client's availability zone, which can influence read operations when using `readFrom: 'AZAffinity'or `readFrom: 'AZAffinityAllNodes'`.
+ * - Use `clientAz` to specify the client's availability zone, which can influence read operations when using `readFrom: 'AZAffinity'or `readFrom: 'AZAffinityReplicasAndPrimary'`.
  *
  * ### Decoder Settings
  *
@@ -640,7 +640,7 @@ export interface BaseClientConfiguration {
     inflightRequestsLimit?: number;
     /**
      * Availability Zone of the client.
-     * If ReadFrom strategy is AZAffinity or AZAffinityAllNodes, this setting ensures that readonly commands are directed to nodes within the specified AZ if they exist.
+     * If ReadFrom strategy is AZAffinity or AZAffinityReplicasAndPrimary, this setting ensures that readonly commands are directed to nodes within the specified AZ if they exist.
      *
      * @example
      * ```typescript
@@ -648,7 +648,7 @@ export interface BaseClientConfiguration {
      * configuration.clientAz = 'us-east-1a'; // Sets the client's availability zone
      * configuration.readFrom = 'AZAffinity'; // Directs read operations to nodes within the same AZ
      * Or
-     * configuration.readFrom = 'AZAffinityAllNodes'; // Directs read operations to any node (primary or replica) within the same AZ
+     * configuration.readFrom = 'AZAffinityReplicasAndPrimary'; // Directs read operations to any node (primary or replica) within the same AZ
      * ```
      */
     clientAz?: string;
@@ -6074,7 +6074,8 @@ export class BaseClient {
         primary: connection_request.ReadFrom.Primary,
         preferReplica: connection_request.ReadFrom.PreferReplica,
         AZAffinity: connection_request.ReadFrom.AZAffinity,
-        AZAffinityAllNodes: connection_request.ReadFrom.AZAffinityAllNodes,
+        AZAffinityReplicasAndPrimary:
+            connection_request.ReadFrom.AZAffinityReplicasAndPrimary,
     };
 
     /**

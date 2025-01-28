@@ -31,7 +31,7 @@ enum ReadFrom {
         client_az: String,
         last_read_replica_index: Arc<AtomicUsize>,
     },
-    AZAffinityAllNodes {
+    AZAffinityReplicasAndPrimary {
         client_az: String,
         last_read_replica_index: Arc<AtomicUsize>,
     },
@@ -133,7 +133,8 @@ impl StandaloneClient {
         let pubsub_addr = &connection_request.addresses[pubsub_node_index];
         let discover_az = matches!(
             connection_request.read_from,
-            Some(ClientReadFrom::AZAffinity(_)) | Some(ClientReadFrom::AZAffinityAllNodes(_))
+            Some(ClientReadFrom::AZAffinity(_))
+                | Some(ClientReadFrom::AZAffinityReplicasAndPrimary(_))
         );
 
         let connection_timeout = to_duration(
@@ -310,7 +311,7 @@ impl StandaloneClient {
         }
     }
 
-    async fn round_robin_read_from_replica_az_awareness_all_nodes(
+    async fn round_robin_read_from_replica_az_awareness_replicas_and_primary(
         &self,
         latest_read_replica_index: &Arc<AtomicUsize>,
         client_az: String,
@@ -387,11 +388,11 @@ impl StandaloneClient {
                 )
                 .await
             }
-            ReadFrom::AZAffinityAllNodes {
+            ReadFrom::AZAffinityReplicasAndPrimary {
                 client_az,
                 last_read_replica_index,
             } => {
-                self.round_robin_read_from_replica_az_awareness_all_nodes(
+                self.round_robin_read_from_replica_az_awareness_replicas_and_primary(
                     last_read_replica_index,
                     client_az.to_string(),
                 )
@@ -679,10 +680,12 @@ fn get_read_from(read_from: Option<super::ReadFrom>) -> ReadFrom {
             client_az: az,
             last_read_replica_index: Default::default(),
         },
-        Some(super::ReadFrom::AZAffinityAllNodes(az)) => ReadFrom::AZAffinityAllNodes {
-            client_az: az,
-            last_read_replica_index: Default::default(),
-        },
+        Some(super::ReadFrom::AZAffinityReplicasAndPrimary(az)) => {
+            ReadFrom::AZAffinityReplicasAndPrimary {
+                client_az: az,
+                last_read_replica_index: Default::default(),
+            }
+        }
         None => ReadFrom::Primary,
     }
 }
