@@ -359,7 +359,7 @@ impl StandaloneClient {
         }
 
         // Step 3: Fall back to any available replica using round-robin
-        return self.round_robin_read_from_replica(latest_read_replica_index);
+        self.round_robin_read_from_replica(latest_read_replica_index)
     }
 
     async fn get_connection(&self, readonly: bool) -> &ReconnectingConnection {
