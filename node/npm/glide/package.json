@@ -40,11 +40,11 @@
         "typescript": "^4.9.4"
     },
     "optionalDependencies": {
-        "${scope}valkey-glide-darwin-arm64": "${package_version}",
-        "${scope}valkey-glide-linux-arm64": "${package_version}",
-        "${scope}valkey-glide-linux-x64": "${package_version}",
-        "${scope}valkey-glide-linux-musl-arm64": "${package_version}",
-        "${scope}valkey-glide-linux-musl-x64": "${package_version}"
+        "${scope}glide-rs-darwin-arm64": "${package_version}",
+        "${scope}glide-rs-linux-arm64": "${package_version}",
+        "${scope}glide-rs-linux-x64": "${package_version}",
+        "${scope}glide-rs-linux-musl-arm64": "${package_version}",
+        "${scope}glide-rs-linux-musl-x64": "${package_version}"
     },
     "eslintConfig": {
         "extends": [

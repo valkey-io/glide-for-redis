@@ -62,37 +62,9 @@ jobs:
                   # Get the matrix from the matrix.json file, without the object that has the IMAGE key
                   export "PLATFORM_MATRIX=$(jq 'map(select(.PACKAGE_MANAGERS != null and (.PACKAGE_MANAGERS | contains(["npm"]))))' < .github/json_matrices/build-matrix.json | jq -c .)"
                   echo "PLATFORM_MATRIX=${PLATFORM_MATRIX}" >> $GITHUB_OUTPUT
-      
-     publish-rust-client:
-        needs: [start-self-hosted-runner, load-platform-matrix]
-        if: github.repository_owner == 'valkey-io'
-        name: Publish Rust client to NPM
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-              with:
-                  submodules: "true"
-
-            - name: Setup node
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "latest"
-                  registry-url: "https://registry.npmjs.org"
-                  scope: "${{ vars.NPM_SCOPE }}"
-                  always-auth: true
-
-            - name: Publish Rust client
-              working-directory: ./node/rust-client
-              run: |
-                  npm ci
-                  npm run build
-                  npm publish --access public
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
 
     publish-binaries:
-        needs: [start-self-hosted-runner, load-platform-matrix, publish-rust-client]
+        needs: [start-self-hosted-runner, load-platform-matrix]
         if: github.repository_owner == 'valkey-io'
         name: Publish packages to NPM
         runs-on: ${{ matrix.build.RUNNER }}
@@ -146,6 +118,31 @@ jobs:
               env:
                   EVENT_NAME: ${{ github.event_name }}
                   INPUT_VERSION: ${{ github.event.inputs.version }}
+
+            - name: Set platform-specific package name
+              shell: bash
+              run: |
+                PLATFORM_NAME="${{ matrix.build.NAMED_OS }}${{ contains(matrix.build.TARGET, 'musl') && '-musl' || '' }}-${{ matrix.build.ARCH }}"
+                echo "PLATFORM_NAME=${PLATFORM_NAME}" >> $GITHUB_ENV
+                echo "NODE_OS=${{ matrix.build.NAMED_OS }}" >> $GITHUB_ENV
+                echo "NODE_ARCH=${{ matrix.build.ARCH }}" >> $GITHUB_ENV
+                echo "PACKAGE_VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
+
+            - name: Update Rust client package.json
+              working-directory: ./node/rust-client
+              run: |
+                sed -i 's|\${PLATFORM_NAME}|'"${PLATFORM_NAME}"'|g' package.json
+                sed -i 's|\${PACKAGE_VERSION}|'"${PACKAGE_VERSION}"'|g' package.json
+                sed -i 's|\${NODE_OS}|'"${NODE_OS}"'|g' package.json
+                sed -i 's|\${NODE_ARCH}|'"${NODE_ARCH}"'|g' package.json
+
+            - name: Validate Rust client package.json
+              working-directory: ./node/rust-client
+              run: |
+                if ! grep -q "@valkey/glide-rs-${PLATFORM_NAME}" package.json; then
+                  echo "Error: package.json does not contain the correct package name"
+                  exit 1
+                fi
 
             - name: Setup node
               if: ${{ !contains(matrix.build.TARGET, 'musl') }}
@@ -206,7 +203,7 @@ jobs:
             - name: Publish to NPM
               if: github.event_name != 'pull_request'
               shell: bash
-              working-directory: ./node
+              working-directory: ./node/rust-client
               run: |
                   npm pkg fix
                   set +e  # Disable immediate exit on non-zero exit codes
@@ -224,7 +221,7 @@ jobs:
                     echo "Skipping publishing, package already published."
                   elif [[ ! -z "$npm_publish_err" ]]; then
                     echo "Failed to publish with error: $npm_publish_err"
-                  exit 1
+                    exit 1
                   fi
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
@@ -244,7 +241,7 @@ jobs:
     publish-base-to-npm:
         if: github.event_name != 'pull_request'
         name: Publish the base NPM package
-        needs: [publish-binaries, publish-rust-client]
+        needs: [publish-binaries]
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
@@ -260,32 +257,42 @@ jobs:
                   scope: "${{ vars.NPM_SCOPE }}"
                   always-auth: true
 
-            - name: Create package.json file
+            - name: Update package.json and index.ts
               shell: bash
               working-directory: ./node/npm/glide
               run: |
-                  export pkg_name=valkey-glide
-
-                  echo "The workflow is: ${{env.EVENT_NAME}}"
-                  if ${{ env.EVENT_NAME == 'workflow_dispatch' }}; then
-                    R_VERSION="${{ env.INPUT_VERSION }}"
+                  # Set version
+                  if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+                    R_VERSION="${{ github.event.inputs.version }}"
                   else
-                    R_VERSION=${GITHUB_REF:11}
+                    R_VERSION=${GITHUB_REF#refs/tags/v}
                   fi
                   echo "RELEASE_VERSION=${R_VERSION}" >> $GITHUB_ENV
 
-                  export package_version=${R_VERSION}
-                  export scope=`if [ "$NPM_SCOPE" != ''  ]; then echo "$NPM_SCOPE/"; fi`
-                  mv package.json package.json.tmpl
-                  envsubst < package.json.tmpl > "package.json"
-                  cat package.json
-                  # Fix index.ts based on the scope variable
-                  sed -i "s|@scope/|${scope}|g" index.ts
-              env:
-                  NPM_SCOPE: ${{ vars.NPM_SCOPE }}
-                  EVENT_NAME: ${{ github.event_name }}
-                  INPUT_VERSION: ${{ github.event.inputs.version }}
+                  # Update package.json
+                  jq '.version = env.RELEASE_VERSION | .name = "@valkey/valkey-glide" | .optionalDependencies = {
+                    "@valkey/glide-rs-linux-x64": env.RELEASE_VERSION,
+                    "@valkey/glide-rs-linux-arm64": env.RELEASE_VERSION,
+                    "@valkey/glide-rs-darwin-x64": env.RELEASE_VERSION,
+                    "@valkey/glide-rs-darwin-arm64": env.RELEASE_VERSION,
+                    "@valkey/glide-rs-linux-musl-x64": env.RELEASE_VERSION,
+                    "@valkey/glide-rs-linux-musl-arm64": env.RELEASE_VERSION
+                  }' package.json > temp.json && mv temp.json package.json
 
+                  # Update index.ts
+                  sed -i 's/@scope\/valkey-glide/@valkey\/glide-rs/g' index.ts
+                  
+            - name: Validate base package.json and index.ts
+              working-directory: ./node/npm/glide
+              run: |
+                if ! grep -q '"@valkey/valkey-glide"' package.json; then
+                  echo "Error: package.json does not contain the correct package name"
+                  exit 1
+                fi
+                if ! grep -q '@valkey/glide-rs' index.ts; then
+                  echo "Error: index.ts does not contain the correct import statements"
+                  exit 1
+                fi
             - name: Build Node wrapper
               uses: ./.github/workflows/build-node-wrapper
               with:
@@ -299,12 +306,11 @@ jobs:
                   if [[ ${{ env.RELEASE_VERSION }} == *"rc"* ]]
                   then
                     echo "This is a release candidate"
-                    export npm_tag="next"
+                    echo "NPM_TAG=next" >> $GITHUB_ENV
                   else
                     echo "This is a stable release"
-                    export npm_tag="latest"
+                    echo "NPM_TAG=latest" >> $GITHUB_ENV
                   fi
-                  echo "NPM_TAG=${npm_tag}" >> $GITHUB_ENV
 
             - name: Publish the base package
               if: github.event_name != 'pull_request'
@@ -406,7 +412,7 @@ jobs:
               working-directory: ./utils/release-candidate-testing/node
               run: |
                   npm install
-                  npm install --no-save @valkey/valkey-glide@${{ env.NPM_TAG }} @valkey/glide-rs@${{ env.NPM_TAG }}
+                  npm install --no-save @valkey/valkey-glide@${{ env.NPM_TAG }}
                   npm run test
 
             - name: Deprecating packages on failure
@@ -445,14 +451,12 @@ jobs:
 
                   # Deprecating base package
                   npm deprecate "@valkey/valkey-glide@${RELEASE_VERSION}" "This version has been deprecated" --force || true
-                  # Deprecating Rust client package
-                  npm deprecate "@valkey/glide-rs@${RELEASE_VERSION}" "This version has been deprecated" --force || true
 
                   # Process platform matrix
                   echo "${PLATFORM_MATRIX}" > platform_matrix.json
 
                   while read -r pkg; do
-                      package_name="@valkey/valkey-glide-${pkg}"
+                      package_name="@valkey/glide-rs-${pkg}"
                       echo "Deprecating ${package_name}@${RELEASE_VERSION}"
                       npm deprecate "${package_name}@${RELEASE_VERSION}" "This version has been deprecated" --force || true
                   done < <(jq -r '.[] | "\(.NAMED_OS)\(.TARGET | test("musl") | if . then "-musl" else "" end)-\(.ARCH)"' platform_matrix.json)

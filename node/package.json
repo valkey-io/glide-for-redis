@@ -11,15 +11,25 @@
     },
     "homepage": "https://github.com/valkey-io/valkey-glide#readme",
     "dependencies": {
-        "@valkey/glide-rs": "^0.1.0",
         "long": "^5.2.3",
         "npmignore": "^0.3.1",
         "protobufjs": "^7.4.0"
     },
+    "optionalDependencies": {
+        "@valkey/glide-rs-linux-x64": "${package_version}",
+        "@valkey/glide-rs-linux-arm64": "${package_version}",
+        "@valkey/glide-rs-darwin-x64": "${package_version}",
+        "@valkey/glide-rs-darwin-arm64": "${package_version}",
+        "@valkey/glide-rs-linux-musl-x64": "${package_version}",
+        "@valkey/glide-rs-linux-musl-arm64": "${package_version}"
+    },
     "scripts": {
-        "build": "npm run prereq &&  npm run build-protobuf && npm run build-external",
-        "build:release": " npm run build-protobuf && npm run build-external:release",
-        "build:benchmark": " npm run build-protobuf && npm run build-external",
+        "build": "npm run prereq && npm run build-internal && npm run build-protobuf && npm run build-external",
+        "build:release": "npm run build-internal:release && npm run build-protobuf && npm run build-external:release",
+        "build:benchmark": "npm run build-internal:benchmark && npm run build-protobuf && npm run build-external",
+        "build-internal": "cd rust-client && npm run build",
+        "build-internal:release": "cd rust-client && npm run build:release",
+        "build-internal:benchmark": "cd rust-client && npm run build:benchmark",
         "build-external": "rm -rf build-ts && tsc",
         "build-external:release": "rm -rf build-ts && tsc --stripInternal",
         "build-protobuf": "npm run compile-protobuf-files && npm run fix-protobuf-file",
