@@ -122,27 +122,27 @@ jobs:
             - name: Set platform-specific package name
               shell: bash
               run: |
-                PLATFORM_NAME="${{ matrix.build.NAMED_OS }}${{ contains(matrix.build.TARGET, 'musl') && '-musl' || '' }}-${{ matrix.build.ARCH }}"
-                echo "PLATFORM_NAME=${PLATFORM_NAME}" >> $GITHUB_ENV
-                echo "NODE_OS=${{ matrix.build.NAMED_OS }}" >> $GITHUB_ENV
-                echo "NODE_ARCH=${{ matrix.build.ARCH }}" >> $GITHUB_ENV
-                echo "PACKAGE_VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
+                  PLATFORM_NAME="${{ matrix.build.NAMED_OS }}${{ contains(matrix.build.TARGET, 'musl') && '-musl' || '' }}-${{ matrix.build.ARCH }}"
+                  echo "PLATFORM_NAME=${PLATFORM_NAME}" >> $GITHUB_ENV
+                  echo "NODE_OS=${{ matrix.build.NAMED_OS }}" >> $GITHUB_ENV
+                  echo "NODE_ARCH=${{ matrix.build.ARCH }}" >> $GITHUB_ENV
+                  echo "PACKAGE_VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
 
             - name: Update Rust client package.json
               working-directory: ./node/rust-client
               run: |
-                sed -i 's|\${PLATFORM_NAME}|'"${PLATFORM_NAME}"'|g' package.json
-                sed -i 's|\${PACKAGE_VERSION}|'"${PACKAGE_VERSION}"'|g' package.json
-                sed -i 's|\${NODE_OS}|'"${NODE_OS}"'|g' package.json
-                sed -i 's|\${NODE_ARCH}|'"${NODE_ARCH}"'|g' package.json
+                  sed -i 's|\${PLATFORM_NAME}|'"${PLATFORM_NAME}"'|g' package.json
+                  sed -i 's|\${PACKAGE_VERSION}|'"${PACKAGE_VERSION}"'|g' package.json
+                  sed -i 's|\${NODE_OS}|'"${NODE_OS}"'|g' package.json
+                  sed -i 's|\${NODE_ARCH}|'"${NODE_ARCH}"'|g' package.json
 
             - name: Validate Rust client package.json
               working-directory: ./node/rust-client
               run: |
-                if ! grep -q "@valkey/glide-rs-${PLATFORM_NAME}" package.json; then
-                  echo "Error: package.json does not contain the correct package name"
-                  exit 1
-                fi
+                  if ! grep -q "@valkey/glide-rs-${PLATFORM_NAME}" package.json; then
+                    echo "Error: package.json does not contain the correct package name"
+                    exit 1
+                  fi
 
             - name: Setup node
               if: ${{ !contains(matrix.build.TARGET, 'musl') }}
@@ -257,42 +257,32 @@ jobs:
                   scope: "${{ vars.NPM_SCOPE }}"
                   always-auth: true
 
-            - name: Update package.json and index.ts
+            - name: Create package.json file
               shell: bash
               working-directory: ./node/npm/glide
               run: |
-                  # Set version
-                  if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-                    R_VERSION="${{ github.event.inputs.version }}"
+                  export pkg_name=valkey-glide
+
+                  echo "The workflow is: ${{env.EVENT_NAME}}"
+                  if ${{ env.EVENT_NAME == 'workflow_dispatch' }}; then
+                    R_VERSION="${{ env.INPUT_VERSION }}"
                   else
-                    R_VERSION=${GITHUB_REF#refs/tags/v}
+                    R_VERSION=${GITHUB_REF:11}
                   fi
                   echo "RELEASE_VERSION=${R_VERSION}" >> $GITHUB_ENV
 
-                  # Update package.json
-                  jq '.version = env.RELEASE_VERSION | .name = "@valkey/valkey-glide" | .optionalDependencies = {
-                    "@valkey/glide-rs-linux-x64": env.RELEASE_VERSION,
-                    "@valkey/glide-rs-linux-arm64": env.RELEASE_VERSION,
-                    "@valkey/glide-rs-darwin-x64": env.RELEASE_VERSION,
-                    "@valkey/glide-rs-darwin-arm64": env.RELEASE_VERSION,
-                    "@valkey/glide-rs-linux-musl-x64": env.RELEASE_VERSION,
-                    "@valkey/glide-rs-linux-musl-arm64": env.RELEASE_VERSION
-                  }' package.json > temp.json && mv temp.json package.json
+                  export package_version=${R_VERSION}
+                  export scope=`if [ "$NPM_SCOPE" != ''  ]; then echo "$NPM_SCOPE/"; fi`
+                  mv package.json package.json.tmpl
+                  envsubst < package.json.tmpl > "package.json"
+                  cat package.json
+                  # Fix index.ts based on the scope variable
+                  sed -i "s|@scope/|${scope}|g" glide-rs.ts
+              env:
+                  NPM_SCOPE: ${{ vars.NPM_SCOPE }}
+                  EVENT_NAME: ${{ github.event_name }}
+                  INPUT_VERSION: ${{ github.event.inputs.version }}
 
-                  # Update index.ts
-                  sed -i 's/@scope\/valkey-glide/@valkey\/glide-rs/g' index.ts
-                  
-            - name: Validate base package.json and index.ts
-              working-directory: ./node/npm/glide
-              run: |
-                if ! grep -q '"@valkey/valkey-glide"' package.json; then
-                  echo "Error: package.json does not contain the correct package name"
-                  exit 1
-                fi
-                if ! grep -q '@valkey/glide-rs' index.ts; then
-                  echo "Error: index.ts does not contain the correct import statements"
-                  exit 1
-                fi
             - name: Build Node wrapper
               uses: ./.github/workflows/build-node-wrapper
               with:
