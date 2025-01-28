@@ -241,7 +241,7 @@ impl Pipeline {
         self.commands.is_empty()
     }
 
-    ///
+    /// Returns whether the pipeline is in sub-pipeline mode.
     pub fn is_sub_pipeline(&self) -> bool {
         self.is_sub_pipeline
     }

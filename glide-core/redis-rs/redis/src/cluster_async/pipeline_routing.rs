@@ -11,8 +11,14 @@ use std::sync::Arc;
 
 use crate::cluster_async::MUTEX_READ_ERR;
 use crate::Pipeline;
+use futures::FutureExt;
 use rand::prelude::IteratorRandom;
+use tokio::sync::oneshot;
+use tokio::sync::oneshot::error::RecvError;
 
+use super::CmdArg;
+use super::PendingRequest;
+use super::RequestInfo;
 use super::{Core, InternalSingleNodeRouting, OperationTarget, Response};
 
 /// Represents a pipeline command execution context for a specific node
@@ -49,14 +55,17 @@ impl<C> NodePipelineContext<C> {
     }
 }
 
-// `NodeResponse` represents a response from a node along with its source node address.
-// `PipelineResponses` represents the responses for each pipeline command.
-// The outer `Vec` represents the pipeline commands, and each inner `Vec` contains (response, address) pairs.
-// Since some commands can be executed across multiple nodes (e.g., multi-node commands), a single command
-// might produce multiple responses, each from a different node. By storing the responses with their
-// respective node addresses, we ensure that we have all the information needed to aggregate the results later.
+/// `NodeResponse` represents a response from a node along with its source node address.
 type NodeResponse = (Value, String);
+/// `PipelineResponses` represents the responses for each pipeline command.
+/// The outer `Vec` represents the pipeline commands, and each inner `Vec` contains (response, address) pairs.
+/// Since some commands can be executed across multiple nodes (e.g., multi-node commands), a single command
+/// might produce multiple responses, each from a different node. By storing the responses with their
+/// respective node addresses, we ensure that we have all the information needed to aggregate the results later.
 pub type PipelineResponses = Vec<Vec<NodeResponse>>;
+
+/// `AddressAndIndices` represents the address of a node and the indices of commands associated with that node.
+type AddressAndIndices = Vec<(String, Vec<(usize, Option<usize>)>)>;
 
 /// Adds a command to the pipeline map for a specific node address.
 pub fn add_command_to_node_pipeline_map<C>(
@@ -85,86 +94,6 @@ pub fn add_command_to_random_existing_node<C>(
         Ok(())
     } else {
         Err(RedisError::from((ErrorKind::IoError, "No nodes available")))
-    }
-}
-
-/// Handles multi-slot commands within a pipeline.
-///
-/// This function processes commands with routing information indicating multiple slots
-/// (e.g., `MSET` or `MGET`), splits them into sub-commands based on their target slots,
-/// and assigns these sub-commands to the appropriate pipelines for the corresponding nodes.
-///
-/// ### Parameters:
-/// - `pipelines_by_connection`: A mutable map of node pipelines where the commands will be added.
-/// - `core`: The core structure that provides access to connection management.
-/// - `cmd`: The original multi-slot command that needs to be split.
-/// - `index`: The index of the original command within the pipeline.
-/// - `slots`: A vector containing routing information. Each entry includes:
-///   - `Route`: The specific route for the slot.
-///   - `Vec<usize>`: Indices of the keys within the command that map to this slot.
-pub async fn handle_pipeline_multi_slot_routing<C>(
-    pipelines_by_connection: &mut NodePipelineMap<C>,
-    core: Core<C>,
-    cmd: &Cmd,
-    index: usize,
-    slots: Vec<(Route, Vec<usize>)>,
-) where
-    C: Clone,
-{
-    // inner_index is used to keep track of the index of the sub-command inside cmd
-    for (inner_index, (route, indices)) in slots.iter().enumerate() {
-        let conn = {
-            let lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
-            lock.connection_for_route(route)
-        };
-        if let Some((address, conn)) = conn {
-            // create the sub-command for the slot
-            let new_cmd = command_for_multi_slot_indices(cmd, indices.iter());
-            add_command_to_node_pipeline_map(
-                pipelines_by_connection,
-                address,
-                conn.await,
-                new_cmd,
-                index,
-                Some(inner_index),
-            );
-        }
-    }
-}
-
-/// Handles pipeline commands that require single-node routing.
-///
-/// This function processes commands with `SingleNode` routing information and determines
-/// the appropriate handling based on the routing type.
-///
-/// ### Parameters:
-/// - `pipeline_map`: A mutable reference to the `NodePipelineMap`, representing the pipelines grouped by nodes.
-/// - `cmd`: The command to process and add to the appropriate node pipeline.
-/// - `routing`: The single-node routing information, which determines how the command is routed.
-/// - `core`: The core object responsible for managing connections and routing logic.
-/// - `index`: The position of the command in the overall pipeline.
-pub async fn handle_pipeline_single_node_routing<C>(
-    pipeline_map: &mut NodePipelineMap<C>,
-    cmd: Cmd,
-    routing: InternalSingleNodeRouting<C>,
-    core: Core<C>,
-    index: usize,
-) -> Result<(), (OperationTarget, RedisError)>
-where
-    C: Clone + ConnectionLike + Connect + Send + Sync + 'static,
-{
-    if matches!(routing, InternalSingleNodeRouting::Random) && !pipeline_map.is_empty() {
-        // The routing info is to a random node, and we already have sub-pipelines within our pipelines map, so just add it to a random sub-pipeline
-        add_command_to_random_existing_node(pipeline_map, cmd, index)
-            .map_err(|err| (OperationTarget::NotFound, err))?;
-        Ok(())
-    } else {
-        let (address, conn) =
-            ClusterConnInner::get_connection(routing, core, Some(Arc::new(cmd.clone())))
-                .await
-                .map_err(|err| (OperationTarget::NotFound, err))?;
-        add_command_to_node_pipeline_map(pipeline_map, address, conn, cmd, index, None);
-        Ok(())
     }
 }
 
@@ -259,59 +188,154 @@ where
     Ok((pipelines_by_connection, response_policies))
 }
 
-/// Executes a pipeline of commands on a specified node.
+/// Handles pipeline commands that require single-node routing.
 ///
-/// This function sends a batch of commands (pipeline) to the specified node for execution.
+/// This function processes commands with `SingleNode` routing information and determines
+/// the appropriate handling based on the routing type.
 ///
 /// ### Parameters:
-/// - `address`: The address of the target node where the pipeline commands should be executed.
-/// - `node_context`: The `NodePipelineContext` containing the pipeline commands and the associated connection.
-///
-/// ### Returns:
-/// - `Ok((Vec<(usize, Option<usize>)>, Vec<Value>, String))`:
-///   - A vector of command indices (`usize`) and their respective inner indices (`Option<usize>`) in the pipeline.
-///   - A vector of `Value` objects representing the responses from the executed pipeline.
-///   - The address of the node where the pipeline was executed.
-/// - `Err((OperationTarget, RedisError))`:
-///   - An error tuple containing the target operation and the corresponding error details if execution fails.
-pub async fn execute_pipeline_on_node<C>(
-    address: String,
-    node_context: NodePipelineContext<C>,
-) -> Result<(Vec<(usize, Option<usize>)>, Vec<Value>, String), (OperationTarget, RedisError)>
+/// - `pipeline_map`: A mutable reference to the `NodePipelineMap`, representing the pipelines grouped by nodes.
+/// - `cmd`: The command to process and add to the appropriate node pipeline.
+/// - `routing`: The single-node routing information, which determines how the command is routed.
+/// - `core`: The core object responsible for managing connections and routing logic.
+/// - `index`: The position of the command in the overall pipeline.
+pub async fn handle_pipeline_single_node_routing<C>(
+    pipeline_map: &mut NodePipelineMap<C>,
+    cmd: Cmd,
+    routing: InternalSingleNodeRouting<C>,
+    core: Core<C>,
+    index: usize,
+) -> Result<(), (OperationTarget, RedisError)>
 where
     C: Clone + ConnectionLike + Connect + Send + Sync + 'static,
 {
-    let count = node_context.pipeline.len();
-    let result =
-        ClusterConnInner::try_pipeline_request(Arc::new(node_context.pipeline), 0, count, async {
-            Ok((address.clone(), node_context.connection))
-        })
-        .await?;
-
-    match result {
-        Response::Multiple(values) => Ok((node_context.command_indices, values, address)),
-        _ => Err((
-            OperationTarget::FanOut,
-            RedisError::from((ErrorKind::ResponseError, "Unsupported response type")),
-        )),
+    if matches!(routing, InternalSingleNodeRouting::Random) && !pipeline_map.is_empty() {
+        // The routing info is to a random node, and we already have sub-pipelines within our pipelines map, so just add it to a random sub-pipeline
+        add_command_to_random_existing_node(pipeline_map, cmd, index)
+            .map_err(|err| (OperationTarget::NotFound, err))?;
+        Ok(())
+    } else {
+        let (address, conn) =
+            ClusterConnInner::get_connection(routing, core, Some(Arc::new(cmd.clone())))
+                .await
+                .map_err(|err| (OperationTarget::NotFound, err))?;
+        add_command_to_node_pipeline_map(pipeline_map, address, conn, cmd, index, None);
+        Ok(())
     }
 }
 
-/// Adds the result of a pipeline command to the `values_and_addresses` collection.
+/// Handles multi-slot commands within a pipeline.
 ///
-/// This function updates the `values_and_addresses` vector at the given `index` and optionally at the
+/// This function processes commands with routing information indicating multiple slots
+/// (e.g., `MSET` or `MGET`), splits them into sub-commands based on their target slots,
+/// and assigns these sub-commands to the appropriate pipelines for the corresponding nodes.
+///
+/// ### Parameters:
+/// - `pipelines_by_connection`: A mutable map of node pipelines where the commands will be added.
+/// - `core`: The core structure that provides access to connection management.
+/// - `cmd`: The original multi-slot command that needs to be split.
+/// - `index`: The index of the original command within the pipeline.
+/// - `slots`: A vector containing routing information. Each entry includes:
+///   - `Route`: The specific route for the slot.
+///   - `Vec<usize>`: Indices of the keys within the command that map to this slot.
+pub async fn handle_pipeline_multi_slot_routing<C>(
+    pipelines_by_connection: &mut NodePipelineMap<C>,
+    core: Core<C>,
+    cmd: &Cmd,
+    index: usize,
+    slots: Vec<(Route, Vec<usize>)>,
+) where
+    C: Clone,
+{
+    // inner_index is used to keep track of the index of the sub-command inside cmd
+    for (inner_index, (route, indices)) in slots.iter().enumerate() {
+        let conn = {
+            let lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
+            lock.connection_for_route(route)
+        };
+        if let Some((address, conn)) = conn {
+            // create the sub-command for the slot
+            let new_cmd = command_for_multi_slot_indices(cmd, indices.iter());
+            add_command_to_node_pipeline_map(
+                pipelines_by_connection,
+                address,
+                conn.await,
+                new_cmd,
+                index,
+                Some(inner_index),
+            );
+        }
+    }
+}
+
+/// Creates `PendingRequest` objects for each pipeline in the provided pipeline map.
+///
+/// This function processes the given map of node pipelines and prepares each sub-pipeline for execution
+/// by creating a `PendingRequest` containing all necessary details for execution.
+/// Additionally, it sets up communication channels to asynchronously receive the results of each sub-pipeline's execution.
+///
+/// Returns a tuple containing:
+/// - **receivers**: A vector of `oneshot::Receiver` objects to receive the responses of the sub-pipeline executions.
+/// - **pending_requests**: A vector of `PendingRequest` objects, each representing a pipeline scheduled for execution on a node.
+/// - **addresses_and_indices**: A vector of tuples containing node addresses and their associated command indices for each sub-pipeline,
+///   allowing the results to be mapped back to their original command within the original pipeline.
+#[allow(clippy::type_complexity)]
+pub fn collect_pipeline_requests<C>(
+    pipelines_by_connection: NodePipelineMap<C>,
+) -> (
+    Vec<oneshot::Receiver<RedisResult<Response>>>,
+    Vec<PendingRequest<C>>,
+    Vec<(String, Vec<(usize, Option<usize>)>)>,
+)
+where
+    C: Clone + ConnectionLike + Connect + Send + Sync + 'static,
+{
+    let mut receivers = Vec::new();
+    let mut pending_requests = Vec::new();
+    let mut addresses_and_indices = Vec::new();
+
+    for (address, context) in pipelines_by_connection {
+        // Create a channel to receive the pipeline execution results
+        let (sender, receiver) = oneshot::channel();
+        // Add the receiver to the list of receivers
+        receivers.push(receiver);
+        pending_requests.push(PendingRequest {
+            retry: 0,
+            sender,
+            info: RequestInfo {
+                cmd: CmdArg::Pipeline {
+                    count: context.pipeline.len(),
+                    pipeline: context.pipeline.into(),
+                    offset: 0,
+                    route: InternalSingleNodeRouting::Connection {
+                        address: address.clone(),
+                        conn: async { context.connection }.boxed().shared(),
+                    },
+                },
+            },
+        });
+        // Record the node address and its associated command indices for result mapping
+        addresses_and_indices.push((address, context.command_indices));
+    }
+
+    (receivers, pending_requests, addresses_and_indices)
+}
+
+/// Adds the result of a pipeline command to the `pipeline_responses` collection.
+///
+/// This function updates the `pipeline_responses` vector at the given `index` and optionally at the
 /// `inner_index` if provided. If `inner_index` is `Some`, it ensures that the vector at that index is large enough
 /// to hold the value and address at the specified position, resizing it if necessary. If `inner_index` is `None`,
 /// the value and address are simply appended to the vector.
 ///
 /// # Parameters
-/// - `values_and_addresses`: A mutable reference to a vector of vectors that stores the results of pipeline commands.
-/// - `index`: The index in `values_and_addresses` where the result should be stored.
+/// - `pipeline_responses`: A mutable reference to a vector of vectors that stores the results of pipeline commands.
+/// - `index`: The index in `pipeline_responses` where the result should be stored.
 /// - `inner_index`: An optional index within the vector at `index`, used to store the result at a specific position.
 /// - `value`: The result value to store.
 /// - `address`: The address associated with the result.
 pub fn add_pipeline_result(
-    values_and_addresses: &mut [Vec<(Value, String)>],
+    pipeline_responses: &mut PipelineResponses,
     index: usize,
     inner_index: Option<usize>,
     value: Value,
@@ -320,58 +344,46 @@ pub fn add_pipeline_result(
     match inner_index {
         Some(inner_index) => {
             // Ensure the vector at the given index is large enough to hold the value and address at the specified position
-            if values_and_addresses[index].len() <= inner_index {
-                values_and_addresses[index].resize(inner_index + 1, (Value::Nil, "".to_string()));
+            if pipeline_responses[index].len() <= inner_index {
+                pipeline_responses[index].resize(inner_index + 1, (Value::Nil, "".to_string()));
             }
-            values_and_addresses[index][inner_index] = (value, address);
+            pipeline_responses[index][inner_index] = (value, address);
         }
-        None => values_and_addresses[index].push((value, address)),
+        None => pipeline_responses[index].push((value, address)),
     }
 }
 
-/// Collects and processes the results of pipeline tasks from a `tokio::task::JoinSet`.
+/// Processes the responses of pipeline commands and updates the given `pipeline_responses`
+/// with the corresponding results.
 ///
-/// This function iteratively retrieves completed tasks from the provided `join_set` and processes
-/// their results. Successful results are added to the `values_and_addresses` vector using the
-/// indices and values provided. If an error occurs in any task, it is recorded and returned as
-/// the first encountered error.
+/// The function iterates over the responses along with the `addresses_and_indices` list,
+/// ensuring that each response is added to its appropriate position in `pipeline_responses` along with the associated address.
+/// If any response indicates an error, the function terminates early and returns the first encountered error.
 ///
 /// # Parameters
-/// - `join_set`: A mutable reference to a `tokio::task::JoinSet` containing tasks that return:
-///   - `Ok((Vec<(usize, Option<usize>)>, Vec<Value>, String))`: On success, a tuple of:
-///     - A list of indices and optional inner indices corresponding to pipeline commands.
-///     - A list of `Value` results from the executed pipeline.
-///     - The `String` address where the task was executed.
-///   - `Err((OperationTarget, RedisError))`: On failure, an error detailing the operation target and the Redis error.
-/// - `values_and_addresses`: A mutable slice of vectors, where each vector corresponds to a pipeline
-///   command's results. This is updated with the values and addresses from successful tasks.
+///
+/// - `pipeline_responses`: A vec that holds the original pipeline commands responses.
+/// - `responses`: A list of responses corresponding to each sub-pipeline.
+/// - `addresses_and_indices`: A list of (address, indices) pairs indicating where each response should be placed.
 ///
 /// # Returns
-/// - `Ok(Some((OperationTarget, RedisError)))`: If one or more tasks encountered an error, returns the first error.
-/// - `Ok(None)`: If all tasks completed successfully.
-/// - `Err((OperationTarget::FanOut, RedisError))`: If a task failed unexpectedly (e.g., due to a panic).
 ///
-///
-/// # Behavior
-/// - Processes successful results by calling `add_pipeline_result` to update the
-///   `values_and_addresses` vector with the indices, values, and addresses.
-/// - Records the first error encountered and continues processing the remaining tasks.
-/// - Returns `Ok(None)` if all tasks complete successfully.
-#[allow(clippy::type_complexity)]
-pub async fn collect_pipeline_tasks(
-    join_set: &mut tokio::task::JoinSet<
-        Result<(Vec<(usize, Option<usize>)>, Vec<Value>, String), (OperationTarget, RedisError)>,
-    >,
-    values_and_addresses: &mut [Vec<(Value, String)>],
-) -> Result<Option<(OperationTarget, RedisError)>, (OperationTarget, RedisError)> {
-    let mut first_error = None;
-
-    while let Some(future_result) = join_set.join_next().await {
-        match future_result {
-            Ok(Ok((indices, values, address))) => {
-                for ((index, inner_index), value) in indices.into_iter().zip(values) {
+/// - `Ok(())` if all responses are processed successfully.
+/// - `Err((OperationTarget, RedisError))` if a node-level or reception error occurs.
+pub fn process_pipeline_responses(
+    pipeline_responses: &mut PipelineResponses,
+    responses: Vec<Result<RedisResult<Response>, RecvError>>,
+    addresses_and_indices: AddressAndIndices,
+) -> Result<(), (OperationTarget, RedisError)> {
+    for ((address, command_indices), response_result) in
+        addresses_and_indices.into_iter().zip(responses)
+    {
+        match response_result {
+            Ok(Ok(Response::Multiple(values))) => {
+                // Add each response to the pipeline_responses vector at the appropriate index
+                for ((index, inner_index), value) in command_indices.into_iter().zip(values) {
                     add_pipeline_result(
-                        values_and_addresses,
+                        pipeline_responses,
                         index,
                         inner_index,
                         value,
@@ -379,16 +391,18 @@ pub async fn collect_pipeline_tasks(
                     );
                 }
             }
-            Ok(Err(e)) => first_error = first_error.or(Some(e)),
-            Err(e) => {
+            Ok(Err(err)) => {
+                return Err((OperationTarget::Node { address }, err));
+            }
+            _ => {
                 return Err((
-                    OperationTarget::FanOut,
-                    std::io::Error::new(std::io::ErrorKind::Other, e.to_string()).into(),
-                ))
+                    OperationTarget::Node { address },
+                    RedisError::from((ErrorKind::ResponseError, "Failed to receive response")),
+                ));
             }
         }
     }
-    Ok(first_error)
+    Ok(())
 }
 
 /// This function returns the route for a given pipeline.
