@@ -3,7 +3,10 @@
  */
 
 import Long from "long";
-import { createLeakedStringVec, MAX_REQUEST_ARGS_LEN } from "../npm/glide/glide-rs";
+import {
+    createLeakedStringVec,
+    MAX_REQUEST_ARGS_LEN,
+} from "../npm/glide/glide-rs";
 
 import {
     BaseClient, // eslint-disable-line @typescript-eslint/no-unused-vars

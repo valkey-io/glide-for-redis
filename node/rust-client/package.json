@@ -3,8 +3,12 @@
     "version": "${PACKAGE_VERSION}",
     "description": "Valkey client for ${PLATFORM_NAME}",
     "main": "index.js",
-    "os": ["${NODE_OS}"],
-    "cpu": ["${NODE_ARCH}"],
+    "os": [
+        "${NODE_OS}"
+    ],
+    "cpu": [
+        "${NODE_ARCH}"
+    ],
     "license": "Apache-2.0",
     "files": [
         "index.d.ts",

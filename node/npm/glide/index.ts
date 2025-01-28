@@ -2,7 +2,7 @@
  * Copyright Valkey GLIDE Project Contributors - SPDX Identifier: Apache-2.0
  */
 
-import glideRs from './glide-rs';
+import glideRs from "./glide-rs";
 
 let globalObject = global as unknown;
 

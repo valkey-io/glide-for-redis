@@ -26,7 +26,7 @@ function loadNativeBinding() {
                             nativeBinding = require("@scope/glide-rs-linux-x64");
                             break;
                     }
-                    
+
                     break;
                 case "arm64":
                     switch (familySync()) {
