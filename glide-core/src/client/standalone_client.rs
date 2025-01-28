@@ -359,13 +359,7 @@ impl StandaloneClient {
         }
 
         // Step 3: Fall back to any available replica using round-robin
-        let replica = self.round_robin_read_from_replica(latest_read_replica_index);
-        if replica as *const _ != primary as *const _ {
-            return replica;
-        }
-
-        // Step 4: Final fallback - use primary
-        return primary;
+        return self.round_robin_read_from_replica(latest_read_replica_index);
     }
 
     async fn get_connection(&self, readonly: bool) -> &ReconnectingConnection {
