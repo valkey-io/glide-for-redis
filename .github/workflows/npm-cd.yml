@@ -296,10 +296,10 @@ jobs:
                   if [[ ${{ env.RELEASE_VERSION }} == *"rc"* ]]
                   then
                     echo "This is a release candidate"
-                    echo "NPM_TAG=next" >> $GITHUB_ENV
+                    export npm_tag="next"
                   else
                     echo "This is a stable release"
-                    echo "NPM_TAG=latest" >> $GITHUB_ENV
+                    export npm_tag="latest"
                   fi
 
             - name: Publish the base package
