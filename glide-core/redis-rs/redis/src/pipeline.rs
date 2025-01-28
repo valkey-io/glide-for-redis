@@ -72,18 +72,8 @@ impl Pipeline {
         self
     }
 
-    /// This enables sub-pipeline mode. In sub-pipeline mode, the whole pipeline is enclosed in
-    /// `MULTI`/`EXEC` and the return value is a nested array of results. This is useful when
-    /// you want to execute a pipeline inside another pipeline.
-    /// ```rust,no_run
-    /// # let client = redis::Client::open("redis://
-    /// 127.0.0.1/").unwrap();  
-    /// # let mut con = client.get_connection(None).unwrap();
-    /// let (k1, k2) : (i32, i32) = redis::pipe()
-    ///    .atomic()        
-    /// .cmd("SET").arg("key_1").arg(42).ignore()
-    ///
-    ///
+    /// Enables sub-pipeline mode, indicating that this pipeline is part of a larger pipeline
+    /// split across multiple nodes.
     pub fn sub_pipeline(&mut self) -> &mut Pipeline {
         self.is_sub_pipeline = true;
         self

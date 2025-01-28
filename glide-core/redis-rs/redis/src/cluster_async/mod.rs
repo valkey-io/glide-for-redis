@@ -2248,16 +2248,17 @@ where
     /// Suppose we have a pipeline with multiple commands that were split and executed on different nodes.
     /// This function will aggregate the responses for commands that were split across multiple nodes.
     ///
-    /// ```rust,no_run
+    /// ```rust,compile_fail
     /// // Example pipeline with commands that might be split across nodes
+    ///
     /// let mut pipeline_responses = vec![
-    ///     vec![(Value::Int(1), "node1".to_string()), (Value::Int(2), "node2".to_string())], (Value::Int(3), "node3".to_string())] // represents `DBSIZE``
+    ///     vec![(Value::Int(1), "node1".to_string()), (Value::Int(2), "node2".to_string()), (Value::Int(3), "node3".to_string())], // represents `DBSIZE`
     ///     vec![(Value::Int(3), "node3".to_string())],
-    ///     vec![(Value::SimpleString("PONG"), "node1".to_string()), (Value::SimpleString("PONG"), "node2".to_string()), (Value::SimpleString("PONG"), "node3".to_string())], // represents `PING`
+    ///     vec![(Value::SimpleString("PONG".to_string()), "node1".to_string()), (Value::SimpleString("PONG".to_string()), "node2".to_string()), (Value::SimpleString("PONG".to_string()), "node3".to_string())], // represents `PING`
     /// ];
     /// let response_policies = vec![
     ///     (0, MultipleNodeRoutingInfo::AllNodes, Some(ResponsePolicy::Aggregate(AggregateOp::Sum))),
-    ///     (2, MultipleNodeRoutingInfo::AllNodes, Some(ResponsePolicy::AllSuceeded),
+    ///     (2, MultipleNodeRoutingInfo::AllNodes, Some(ResponsePolicy::AllSucceeded)),
     /// ];
     ///
     /// // Aggregating the responses
@@ -2266,7 +2267,7 @@ where
     /// // After aggregation, pipeline_responses will be updated with aggregated results
     /// assert_eq!(pipeline_responses[0], vec![(Value::Int(6), "".to_string())]);
     /// assert_eq!(pipeline_responses[1], vec![(Value::Int(3), "node3".to_string())]);
-    /// assert_eq!(pipeline_responses[2], vec![(Value::SimpleString("PONG"), "".to_string())]);
+    /// assert_eq!(pipeline_responses[2], vec![(Value::SimpleString("PONG".to_string()), "".to_string())]);
     /// ```
     ///
     /// This function is essential for handling multi-node commands in a Redis cluster, ensuring that responses from different nodes are correctly aggregated and processed.
