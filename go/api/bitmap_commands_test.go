@@ -9,7 +9,9 @@ import (
 func ExampleGlideClient_SetBit() {
 	var client *GlideClient = getExampleGlideClient() // example helper function
 
-	result, err := client.SetBit("my_key", 1, 1)
+	client.SetBit("my_key", 1, 1) // initialize bit 1 with a value of 1
+
+	result, err := client.SetBit("my_key", 1, 1) // set bit should return the previous value of bit 1
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -33,6 +35,8 @@ func ExampleGlideClient_GetBit() {
 func ExampleGlideClient_BitCount() {
 	var client *GlideClient = getExampleGlideClient() // example helper function
 
+	client.SetBit("my_key", 1, 1)
+	client.SetBit("my_key", 2, 1)
 	result, err := client.BitCount("my_key")
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)

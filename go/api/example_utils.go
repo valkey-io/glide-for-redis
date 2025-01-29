@@ -16,5 +16,10 @@ func getExampleGlideClient() *GlideClient {
 		fmt.Println("error connecting to database: ", err)
 	}
 
+	_, err = client.CustomCommand([]string{"FLUSHALL"}) // todo: replace with client.FlushAll() when implemented
+	if err != nil {
+		fmt.Println("error flushing database: ", err)
+	}
+
 	return client.(*GlideClient)
 }
