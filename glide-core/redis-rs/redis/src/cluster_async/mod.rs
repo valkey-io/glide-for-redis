@@ -291,6 +291,7 @@ where
                     offset,
                     count,
                     route: route.into(),
+                    sub_pipeline: false,
                 },
                 sender,
             })
@@ -612,6 +613,7 @@ enum CmdArg<C> {
         offset: usize,
         count: usize,
         route: InternalSingleNodeRouting<C>,
+        sub_pipeline: bool,
     },
     ClusterScan {
         // struct containing the arguments for the cluster scan command - scan state cursor, match pattern, count and object type.
@@ -2115,8 +2117,9 @@ where
                 offset,
                 count,
                 route,
+                sub_pipeline,
             } => {
-                if pipeline.is_atomic() || pipeline.is_sub_pipeline() {
+                if pipeline.is_atomic() || sub_pipeline {
                     // If the pipeline is atomic (i.e., a transaction) or if the pipeline is already splitted into sub-pipelines, we can send it as is, with no need to split it into sub-pipelines.
                     Self::try_pipeline_request(
                         pipeline,

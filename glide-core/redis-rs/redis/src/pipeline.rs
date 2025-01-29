@@ -12,7 +12,6 @@ pub struct Pipeline {
     commands: Vec<Cmd>,
     transaction_mode: bool,
     ignored_commands: HashSet<usize>,
-    is_sub_pipeline: bool,
 }
 
 /// A pipeline allows you to send multiple commands in one go to the
@@ -49,7 +48,6 @@ impl Pipeline {
             commands: Vec::with_capacity(capacity),
             transaction_mode: false,
             ignored_commands: HashSet::new(),
-            is_sub_pipeline: false,
         }
     }
 
@@ -69,13 +67,6 @@ impl Pipeline {
     #[inline]
     pub fn atomic(&mut self) -> &mut Pipeline {
         self.transaction_mode = true;
-        self
-    }
-
-    /// Enables sub-pipeline mode, indicating that this pipeline is part of a larger pipeline
-    /// split across multiple nodes.
-    pub fn sub_pipeline(&mut self) -> &mut Pipeline {
-        self.is_sub_pipeline = true;
         self
     }
 
@@ -229,11 +220,6 @@ impl Pipeline {
     /// Returns `true` if the pipeline contains no commands.
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
-    }
-
-    /// Returns whether the pipeline is in sub-pipeline mode.
-    pub fn is_sub_pipeline(&self) -> bool {
-        self.is_sub_pipeline
     }
 }
 

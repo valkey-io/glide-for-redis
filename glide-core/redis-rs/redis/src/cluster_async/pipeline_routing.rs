@@ -39,10 +39,8 @@ pub type NodePipelineMap<C> = HashMap<String, NodePipelineContext<C>>;
 
 impl<C> NodePipelineContext<C> {
     fn new(connection: C) -> Self {
-        let mut pipeline = Pipeline::new();
-        pipeline.sub_pipeline();
         Self {
-            pipeline,
+            pipeline: Pipeline::new(),
             connection,
             command_indices: Vec::new(),
         }
@@ -311,6 +309,8 @@ where
                         address: address.clone(),
                         conn: async { context.connection }.boxed().shared(),
                     },
+                    // mark it as a sub-pipeline mode
+                    sub_pipeline: true,
                 },
             },
         });
