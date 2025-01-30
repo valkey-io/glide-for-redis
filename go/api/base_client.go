@@ -3879,11 +3879,6 @@ func createStreamCommandArgs(
 //
 //	The number of members added to the set.
 //
-// Example:
-//
-//	res, err := client.ZAdd(key, map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0})
-//	fmt.Println(res) // Output: 3
-//
 // [valkey.io]: https://valkey.io/commands/zadd/
 func (client *baseClient) ZAdd(
 	key string,
@@ -3913,15 +3908,6 @@ func (client *baseClient) ZAdd(
 // Return value:
 //
 //	The number of members added to the set. If `CHANGED` is set, the number of members that were updated.
-//
-// Example:
-//
-//	res, err := client.ZAddWithOptions(
-//		key,
-//		map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0},
-//		options.NewZAddOptionsBuilder().SetChanged(true).Build()
-//	)
-//	fmt.Println(res) // Output: 3
 //
 // [valkey.io]: https://valkey.io/commands/zadd/
 func (client *baseClient) ZAddWithOptions(
@@ -3973,11 +3959,6 @@ func (client *baseClient) zAddIncrBase(key string, opts *options.ZAddOptions) (R
 //
 //	Result[float64] - The new score of the member.
 //
-// Example:
-//
-//	res, err := client.ZAddIncr(key, "one", 1.0)
-//	fmt.Println(res.Value()) // Output: 1.0
-//
 // [valkey.io]: https://valkey.io/commands/zadd/
 func (client *baseClient) ZAddIncr(
 	key string,
@@ -4007,11 +3988,6 @@ func (client *baseClient) ZAddIncr(
 //
 //	The new score of the member.
 //	If there was a conflict with the options, the operation aborts and `nil` is returned.
-//
-// Example:
-//
-//	res, err := client.ZAddIncrWithOptions(key, "one", 1.0, options.NewZAddOptionsBuilder().SetChanged(true))
-//	fmt.Println(res.Value()) // Output: 1.0
 //
 // [valkey.io]: https://valkey.io/commands/zadd/
 func (client *baseClient) ZAddIncrWithOptions(
@@ -4045,11 +4021,6 @@ func (client *baseClient) ZAddIncrWithOptions(
 //
 //	The new score of member.
 //
-// Example:
-//
-//	res, err := client.ZIncrBy("myzset", 2.0, "one")
-//	fmt.Println(res) // Output: 2.0
-//
 // [valkey.io]: https://valkey.io/commands/zincrby/
 func (client *baseClient) ZIncrBy(key string, increment float64, member string) (float64, error) {
 	result, err := client.executeCommand(C.ZIncrBy, []string{key, utils.FloatToString(increment), member})
@@ -4074,11 +4045,6 @@ func (client *baseClient) ZIncrBy(key string, increment float64, member string) 
 //	A map containing the removed member and its corresponding score.
 //	If `key` doesn't exist, it will be treated as an empty sorted set and the
 //	command returns an empty map.
-//
-// Example:
-//
-//	res, err := client.zpopmin("mySortedSet")
-//	fmt.Println(res) // Output: map["member1": 5.0]
 //
 // [valkey.io]: https://valkey.io/commands/zpopmin/
 func (client *baseClient) ZPopMin(key string) (map[string]float64, error) {
@@ -4105,11 +4071,6 @@ func (client *baseClient) ZPopMin(key string) (map[string]float64, error) {
 //	If `key` doesn't exist, it will be treated as an empty sorted set and the
 //	command returns an empty map.
 //
-// Example:
-//
-//	res, err := client.ZPopMinWithCount("mySortedSet", 2)
-//	fmt.Println(res) // Output: map["member1": 5.0, "member2": 6.0]
-//
 // [valkey.io]: https://valkey.io/commands/zpopmin/
 func (client *baseClient) ZPopMinWithCount(key string, count int64) (map[string]float64, error) {
 	result, err := client.executeCommand(C.ZPopMin, []string{key, utils.IntToString(count)})
@@ -4133,11 +4094,6 @@ func (client *baseClient) ZPopMinWithCount(key string, count int64) (map[string]
 //	A map containing the removed member and its corresponding score.
 //	If `key` doesn't exist, it will be treated as an empty sorted set and the
 //	command returns an empty map.
-//
-// Example:
-//
-//	res, err := client.zpopmax("mySortedSet")
-//	fmt.Println(res) // Output: map["member2": 8.0]
 //
 // [valkey.io]: https://valkey.io/commands/zpopmin/
 func (client *baseClient) ZPopMax(key string) (map[string]float64, error) {
@@ -4164,11 +4120,6 @@ func (client *baseClient) ZPopMax(key string) (map[string]float64, error) {
 //	If `key` doesn't exist, it will be treated as an empty sorted set and the
 //	command returns an empty map.
 //
-// Example:
-//
-//	res, err := client.ZPopMaxWithCount("mySortedSet", 2)
-//	fmt.Println(res) // Output: map["member1": 5.0, "member2": 6.0]
-//
 // [valkey.io]: https://valkey.io/commands/zpopmin/
 func (client *baseClient) ZPopMaxWithCount(key string, count int64) (map[string]float64, error) {
 	result, err := client.executeCommand(C.ZPopMax, []string{key, utils.IntToString(count)})
@@ -4193,11 +4144,6 @@ func (client *baseClient) ZPopMaxWithCount(key string, count int64) (map[string]
 //	The number of members that were removed from the sorted set, not including non-existing members.
 //	If `key` does not exist, it is treated as an empty sorted set, and this command returns `0`.
 //
-// Example:
-//
-//	res, err := client.ZRem("mySortedSet", []string{""member1", "member2", "missing"})
-//	fmt.Println(res) // Output: 2
-//
 // [valkey.io]: https://valkey.io/commands/zrem/
 func (client *baseClient) ZRem(key string, members []string) (int64, error) {
 	result, err := client.executeCommand(C.ZRem, append([]string{key}, members...))
@@ -4218,14 +4164,8 @@ func (client *baseClient) ZRem(key string, members []string) (int64, error) {
 // Return value:
 //
 //	The number of elements in the sorted set.
-//
-// If `key` does not exist, it is treated as an empty sorted set, and this command returns `0`.
-// If `key` holds a value that is not a sorted set, an error is returned.
-//
-// Example:
-//
-//	result, err := client.ZCard("mySet")
-//	result: 1 // There is 1 item in the set
+//	If `key` does not exist, it is treated as an empty sorted set, and this command returns `0`.
+//	If `key` holds a value that is not a sorted set, an error is returned.
 //
 // [valkey.io]: https://valkey.io/commands/zcard/
 func (client *baseClient) ZCard(key string) (int64, error) {
@@ -4258,13 +4198,6 @@ func (client *baseClient) ZCard(key string) (int64, error) {
 //
 //	A `KeyWithMemberAndScore` struct containing the key where the member was popped out, the member
 //	itself, and the member score. If no member could be popped and the `timeout` expired, returns `nil`.
-//
-// Example:
-//
-//	zaddResult1, err := client.ZAdd(key1, map[string]float64{"a": 1.0, "b": 1.5})
-//	zaddResult2, err := client.ZAdd(key2, map[string]float64{"c": 2.0})
-//	result, err := client.BZPopMin([]string{key1, key2}, float64(.5))
-//	fmt.Println(res.Value()) // Output: {key: key1 member:a, score:1}
 //
 // [valkey.io]: https://valkey.io/commands/bzpopmin/
 //
@@ -4439,19 +4372,6 @@ func (client *baseClient) BZMPopWithOptions(
 //	An array of elements within the specified range.
 //	If `key` does not exist, it is treated as an empty sorted set, and the command returns an empty array.
 //
-// Example:
-//
-//	// Retrieve all members of a sorted set in ascending order
-//	result, err := client.ZRange("my_sorted_set", options.NewRangeByIndexQuery(0, -1))
-//
-//	// Retrieve members within a score range in descending order
-//	query := options.NewRangeByScoreQuery(
-//	    options.NewScoreBoundary(3, false),
-//	    options.NewInfiniteScoreBoundary(options.NegativeInfinity)).
-//	  SetReverse()
-//	result, err := client.ZRange("my_sorted_set", query)
-//	// `result` contains members which have scores within the range of negative infinity to 3, in descending order
-//
 // [valkey.io]: https://valkey.io/commands/zrange/
 func (client *baseClient) ZRange(key string, rangeQuery options.ZRangeQuery) ([]string, error) {
 	args := make([]string, 0, 10)
@@ -4481,19 +4401,6 @@ func (client *baseClient) ZRange(key string, rangeQuery options.ZRangeQuery) ([]
 //
 //	A map of elements and their scores within the specified range.
 //	If `key` does not exist, it is treated as an empty sorted set, and the command returns an empty map.
-//
-// Example:
-//
-//	// Retrieve all members of a sorted set in ascending order
-//	result, err := client.ZRangeWithScores("my_sorted_set", options.NewRangeByIndexQuery(0, -1))
-//
-//	// Retrieve members within a score range in descending order
-//	query := options.NewRangeByScoreQuery(
-//	    options.NewScoreBoundary(3, false),
-//	    options.NewInfiniteScoreBoundary(options.NegativeInfinity)).
-//	  SetReverse()
-//	result, err := client.ZRangeWithScores("my_sorted_set", query)
-//	// `result` contains members with scores within the range of negative infinity to 3, in descending order
 //
 // [valkey.io]: https://valkey.io/commands/zrange/
 func (client *baseClient) ZRangeWithScores(
@@ -4555,21 +4462,6 @@ func (client *baseClient) Persist(key string) (bool, error) {
 //
 //	The number of members in the specified score range.
 //
-// Example:
-//
-//	 key1 := uuid.NewString()
-//	 membersScores := map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0 }
-//	 zAddResult, err := client.ZAdd(key1, membersScores)
-//	 zCountRange := options.NewZCountRangeBuilder(
-//		 options.NewInfiniteScoreBoundary(options.NegativeInfinity),
-//		 options.NewInfiniteScoreBoundary(options.PositiveInfinity),
-//	 )
-//	 zCountResult, err := client.ZCount(key1, zCountRange)
-//	 if err != nil {
-//	    // Handle err
-//	 }
-//	 fmt.Println(zCountResult) // Output: 3
-//
 // [valkey.io]: https://valkey.io/commands/zcount/
 func (client *baseClient) ZCount(key string, rangeOptions *options.ZCountRange) (int64, error) {
 	zCountRangeArgs, err := rangeOptions.ToArgs()
@@ -4600,16 +4492,6 @@ func (client *baseClient) ZCount(key string, rangeOptions *options.ZCountRange) 
 //	If `key` doesn't exist, or if `member` is not present in the set,
 //	`nil` will be returned.
 //
-// Example:
-//
-//	res, err := client.ZRank("mySortedSet", "member1")
-//	fmt.Println(res.Value()) // Output: 3
-//
-//	res2, err := client.ZRank("mySortedSet", "non-existing-member")
-//	if res2.IsNil() {
-//	  fmt.Println("Member not found")
-//	}
-//
 // [valkey.io]: https://valkey.io/commands/zrank/
 func (client *baseClient) ZRank(key string, member string) (Result[int64], error) {
 	result, err := client.executeCommand(C.ZRank, []string{key, member})
@@ -4634,17 +4516,6 @@ func (client *baseClient) ZRank(key string, member string) (Result[int64], error
 //	A tuple containing the rank of `member` and its score.
 //	If `key` doesn't exist, or if `member` is not present in the set,
 //	`nil` will be returned.
-//
-// Example:
-//
-//	resRank, resScore, err := client.ZRankWithScore("mySortedSet", "member1")
-//	fmt.Println(resRank.Value()) // Output: 3
-//	fmt.Println(resScore.Value()) // Output: 5.0
-//
-//	res2Rank, res2Score, err := client.ZRankWithScore("mySortedSet", "non-existing-member")
-//	if res2Rank.IsNil() {
-//	  fmt.Println("Member not found")
-//	}
 //
 // [valkey.io]: https://valkey.io/commands/zrank/
 func (client *baseClient) ZRankWithScore(key string, member string) (Result[int64], Result[float64], error) {
@@ -4673,16 +4544,6 @@ func (client *baseClient) ZRankWithScore(key string, member string) (Result[int6
 //	If `key` doesn't exist, or if `member` is not present in the set,
 //	`nil` will be returned.
 //
-// Example:
-//
-//	res, err := client.ZRevRank("mySortedSet", "member2")
-//	fmt.Println(res.Value()) // Output: 1
-//
-//	res2, err := client.ZRevRank("mySortedSet", "non-existing-member")
-//	if res2.IsNil() {
-//	  fmt.Println("Member not found")
-//	}
-//
 // [valkey.io]: https://valkey.io/commands/zrevrank/
 func (client *baseClient) ZRevRank(key string, member string) (Result[int64], error) {
 	result, err := client.executeCommand(C.ZRevRank, []string{key, member})
@@ -4708,17 +4569,6 @@ func (client *baseClient) ZRevRank(key string, member string) (Result[int64], er
 //	A tuple containing the rank of `member` and its score.
 //	If `key` doesn't exist, or if `member` is not present in the set,
 //	`nil` will be returned.s
-//
-// Example:
-//
-//	resRank, resScore, err := client.ZRevRankWithScore("mySortedSet", "member2")
-//	fmt.Println(resRank.Value()) // Output: 1
-//	fmt.Println(resScore.Value()) // Output: 6.0
-//
-//	res2Rank, res2Score, err := client.ZRevRankWithScore("mySortedSet", "non-existing-member")
-//	if res2Rank.IsNil() {
-//	  fmt.Println("Member not found")
-//	}
 //
 // [valkey.io]: https://valkey.io/commands/zrevrank/
 func (client *baseClient) ZRevRankWithScore(key string, member string) (Result[int64], Result[float64], error) {
@@ -4994,18 +4844,6 @@ func (client *baseClient) XDel(key string, ids []string) (int64, error) {
 //	The score of the member. If `member` does not exist in the sorted set, `nil` is returned.
 //	If `key` does not exist, `nil` is returned.
 //
-// Example:
-//
-//	membersScores := map[string]float64{
-//		"one":   1.0,
-//		"two":   2.0,
-//		"three": 3.0,
-//	}
-//
-//	zAddResult, err := client.ZAdd("key1", membersScores)
-//	zScoreResult, err := client.ZScore("key1", "one")
-//	//fmt.Println(zScoreResult.Value()) // Value: 1.0
-//
 // [valkey.io]: https://valkey.io/commands/zscore/
 func (client *baseClient) ZScore(key string, member string) (Result[float64], error) {
 	result, err := client.executeCommand(C.ZScore, []string{key, member})
@@ -5033,18 +4871,6 @@ func (client *baseClient) ZScore(key string, member string) (Result[float64], er
 //	The second return value is always an array of the subset of the sorted set held in `key`.
 //	The array is a flattened series of `string` pairs, where the value is at even indices and the score is at odd indices.
 //
-// Example:
-//
-//	// assume "key" contains a set
-//	resCursor, resCol, err := client.ZScan("key", "0")
-//	fmt.Println(resCursor)
-//	fmt.Println(resCol)
-//	for resCursor != "0" {
-//	  resCursor, resCol, err = client.ZScan("key", resCursor)
-//	  fmt.Println("Cursor: ", resCursor)
-//	  fmt.Println("Members: ", resCol)
-//	}
-//
 // [valkey.io]: https://valkey.io/commands/zscan/
 func (client *baseClient) ZScan(key string, cursor string) (string, []string, error) {
 	result, err := client.executeCommand(C.ZScan, []string{key, cursor})
@@ -5071,18 +4897,6 @@ func (client *baseClient) ZScan(key string, cursor string) (string, []string, er
 //	The second return value is always an array of the subset of the sorted set held in `key`.
 //	The array is a flattened series of `string` pairs, where the value is at even indices and the score is at odd indices.
 //	If `ZScanOptionsBuilder#noScores` is to `true`, the second return value will only contain the members without scores.
-//
-// Example:
-//
-//	resCursor, resCol, err := client.ZScanWithOptions("key", "0", options.NewBaseScanOptionsBuilder().SetMatch("*"))
-//	fmt.Println(resCursor)
-//	fmt.Println(resCol)
-//	for resCursor != "0" {
-//	  resCursor, resCol, err = client.ZScanWithOptions("key", resCursor,
-//		options.NewBaseScanOptionsBuilder().SetMatch("*"))
-//	  fmt.Println("Cursor: ", resCursor)
-//	  fmt.Println("Members: ", resCol)
-//	}
 //
 // [valkey.io]: https://valkey.io/commands/zscan/
 func (client *baseClient) ZScanWithOptions(
@@ -5499,11 +5313,6 @@ func (client *baseClient) XGroupSetIdWithOptions(
 //	If `key` does not exist, it is treated as an empty sorted set, and the command returns `0`.
 //	If `rangeQuery.Start` is greater than `rangeQuery.End`, `0` is returned.
 //
-// Example:
-//
-//	zRemRangeByLexResult, err := client.ZRemRangeByLex("key1", options.NewRangeByLexQuery("a", "b"))
-//	fmt.Println(zRemRangeByLexResult) // Output: 1
-//
 // [valkey.io]: https://valkey.io/commands/zremrangebylex/
 func (client *baseClient) ZRemRangeByLex(key string, rangeQuery options.RangeByLex) (int64, error) {
 	result, err := client.executeCommand(
@@ -5530,11 +5339,6 @@ func (client *baseClient) ZRemRangeByLex(key string, rangeQuery options.RangeByL
 //	If `key` does not exist, it is treated as an empty sorted set, and the command returns `0`.
 //	If `start` is greater than `stop`, `0` is returned.
 //
-// Example:
-//
-//	zRemRangeByRankResult, err := client.ZRemRangeByRank("key1", 0, 1)
-//	fmt.Println(zRemRangeByRankResult) // Output: 1
-//
 // [valkey.io]: https://valkey.io/commands/zremrangebyrank/
 func (client *baseClient) ZRemRangeByRank(key string, start int64, stop int64) (int64, error) {
 	result, err := client.executeCommand(C.ZRemRangeByRank, []string{key, utils.IntToString(start), utils.IntToString(stop)})
@@ -5559,14 +5363,6 @@ func (client *baseClient) ZRemRangeByRank(key string, start int64, stop int64) (
 //	The number of members removed from the sorted set.
 //	If `key` does not exist, it is treated as an empty sorted set, and the command returns `0`.
 //	If `rangeQuery.Start` is greater than `rangeQuery.End`, `0` is returned.
-//
-// Example:
-//
-//	zRemRangeByScoreResult, err := client.ZRemRangeByScore("key1", options.NewRangeByScoreBuilder(
-//		options.NewInfiniteScoreBoundary(options.NegativeInfinity),
-//		options.NewInfiniteScoreBoundary(options.PositiveInfinity),
-//	))
-//	fmt.Println(zRemRangeByScoreResult) // Output: 1
 //
 // [valkey.io]: https://valkey.io/commands/zremrangebyscore/
 func (client *baseClient) ZRemRangeByScore(key string, rangeQuery options.RangeByScore) (int64, error) {
