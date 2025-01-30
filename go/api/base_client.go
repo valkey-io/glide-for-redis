@@ -3644,12 +3644,6 @@ func (client *baseClient) Renamenx(key string, newKey string) (bool, error) {
 //
 //	The id of the added entry.
 //
-// For example:
-//
-//	result, err := client.XAdd("myStream", [][]string{{"field1", "value1"}, {"field2", "value2"}})
-//	result.IsNil(): false
-//	result.Value(): "1526919030474-55"
-//
 // [valkey.io]: https://valkey.io/commands/xadd/
 func (client *baseClient) XAdd(key string, values [][]string) (Result[string], error) {
 	return client.XAddWithOptions(key, values, options.NewXAddOptions())
@@ -3668,13 +3662,6 @@ func (client *baseClient) XAdd(key string, values [][]string) (Result[string], e
 // Return value:
 //
 //	The id of the added entry.
-//
-// For example:
-//
-//	options := options.NewXAddOptions().SetId("100-500").SetDontMakeNewStream()
-//	result, err := client.XAddWithOptions("myStream", [][]string{{"field1", "value1"}, {"field2", "value2"}}, options)
-//	result.IsNil(): false
-//	result.Value(): "100-500"
 //
 // [valkey.io]: https://valkey.io/commands/xadd/
 func (client *baseClient) XAddWithOptions(
@@ -3722,15 +3709,6 @@ func (client *baseClient) XAddWithOptions(
 // A `map[string]map[string][][]string` of stream keys to a map of stream entry IDs mapped to an array entries or `nil` if
 // a key does not exist or does not contain requiested entries.
 //
-// For example:
-//
-//	result, err := client.XRead({"stream1": "0-0", "stream2": "0-1"})
-//	err == nil: true
-//	result: map[string]map[string][][]string{
-//	  "stream1": {"0-1": {{"field1", "value1"}}, "0-2": {{"field2", "value2"}, {"field2", "value3"}}},
-//	  "stream2": {},
-//	}
-//
 // [valkey.io]: https://valkey.io/commands/xread/
 func (client *baseClient) XRead(keysAndIds map[string]string) (map[string]map[string][][]string, error) {
 	return client.XReadWithOptions(keysAndIds, options.NewXReadOptions())
@@ -3752,16 +3730,6 @@ func (client *baseClient) XRead(keysAndIds map[string]string) (map[string]map[st
 // Return value:
 // A `map[string]map[string][][]string` of stream keys to a map of stream entry IDs mapped to an array entries or `nil` if
 // a key does not exist or does not contain requiested entries.
-//
-// For example:
-//
-//	options := options.NewXReadOptions().SetBlock(100500)
-//	result, err := client.XReadWithOptions({"stream1": "0-0", "stream2": "0-1"}, options)
-//	err == nil: true
-//	result: map[string]map[string][][]string{
-//	  "stream1": {"0-1": {{"field1", "value1"}}, "0-2": {{"field2", "value2"}, {"field2", "value3"}}},
-//	  "stream2": {},
-//	}
 //
 // [valkey.io]: https://valkey.io/commands/xread/
 func (client *baseClient) XReadWithOptions(
@@ -3808,22 +3776,6 @@ func (client *baseClient) XReadWithOptions(
 // Return value:
 // A `map[string]map[string][][]string` of stream keys to a map of stream entry IDs mapped to an array entries or `nil` if
 // a key does not exist or does not contain requested entries.
-//
-// For example:
-//
-//	result, err := client.XReadGroup({"stream1": "0-0", "stream2": "0-1", "stream3": "0-1"})
-//	err == nil: true
-//	result: map[string]map[string][][]string{
-//	  "stream1": {
-//	    "0-1": {{"field1", "value1"}},
-//	    "0-2": {{"field2", "value2"}, {"field2", "value3"}},
-//	  },
-//	  "stream2": {
-//	    "1526985676425-0": {{"name", "Virginia"}, {"surname", "Woolf"}},
-//	    "1526985685298-0": nil,                                               // entry was deleted
-//	  },
-//	  "stream3": {},                                                          // stream is empty
-//	}
 //
 // [valkey.io]: https://valkey.io/commands/xreadgroup/
 func (client *baseClient) XReadGroup(
@@ -4790,21 +4742,6 @@ func (client *baseClient) ZRevRankWithScore(key string, member string) (Result[i
 //
 //	The number of entries deleted from the stream.
 //
-// For example:
-//
-//	 xAddResult, err = client.XAddWithOptions(
-//		"key1",
-//		[][]string{{field1, "foo4"}, {field2, "bar4"}},
-//		options.NewXAddOptions().SetTrimOptions(
-//			options.NewXTrimOptionsWithMinId(id).SetExactTrimming(),
-//		),
-//	 )
-//	 xTrimResult, err := client.XTrim(
-//		"key1",
-//		options.NewXTrimOptionsWithMaxLen(1).SetExactTrimming(),
-//	 )
-//	 fmt.Println(xTrimResult) // Output: 1
-//
 // [valkey.io]: https://valkey.io/commands/xtrim/
 func (client *baseClient) XTrim(key string, options *options.XTrimOptions) (int64, error) {
 	xTrimArgs, err := options.ToArgs()
@@ -4829,18 +4766,6 @@ func (client *baseClient) XTrim(key string, options *options.XTrimOptions) (int6
 // Return value:
 //
 //	The number of entries in the stream. If `key` does not exist, return 0.
-//
-// For example:
-//
-//	 xAddResult, err = client.XAddWithOptions(
-//		"key1",
-//		[][]string{{field1, "foo4"}, {field2, "bar4"}},
-//		options.NewXAddOptions().SetTrimOptions(
-//			options.NewXTrimOptionsWithMinId(id).SetExactTrimming(),
-//		),
-//	 )
-//	 xLenResult, err = client.XLen("key1")
-//	 fmt.Println(xLenResult) // Output: 2
 //
 // [valkey.io]: https://valkey.io/commands/xlen/
 func (client *baseClient) XLen(key string) (int64, error) {
@@ -4877,24 +4802,6 @@ func (client *baseClient) XLen(key string) (int64, error) {
 //	  - If you are using Valkey 7.0.0 or above, the response will also include an array containing
 //	    the message IDs that were in the Pending Entries List but no longer exist in the stream.
 //	    These IDs are deleted from the Pending Entries List.
-//
-// Example:
-//
-//	result, err := client.XAutoClaim("myStream", "myGroup", "myConsumer", 42, "0-0")
-//	result:
-//	// &{
-//	//     "1609338788321-0"               // value to be used as `start` argument for the next `xautoclaim` call
-//	//     map[
-//	//         "1609338752495-0": [        // claimed entries
-//	//             ["field 1", "value 1"]
-//	//             ["field 2", "value 2"]
-//	//         ]
-//	//     ]
-//	//     [
-//	//         "1594324506465-0",          // array of IDs of deleted messages,
-//	//         "1594568784150-0"           // included in the response only on valkey 7.0.0 and above
-//	//     ]
-//	// }
 //
 // [valkey.io]: https://valkey.io/commands/xautoclaim/
 func (client *baseClient) XAutoClaim(
@@ -4934,25 +4841,6 @@ func (client *baseClient) XAutoClaim(
 //	  - If you are using Valkey 7.0.0 or above, the response will also include an array containing
 //	    the message IDs that were in the Pending Entries List but no longer exist in the stream.
 //	    These IDs are deleted from the Pending Entries List.
-//
-// Example:
-//
-//	opts := options.NewXAutoClaimOptionsWithCount(1)
-//	result, err := client.XAutoClaimWithOptions("myStream", "myGroup", "myConsumer", 42, "0-0", opts)
-//	result:
-//	// &{
-//	//     "1609338788321-0"               // value to be used as `start` argument for the next `xautoclaim` call
-//	//     map[
-//	//         "1609338752495-0": [        // claimed entries
-//	//             ["field 1", "value 1"]
-//	//             ["field 2", "value 2"]
-//	//         ]
-//	//     ]
-//	//     [
-//	//         "1594324506465-0",          // array of IDs of deleted messages,
-//	//         "1594568784150-0"           // included in the response only on valkey 7.0.0 and above
-//	//     ]
-//	// }
 //
 // [valkey.io]: https://valkey.io/commands/xautoclaim/
 func (client *baseClient) XAutoClaimWithOptions(
@@ -5005,22 +4893,6 @@ func (client *baseClient) XAutoClaimWithOptions(
 //	    the message IDs that were in the Pending Entries List but no longer exist in the stream.
 //	    These IDs are deleted from the Pending Entries List.
 //
-// Example:
-//
-//	result, err := client.XAutoClaimJustId("myStream", "myGroup", "myConsumer", 42, "0-0")
-//	result:
-//	// &{
-//	//     "1609338788321-0"               // value to be used as `start` argument for the next `xautoclaim` call
-//	//     [
-//	//         "1609338752495-0",          // claimed entries
-//	//         "1609338752495-1"
-//	//     ]
-//	//     [
-//	//         "1594324506465-0",          // array of IDs of deleted messages,
-//	//         "1594568784150-0"           // included in the response only on valkey 7.0.0 and above
-//	//     ]
-//	// }
-//
 // [valkey.io]: https://valkey.io/commands/xautoclaim/
 func (client *baseClient) XAutoClaimJustId(
 	key string,
@@ -5060,23 +4932,6 @@ func (client *baseClient) XAutoClaimJustId(
 //	    the message IDs that were in the Pending Entries List but no longer exist in the stream.
 //	    These IDs are deleted from the Pending Entries List.
 //
-// Example:
-//
-//	opts := options.NewXAutoClaimOptionsWithCount(1)
-//	result, err := client.XAutoClaimJustIdWithOptions("myStream", "myGroup", "myConsumer", 42, "0-0", opts)
-//	result:
-//	// &{
-//	//     "1609338788321-0"               // value to be used as `start` argument for the next `xautoclaim` call
-//	//     [
-//	//         "1609338752495-0",          // claimed entries
-//	//         "1609338752495-1"
-//	//     ]
-//	//     [
-//	//         "1594324506465-0",          // array of IDs of deleted messages,
-//	//         "1594568784150-0"           // included in the response only on valkey 7.0.0 and above
-//	//     ]
-//	// }
-//
 // [valkey.io]: https://valkey.io/commands/xautoclaim/
 func (client *baseClient) XAutoClaimJustIdWithOptions(
 	key string,
@@ -5115,16 +4970,6 @@ func (client *baseClient) XAutoClaimJustIdWithOptions(
 //
 //	The number of entries removed from the stream. This number may be less than the number
 //	of entries in `ids`, if the specified `ids` don't exist in the stream.
-//
-// For example:
-//
-//	 xAddResult, err := client.XAddWithOptions(
-//		"key1",
-//	 	[][]string{{"f1", "foo1"}, {"f2", "bar2"}},
-//		options.NewXAddOptions().SetId(streamId1),
-//	 )
-//	 xDelResult, err := client.XDel("key1", []string{streamId1, streamId3})
-//	 fmt.Println(xDelResult) // Output: 1
 //
 // [valkey.io]: https://valkey.io/commands/xdel/
 func (client *baseClient) XDel(key string, ids []string) (int64, error) {
