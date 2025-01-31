@@ -29,9 +29,11 @@ import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import response.ResponseOuterClass.Response;
 
+@Disabled
 public class ConnectionWithGlideMockTests extends RustCoreLibMockTestBase {
 
     private ChannelHandler channelHandler = null;

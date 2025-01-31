@@ -17,9 +17,9 @@ dependencies {
 
     // https://github.com/netty/netty/wiki/Native-transports
     // At the moment, Windows is not supported
-    implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: '4.1.115.Final', classifier: 'linux-x86_64'
-    implementation group: 'io.netty', name: 'netty-transport-native-kqueue', version: '4.1.115.Final', classifier: 'osx-x86_64'
-    implementation group: 'io.netty', name: 'netty-transport-native-kqueue', version: '4.1.115.Final', classifier: 'osx-aarch_64'
+//    implementation group: 'io.netty', name: 'netty-transport-native-epoll', version: '4.1.115.Final', classifier: 'linux-x86_64'
+//    implementation group: 'io.netty', name: 'netty-transport-native-kqueue', version: '4.1.115.Final', classifier: 'osx-x86_64'
+//    implementation group: 'io.netty', name: 'netty-transport-native-kqueue', version: '4.1.115.Final', classifier: 'osx-aarch_64'
 
     // junit
     testImplementation 'org.mockito:mockito-junit-jupiter:3.12.4'

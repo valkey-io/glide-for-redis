@@ -2,7 +2,7 @@
 package glide.connectors.resources;
 
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.unix.DomainSocketChannel;
+import io.netty.channel.socket.DuplexChannel;
 import lombok.Getter;
 import lombok.NonNull;
 
@@ -13,11 +13,11 @@ import lombok.NonNull;
 @Getter
 public abstract class ThreadPoolResource {
     private EventLoopGroup eventLoopGroup;
-    private Class<? extends DomainSocketChannel> domainSocketChannelClass;
+    private Class<? extends DuplexChannel> domainSocketChannelClass;
 
     public ThreadPoolResource(
             @NonNull EventLoopGroup eventLoopGroup,
-            @NonNull Class<? extends DomainSocketChannel> domainSocketChannelClass) {
+            @NonNull Class<? extends DuplexChannel> domainSocketChannelClass) {
         this.eventLoopGroup = eventLoopGroup;
         this.domainSocketChannelClass = domainSocketChannelClass;
     }

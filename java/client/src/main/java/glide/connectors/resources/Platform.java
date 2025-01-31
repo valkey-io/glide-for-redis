@@ -1,8 +1,6 @@
 /** Copyright Valkey GLIDE Project Contributors - SPDX Identifier: Apache-2.0 */
 package glide.connectors.resources;
 
-import io.netty.channel.epoll.Epoll;
-import io.netty.channel.kqueue.KQueue;
 import java.util.function.Supplier;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -23,47 +21,28 @@ public class Platform {
     public static class Capabilities {
         private final boolean isKQueueAvailable;
         private final boolean isEPollAvailable;
-        // TODO support IO-Uring and NIO
+        // TODO support IO-Uring
         private final boolean isIOUringAvailable;
-        // At the moment, Windows is not supported
-        // Probably we should use NIO (NioEventLoopGroup) for Windows.
         private final boolean isNIOAvailable;
     }
 
     /** Detected platform (OS + JVM) capabilities. Not supposed to be changed in runtime. */
     @Getter
-    private static final Capabilities capabilities =
-            new Capabilities(isKQueueAvailable(), isEPollAvailable(), false, false);
+    private static Capabilities capabilities =
+            new Capabilities(false, false, false, isNIOAvailable());
 
-    /** Detect <em>kqueue</em> availability. */
-    private static boolean isKQueueAvailable() {
-        try {
-            Class.forName("io.netty.channel.kqueue.KQueue");
-            return KQueue.isAvailable();
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
-    }
-
-    /** Detect <em>epoll</em> availability. */
-    private static boolean isEPollAvailable() {
-        try {
-            Class.forName("io.netty.channel.epoll.Epoll");
-            return Epoll.isAvailable();
-        } catch (ClassNotFoundException e) {
-            return false;
-        }
+    /** Detect <em>NIO</em> availability. */
+    private static boolean isNIOAvailable() {
+        // available on java 16+ and netty > 4.1.84 (TODO clarify min netty)
+        return true;
     }
 
     public static Supplier<ThreadPoolResource> getThreadPoolResourceSupplier() {
-        if (Platform.getCapabilities().isKQueueAvailable()) {
-            return KQueuePoolResource::new;
+        if (capabilities.isNIOAvailable()) {
+            return NIOPoolResource::new;
         }
 
-        if (Platform.getCapabilities().isEPollAvailable()) {
-            return EpollResource::new;
-        }
-        // TODO support IO-Uring and NIO
+        // TODO support IO-Uring
         throw new RuntimeException("Current platform supports no known thread pool resources");
     }
 }

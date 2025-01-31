@@ -5,12 +5,8 @@ import static glide.TestUtilities.commonClientConfig;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import glide.api.GlideClient;
-import glide.connectors.resources.EpollResource;
-import glide.connectors.resources.KQueuePoolResource;
-import glide.connectors.resources.Platform;
-import glide.connectors.resources.ThreadPoolResource;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import glide.connectors.resources.NIOPoolResource;
+import io.netty.channel.nio.NioEventLoopGroup;
 import java.util.concurrent.TimeUnit;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
@@ -19,16 +15,8 @@ public class CustomThreadPoolResourceTest {
     @Test
     @SneakyThrows
     public void standalone_client_with_custom_threadPoolResource() {
-        ThreadPoolResource customThreadPoolResource;
         int numOfThreads = 8;
-
-        if (Platform.getCapabilities().isKQueueAvailable()) {
-            customThreadPoolResource = new KQueuePoolResource(new KQueueEventLoopGroup(numOfThreads));
-        } else if (Platform.getCapabilities().isEPollAvailable()) {
-            customThreadPoolResource = new EpollResource(new EpollEventLoopGroup(numOfThreads));
-        } else {
-            throw new RuntimeException("Current platform supports no known thread pool resources");
-        }
+        var customThreadPoolResource = new NIOPoolResource(new NioEventLoopGroup(numOfThreads));
 
         var regularClient =
                 GlideClient.createClient(

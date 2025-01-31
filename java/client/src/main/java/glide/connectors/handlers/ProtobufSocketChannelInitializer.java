@@ -3,7 +3,7 @@ package glide.connectors.handlers;
 
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
-import io.netty.channel.unix.UnixChannel;
+import io.netty.channel.socket.DuplexChannel;
 import io.netty.handler.codec.protobuf.ProtobufDecoder;
 import io.netty.handler.codec.protobuf.ProtobufEncoder;
 import io.netty.handler.codec.protobuf.ProtobufVarint32FrameDecoder;
@@ -14,12 +14,12 @@ import response.ResponseOuterClass.Response;
 
 /** Builder for the channel used by {@link ChannelHandler}. */
 @RequiredArgsConstructor
-public class ProtobufSocketChannelInitializer extends ChannelInitializer<UnixChannel> {
+public class ProtobufSocketChannelInitializer extends ChannelInitializer<DuplexChannel> {
 
     private final CallbackDispatcher callbackDispatcher;
 
     @Override
-    public void initChannel(@NonNull UnixChannel ch) {
+    public void initChannel(@NonNull DuplexChannel ch) {
         ch.pipeline()
                 // https://netty.io/4.1/api/io/netty/handler/codec/protobuf/ProtobufEncoder.html
                 .addLast("frameDecoder", new ProtobufVarint32FrameDecoder())

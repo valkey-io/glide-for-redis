@@ -8,7 +8,7 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.unix.DomainSocketAddress;
+import java.net.UnixDomainSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.NonNull;
@@ -47,7 +47,7 @@ public class ChannelHandler {
                         .group(threadPoolResource.getEventLoopGroup())
                         .channel(threadPoolResource.getDomainSocketChannelClass())
                         .handler(new ProtobufSocketChannelInitializer(callbackDispatcher))
-                        .connect(new DomainSocketAddress(socketPath))
+                        .connect(UnixDomainSocketAddress.of(socketPath))
                         // TODO    .addListener(new NettyFutureErrorHandler())
                         //   we need to use connection promise here for that ^
                         .sync()

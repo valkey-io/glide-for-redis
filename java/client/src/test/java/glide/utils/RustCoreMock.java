@@ -12,13 +12,12 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.epoll.EpollServerDomainSocketChannel;
-import io.netty.channel.kqueue.KQueueServerDomainSocketChannel;
-import io.netty.channel.unix.DomainSocketAddress;
+import io.netty.channel.socket.nio.NioServerDomainSocketChannel;
 import io.netty.channel.unix.DomainSocketChannel;
 import io.netty.handler.codec.protobuf.ProtobufEncoder;
 import io.netty.handler.codec.protobuf.ProtobufVarint32FrameDecoder;
 import io.netty.handler.codec.protobuf.ProtobufVarint32LengthFieldPrepender;
+import java.net.UnixDomainSocketAddress;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -99,10 +98,7 @@ public class RustCoreMock {
         channel =
                 new ServerBootstrap()
                         .group(group)
-                        .channel(
-                                Platform.getCapabilities().isEPollAvailable()
-                                        ? EpollServerDomainSocketChannel.class
-                                        : KQueueServerDomainSocketChannel.class)
+                        .channel(NioServerDomainSocketChannel.class)
                         .childHandler(
                                 new ChannelInitializer<DomainSocketChannel>() {
 
@@ -116,7 +112,7 @@ public class RustCoreMock {
                                                 .addLast(new UdsServer(ch));
                                     }
                                 })
-                        .bind(new DomainSocketAddress(socketPath))
+                        .bind(UnixDomainSocketAddress.of(socketPath))
                         .syncUninterruptibly()
                         .channel();
     }
