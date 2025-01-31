@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/go-jose/go-jose/v4/json"
+	"encoding/json"
+
 	"github.com/google/uuid"
 	"github.com/valkey-io/valkey-glide/go/glide/api/options"
 )
@@ -438,14 +439,15 @@ func ExampleGlideClient_XGroupCreate() {
 		key,
 		[][]string{{"field1", "value1"}, {"field2", "value2"}},
 		options.NewXAddOptions().SetId(streamId),
-	)
-	response, err := client.XGroupCreate(key, group, "0")
+	) // This will create the stream if it does not exist
+
+	response, err := client.XGroupCreate(key, group, "0") // create the group (no MKSTREAM needed)
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
 	fmt.Println(response)
 
-	// Output: 0
+	// Output: OK
 }
 
 // func ExampleGlideClient_XGroupCreateWithOptions() {
