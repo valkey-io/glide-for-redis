@@ -4566,26 +4566,15 @@ func (client *baseClient) ZScanWithOptions(
 //	group - The consumer group name.
 //
 // Return value:
+//
 // An XPendingSummary struct that includes a summary with the following fields:
 //
-//	NumOfMessages: The total number of pending messages for this consumer group.
-//	StartId: The smallest ID among the pending messages or nil if no pending messages exist.
-//	EndId: The greatest ID among the pending messages or nil if no pending messages exists.
-//	GroupConsumers: An array of ConsumerPendingMessages with the following fields:
-//	  ConsumerName: The name of the consumer.
-//	  MessageCount: The number of pending messages for this consumer.
-//
-// Example
-//
-//	result, err := client.XPending("myStream", "myGroup")
-//	if err != nil {
-//	  return err
-//	}
-//	fmt.Println("Number of pending messages: ", result.NumOfMessages)
-//	fmt.Println("Start and End ID of messages: ", result.StartId, result.EndId)
-//	for _, consumer := range result.ConsumerMessages {
-//	  fmt.Printf("Consumer messages:  %s: $v\n", consumer.ConsumerName, consumer.MessageCount)
-//	}
+//	NumOfMessages - The total number of pending messages for this consumer group.
+//	StartId - The smallest ID among the pending messages or nil if no pending messages exist.
+//	EndId - The greatest ID among the pending messages or nil if no pending messages exists.
+//	GroupConsumers - An array of ConsumerPendingMessages with the following fields:
+//	ConsumerName - The name of the consumer.
+//	MessageCount - The number of pending messages for this consumer.
 //
 // [valkey.io]: https://valkey.io/commands/xpending/
 func (client *baseClient) XPending(key string, group string) (XPendingSummary, error) {
@@ -4614,21 +4603,6 @@ func (client *baseClient) XPending(key string, group string) (XPendingSummary, e
 //	ConsumerName - The name of the consumer that fetched the message and has still to acknowledge it.
 //	IdleTime - The time in milliseconds since the last time the message was delivered to the consumer.
 //	DeliveryCount - The number of times this message was delivered.
-//
-// Example
-//
-//	detailResult, err := client.XPendingWithOptions(key, groupName, options.NewXPendingOptions("-", "+", 10))
-//	if err != nil {
-//	  return err
-//	}
-//	fmt.Println("=========================")
-//	for _, detail := range detailResult {
-//	  fmt.Println(detail.Id)
-//	  fmt.Println(detail.ConsumerName)
-//	  fmt.Println(detail.IdleTime)
-//	  fmt.Println(detail.DeliveryCount)
-//	  fmt.Println("=========================")
-//	}
 //
 // [valkey.io]: https://valkey.io/commands/xpending/
 func (client *baseClient) XPendingWithOptions(
@@ -4870,13 +4844,6 @@ func (client *baseClient) XGroupDestroy(key string, group string) (bool, error) 
 //
 //	`"OK"`.
 //
-// Example:
-//
-//	ok, err := client.XGroupSetId("mystream", "mygroup", "0-0")
-//	if ok != "OK" || err != nil {
-//		// handle error
-//	}
-//
 // [valkey.io]: https://valkey.io/commands/xgroup-create/
 func (client *baseClient) XGroupSetId(key string, group string, id string) (string, error) {
 	return client.XGroupSetIdWithOptions(key, group, id, options.NewXGroupSetIdOptionsOptions())
@@ -4896,14 +4863,6 @@ func (client *baseClient) XGroupSetId(key string, group string, id string) (stri
 // Return value:
 //
 //	`"OK"`.
-//
-// Example:
-//
-//	opts := options.NewXGroupSetIdOptionsOptions().SetEntriesRead(42)
-//	ok, err := client.XGroupSetIdWithOptions("mystream", "mygroup", "0-0", opts)
-//	if ok != "OK" || err != nil {
-//		// handle error
-//	}
 //
 // [valkey.io]: https://valkey.io/commands/xgroup-create/
 func (client *baseClient) XGroupSetIdWithOptions(
