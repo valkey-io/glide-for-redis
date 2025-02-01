@@ -44,11 +44,12 @@ serde = { version = "1", features = ["derive"] }
 versions = "6.3"
 
 [features]
+proto = ["protobuf"]
 socket-layer = [
+    "proto",
     "directories",
     "integer-encoding",
     "num_cpus",
-    "protobuf",
     "tokio-util",
 ]
 standalone_heartbeat = []

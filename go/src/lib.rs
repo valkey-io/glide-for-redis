@@ -34,7 +34,7 @@ use tokio::runtime::Runtime;
 #[derive(Debug)]
 pub struct CommandResponse {
     response_type: ResponseType,
-    int_value: c_long,
+    int_value: i64,
     float_value: c_double,
     bool_value: bool,
 

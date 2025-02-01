@@ -1,7 +1,7 @@
 // Copyright Valkey GLIDE Project Contributors - SPDX Identifier: Apache-2.0
 
-#[cfg(feature = "socket-layer")]
-include!(concat!(env!("OUT_DIR"), "/protobuf/mod.rs"));
+#[cfg(feature = "proto")]
+include!("generated/mod.rs");
 pub mod client;
 mod retry_strategies;
 #[cfg(feature = "socket-layer")]

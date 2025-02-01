@@ -6,7 +6,7 @@ use logger_core::log_warn;
 use std::collections::HashSet;
 use std::time::Duration;
 
-#[cfg(feature = "socket-layer")]
+#[cfg(feature = "proto")]
 use crate::connection_request as protobuf;
 
 #[derive(Default)]
@@ -74,7 +74,7 @@ pub struct ConnectionRetryStrategy {
     pub number_of_retries: u32,
 }
 
-#[cfg(feature = "socket-layer")]
+#[cfg(feature = "proto")]
 fn chars_to_string_option(chars: &::protobuf::Chars) -> Option<String> {
     if chars.is_empty() {
         None
@@ -83,7 +83,7 @@ fn chars_to_string_option(chars: &::protobuf::Chars) -> Option<String> {
     }
 }
 
-#[cfg(feature = "socket-layer")]
+#[cfg(feature = "proto")]
 fn none_if_zero(value: u32) -> Option<u32> {
     if value == 0 {
         None
@@ -92,7 +92,7 @@ fn none_if_zero(value: u32) -> Option<u32> {
     }
 }
 
-#[cfg(feature = "socket-layer")]
+#[cfg(feature = "proto")]
 impl From<protobuf::ConnectionRequest> for ConnectionRequest {
     fn from(value: protobuf::ConnectionRequest) -> Self {
         let read_from = value.read_from.enum_value().ok().map(|val| match val {
