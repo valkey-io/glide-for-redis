@@ -146,7 +146,7 @@ where
 async fn setup_connection<C>(
     connection_info: &RedisConnectionInfo,
     con: &mut C,
-    // This parameter is set to 'true' if ReadFromReplica strategy is set to AZAffinity.
+    // This parameter is set to 'true' if ReadFromReplica strategy is set to AZAffinity or AZAffinityReplicasAndPrimary.
     // An INFO command will be triggered in the connection's setup to update the 'availability_zone' property.
     discover_az: bool,
 ) -> RedisResult<()>

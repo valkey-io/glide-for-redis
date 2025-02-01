@@ -11,6 +11,7 @@ enum ReadFrom {
     PreferReplica = 1;
     LowestLatency = 2;
     AZAffinity = 3;
+    AZAffinityReplicasAndPrimary = 4;
 }
 
 enum TlsMode {

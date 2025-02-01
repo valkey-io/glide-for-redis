@@ -58,6 +58,7 @@ pub enum ReadFrom {
     Primary,
     PreferReplica,
     AZAffinity(String),
+    AZAffinityReplicasAndPrimary(String),
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Default)]
@@ -113,6 +114,20 @@ impl From<protobuf::ConnectionRequest> for ConnectionRequest {
                     ReadFrom::PreferReplica
                 }
             }
+            protobuf::ReadFrom::AZAffinityReplicasAndPrimary => {
+                if let Some(client_az) = chars_to_string_option(&value.client_az) {
+                    ReadFrom::AZAffinityReplicasAndPrimary(client_az)
+                } else {
+                    log_warn(
+                        "types",
+                        format!(
+                            "Failed to convert availability zone string: '{:?}'. Falling back to `ReadFrom::PreferReplica`",
+                            value.client_az
+                        ),
+                    );
+                    ReadFrom::PreferReplica
+                }
+            },
         });
 
         let client_name = chars_to_string_option(&value.client_name);

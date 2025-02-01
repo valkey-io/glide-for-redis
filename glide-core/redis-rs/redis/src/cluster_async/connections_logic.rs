@@ -182,6 +182,7 @@ where
     let discover_az = matches!(
         params.read_from_replicas,
         crate::cluster_slotmap::ReadFromReplicaStrategy::AZAffinity(_)
+            | crate::cluster_slotmap::ReadFromReplicaStrategy::AZAffinityReplicasAndPrimary(_)
     );
 
     match create_connection::<C>(

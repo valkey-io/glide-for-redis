@@ -86,7 +86,7 @@ pub struct GlideConnectionOptions {
     #[cfg(feature = "aio")]
     /// Passive disconnect notifier
     pub disconnect_notifier: Option<Box<dyn DisconnectNotifier>>,
-    /// If ReadFromReplica strategy is set to AZAffinity, this parameter will be set to 'true'.
+    /// If ReadFromReplica strategy is set to AZAffinity or AZAffinityReplicasAndPrimary, this parameter will be set to 'true'.
     /// In this case, an INFO command will be triggered in the connection's setup to update the connection's 'availability_zone' property.
     pub discover_az: bool,
     /// Connection timeout duration.

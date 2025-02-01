@@ -1,5 +1,6 @@
 #### Changes
 
+* Core: Add support to AzAffinityReplicasAndPrimary read strategy ([#2792](https://github.com/valkey-io/valkey-glide/pull/2792))
 * Go: Add `HScan` command ([#2917](https://github.com/valkey-io/valkey-glide/pull/2917))
 * Java, Node, Python: Add transaction commands for JSON module ([#2862](https://github.com/valkey-io/valkey-glide/pull/2862))
 * Go: Add HINCRBY command ([#2847](https://github.com/valkey-io/valkey-glide/pull/2847))

@@ -32,6 +32,9 @@ pub enum ReadFromReplicaStrategy {
     /// Spread the read requests between replicas in the same client's Aviliablity zone in a round robin manner,
     /// falling back to other replicas or the primary if needed.
     AZAffinity(String),
+    /// Spread the read requests among nodes within the client's Availability Zone (AZ) in a round robin manner,
+    /// prioritizing local replicas, then the local primary, and falling back to any replica or the primary if needed.
+    AZAffinityReplicasAndPrimary(String),
 }
 
 #[derive(Debug, Default)]
@@ -60,6 +63,7 @@ fn get_address_from_slot(
             addrs.replicas()[index].clone()
         }
         ReadFromReplicaStrategy::AZAffinity(_az) => todo!(), // Drop sync client
+        ReadFromReplicaStrategy::AZAffinityReplicasAndPrimary(_az) => todo!(), // Drop sync client
     }
 }
 

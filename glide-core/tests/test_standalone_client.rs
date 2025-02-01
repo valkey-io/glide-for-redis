@@ -272,10 +272,23 @@ mod standalone_client_tests {
         });
     }
 
+    // TODO - Current test falls back to PreferReplica when run, need to integrate the az here also
     #[rstest]
     #[serial_test::serial]
     #[timeout(SHORT_STANDALONE_TEST_TIMEOUT)]
     fn test_read_from_replica_az_affinity() {
+        test_read_from_replica(ReadFromReplicaTestConfig {
+            read_from: ReadFrom::AZAffinity,
+            expected_primary_reads: 0,
+            expected_replica_reads: vec![1, 1, 1],
+            ..Default::default()
+        });
+    }
+    // TODO - Needs changes in the struct and the create_primary_mock
+    #[rstest]
+    #[serial_test::serial]
+    #[timeout(SHORT_STANDALONE_TEST_TIMEOUT)]
+    fn test_read_from_replica_az_affinity_replicas_and_primary() {
         test_read_from_replica(ReadFromReplicaTestConfig {
             read_from: ReadFrom::AZAffinity,
             expected_primary_reads: 0,

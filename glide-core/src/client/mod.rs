@@ -579,6 +579,9 @@ async fn create_cluster_client(
     let read_from_strategy = request.read_from.unwrap_or_default();
     builder = builder.read_from(match read_from_strategy {
         ReadFrom::AZAffinity(az) => ReadFromReplicaStrategy::AZAffinity(az),
+        ReadFrom::AZAffinityReplicasAndPrimary(az) => {
+            ReadFromReplicaStrategy::AZAffinityReplicasAndPrimary(az)
+        }
         ReadFrom::PreferReplica => ReadFromReplicaStrategy::RoundRobin,
         ReadFrom::Primary => ReadFromReplicaStrategy::AlwaysFromPrimary,
     });
@@ -733,6 +736,8 @@ fn sanitized_request_string(request: &ConnectionRequest) -> String {
                     ReadFrom::Primary => "Only primary",
                     ReadFrom::PreferReplica => "Prefer replica",
                     ReadFrom::AZAffinity(_) => "Prefer replica in user's availability zone",
+                    ReadFrom::AZAffinityReplicasAndPrimary(_) =>
+                        "Prefer replica and primary in user's availability zone",
                 }
             )
         })
