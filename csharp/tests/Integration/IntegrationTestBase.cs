@@ -2,7 +2,7 @@
 
 using System.Diagnostics;
 
-using Xunit.Abstractions;
+using Xunit.Runner.Common;
 using Xunit.Sdk;
 
 // Note: All IT should be in the same namespace
@@ -135,7 +135,7 @@ public class IntegrationTestBase : IDisposable
 
         // Redis response:
         // Redis server v=7.2.3 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=7504b1fedf883f2
-        // Valkey response: 
+        // Valkey response:
         // Server v=7.2.5 sha=26388270:0 malloc=jemalloc-5.3.0 bits=64 build=ea40bb1576e402d6
         return new Version(output.Split("v=")[1].Split(" ")[0]);
     }
