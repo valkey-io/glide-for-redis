@@ -629,7 +629,7 @@ mod cluster_async {
             .route_command(
                 &cmd,
                 RoutingInfo::SingleNode(SingleNodeRoutingInfo::SpecificNode(Route::new(
-                    10923, // This should target the third primary
+                    12182, // This should target the third primary
                     SlotAddr::Master,
                 ))),
             )
