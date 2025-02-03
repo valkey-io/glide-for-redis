@@ -1364,7 +1364,7 @@ where
 
         if !addrs_to_refresh.is_empty() {
             // don't try existing nodes since we know a. it does not exist. b. exist but its connection is closed
-            Self::refresh_and_update_connections(
+            Self::trigger_refresh_connection_tasks(
                 inner.clone(),
                 addrs_to_refresh,
                 RefreshConnectionType::AllConnections,
@@ -1432,13 +1432,6 @@ where
             let address_clone = address.clone();
             let address_clone_for_task = address.clone();
 
-            // let node_option = if check_existing_conn {
-            //     let connections_container = inner.conn_lock.read().expect(MUTEX_READ_ERR);
-            //     connections_container.remove_node(&address)
-            // } else {
-            //     None
-            // };
-
             let mut node_option = inner
                 .conn_lock
                 .read()
@@ -1474,20 +1467,6 @@ where
                 )
                 .await;
 
-                // Maintain the newly refreshed connection separately from the main connection map.
-                // This refreshed connection will be incorporated into the main connection map at the start of the poll_flush operation.
-                // This approach ensures that all requests within the current batch interact with a consistent connection map,
-                // preventing potential reordering issues.
-                //
-                // By delaying the integration of the refreshed connection:
-                //
-                // 1. We maintain consistency throughout the processing of a batch of requests.
-                // 2. We avoid mid-batch changes to the connection map that could lead to inconsistent routing or ordering of operations.
-                // 3. We ensure that all requests in a batch see the same cluster topology, reducing the risk of race conditions or unexpected behavior.
-                //
-                // This strategy effectively creates a synchronization point at the beginning of poll_flush, where the connection map is
-                // updated atomically for the next batch of operations. This approach balances the need for up-to-date connection information
-                // with the requirement for consistent request handling within each processing cycle.
                 match node_result {
                     Ok(node) => {
                         debug!(

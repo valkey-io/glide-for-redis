@@ -267,7 +267,8 @@ impl Drop for RefreshTaskState {
     }
 }
 
-// This struct is used to track the status of each address refresh
+// This struct is used to track the status of each address refresh state
+// TODO move this struct logic into the connection_map itself
 #[derive(Default)]
 pub(crate) struct RefreshConnectionStates {
     // Follow the refresh ops on the connections
