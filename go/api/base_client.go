@@ -5213,11 +5213,6 @@ func (client *baseClient) XAck(key string, group string, ids []string) (int64, e
 //
 //	The bit value that was previously stored at offset.
 //
-// Example:
-//
-//	result, err := client.SetBit("key", 1, 1)
-//	result: 1
-//
 // [valkey.io]: https://valkey.io/commands/setbit/
 func (client *baseClient) SetBit(key string, offset int64, value int64) (int64, error) {
 	result, err := client.executeCommand(C.SetBit, []string{key, utils.IntToString(offset), utils.IntToString(value)})
@@ -5239,11 +5234,6 @@ func (client *baseClient) SetBit(key string, offset int64, value int64) (int64, 
 // Return value:
 // The bit at offset of the string. Returns zero if the key is empty or if the positive
 // offset exceeds the length of the string.
-//
-// Example:
-//
-//	result, err := client.GetBit("key1", 1, 1)
-//	result: 1
 //
 // [valkey.io]: https://valkey.io/commands/getbit/
 func (client *baseClient) GetBit(key string, offset int64) (int64, error) {
@@ -5287,11 +5277,6 @@ func (client *baseClient) Wait(numberOfReplicas int64, timeout int64) (int64, er
 // The number of set bits in the string. Returns zero if the key is missing as it is
 // treated as an empty string.
 //
-// Example:
-//
-//	result, err := client.BitCount("mykey")
-//	result: 26
-//
 // [valkey.io]: https://valkey.io/commands/bitcount/
 func (client *baseClient) BitCount(key string) (int64, error) {
 	result, err := client.executeCommand(C.BitCount, []string{key})
@@ -5315,12 +5300,6 @@ func (client *baseClient) BitCount(key string) (int64, error) {
 // Return value:
 // The number of set bits in the string interval specified by start, end, and options.
 // Returns zero if the key is missing as it is treated as an empty string.
-//
-// Example:
-//
-//	opts := NewBitCountOptionsBuilder().SetStart(1).SetEnd(1).SetBitmapIndexType(options.BYTE)
-//	result, err := client.BitCount("mykey",options)
-//	result: 6
 //
 // [valkey.io]: https://valkey.io/commands/bitcount/
 func (client *baseClient) BitCountWithOptions(key string, opts *options.BitCountOptions) (int64, error) {
