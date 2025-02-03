@@ -450,168 +450,342 @@ func ExampleGlideClient_XGroupCreate() {
 	// Output: OK
 }
 
-// func ExampleGlideClient_XGroupCreateWithOptions() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+func ExampleGlideClient_XGroupCreateWithOptions() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	group := "g12345"
 
-// 	options := options.NewXGroupCreateOptions().
-// 		SetNoAck(true)
-// 	response, err := client.XGroupCreateWithOptions("mystream", "mygroup", "0", options)
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+	opts := options.NewXGroupCreateOptions().SetMakeStream()
+	response, err := client.XGroupCreateWithOptions(key, group, "0", opts) // create the group (no MKSTREAM needed)
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println(response)
 
-// 	// Output: 0
-// }
+	// Output: OK
+}
 
-// func ExampleGlideClient_XGroupDestroy() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+func ExampleGlideClient_XGroupDestroy() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	group := "g12345"
 
-// 	response, err := client.XGroupDestroy("mystream", "mygroup")
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+	opts := options.NewXGroupCreateOptions().SetMakeStream()
+	client.XGroupCreateWithOptions(key, group, "0", opts) // create the group (no MKSTREAM needed)
 
-// 	// Output: true
-// }
+	success, err := client.XGroupDestroy(key, group) // destroy the group
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println(success)
 
-// func ExampleGlideClient_XGroupCreateConsumer() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+	// Output: true
 
-// 	response, err := client.XGroupCreateConsumer("mystream", "mygroup", "myconsumer")
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+}
 
-// 	// Output: true
-// }
+func ExampleGlideClient_XGroupCreateConsumer() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	group := "g12345"
+	consumer := "c12345"
 
-// func ExampleGlideClient_XGroupDelConsumer() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+	opts := options.NewXGroupCreateOptions().SetMakeStream()
+	client.XGroupCreateWithOptions(key, group, "0", opts) // create the group (no MKSTREAM needed)
 
-// 	count, err := client.XGroupDelConsumer("mystream", "mygroup", "myconsumer")
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(count)
+	success, err := client.XGroupCreateConsumer(key, group, consumer)
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println(success)
 
-// 	// Output: 1
-// }
+	// Output: true
+}
 
-// func ExampleGlideClient_XAck() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+func ExampleGlideClient_XGroupDelConsumer() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	group := "g12345"
+	consumer := "c12345"
+	streamId := "12345-1"
 
-// 	count, err := client.XAck("mystream", "mygroup", []string{"0"})
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(count)
+	client.XAddWithOptions(
+		key,
+		[][]string{{"field1", "value1"}, {"field2", "value2"}},
+		options.NewXAddOptions().SetId(streamId),
+	)
+	client.XGroupCreate(key, group, "0")
+	client.XGroupCreateConsumer(key, group, consumer)
+	client.XReadGroup(group, consumer, map[string]string{key: ">"})
 
-// 	// Output: 1
-// }
+	count, err := client.XGroupDelConsumer(key, group, consumer)
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println("Consumer deleted. Messages pending:", count)
 
-// func ExampleGlideClient_XClaim() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+	// Output:
+	// Consumer deleted. Messages pending: 1
+}
 
-// 	response, err := client.XClaim("mystream", "mygroup", "myconsumer", 1000, []string{"0"})
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+func ExampleGlideClient_XAck() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	group := "g12345"
+	consumer := "c12345"
 
-// 	// Output: map[]
-// }
+	streamId, _ := client.XAdd(
+		key,
+		[][]string{{"entry1_field1", "entry1_value1"}, {"entry1_field2", "entry1_value2"}},
+	)
+	client.XGroupCreate(key, group, "0")
+	client.XGroupCreateConsumer(key, group, consumer)
+	client.XReadGroup(group, consumer, map[string]string{key: ">"})
 
-// func ExampleGlideClient_XClaimWithOptions() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+	count, err := client.XAck(key, group, []string{streamId.Value()}) // ack the message and remove it from the pending list
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println(count)
 
-// 	options := options.NewStreamClaimOptions().
-// 		SetMinIdleTime(1000)
-// 	response, err := client.XClaimWithOptions("mystream", "mygroup", "myconsumer", 1000, []string{"0"}, options)
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+	// Output: 1
+}
 
-// 	// Output: map[]
-// }
+func ExampleGlideClient_XClaim() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	streamId := "12345-1"
+	group := "g12345"
+	consumer1 := "c12345-1"
+	consumer2 := "c12345-2"
 
-// func ExampleGlideClient_XClaimJustId() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+	client.XGroupCreateWithOptions(key, group, "0", options.NewXGroupCreateOptions().SetMakeStream())
+	client.XGroupCreateConsumer(key, group, consumer1)
+	client.XAddWithOptions(
+		key,
+		[][]string{{"entry1_field1", "entry1_value1"}, {"entry1_field2", "entry1_value2"}},
+		options.NewXAddOptions().SetId(streamId),
+	)
+	client.XReadGroup(group, consumer1, map[string]string{key: ">"})
 
-// 	response, err := client.XClaimJustId("mystream", "mygroup", "myconsumer", 1000, []string{"0"})
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+	result, err := client.XPendingWithOptions(
+		key,
+		group,
+		options.NewXPendingOptions("-", "+", 10).SetConsumer(consumer1),
+	)
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	if len(result) == 0 {
+		fmt.Println("No pending messages")
+		return
+	}
 
-// 	// Output: []
-// }
+	response, err := client.XClaim(key, group, consumer2, 1, []string{result[0].Id})
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Printf("Claimed %d message\n", len(response))
 
-// func ExampleGlideClient_XClaimJustIdWithOptions() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+	// Output: Claimed 1 message
+}
 
-// 	options := options.NewStreamClaimOptions().
-// 		SetMinIdleTime(1000)
-// 	response, err := client.XClaimJustIdWithOptions("mystream", "mygroup", "myconsumer", 1000, []string{"0"}, options)
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+func ExampleGlideClient_XClaimWithOptions() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	streamId := "12345-1"
+	group := "g12345"
+	consumer1 := "c12345-1"
+	consumer2 := "c12345-2"
 
-// 	// Output: []
-// }
+	client.XGroupCreateWithOptions(key, group, "0", options.NewXGroupCreateOptions().SetMakeStream())
+	client.XGroupCreateConsumer(key, group, consumer1)
+	client.XAddWithOptions(
+		key,
+		[][]string{{"entry1_field1", "entry1_value1"}, {"entry1_field2", "entry1_value2"}},
+		options.NewXAddOptions().SetId(streamId),
+	)
+	client.XReadGroup(group, consumer1, map[string]string{key: ">"})
 
-// func ExampleGlideClient_XRange() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+	result, err := client.XPendingWithOptions(
+		key,
+		group,
+		options.NewXPendingOptions("-", "+", 10).SetConsumer(consumer1),
+	)
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	if len(result) == 0 {
+		fmt.Println("No pending messages")
+		return
+	}
 
-// 	response, err := client.XRange("mystream", options.StreamBoundary{}, options.StreamBoundary{})
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+	opts := options.NewStreamClaimOptions().SetRetryCount(3)
+	response, err := client.XClaimWithOptions(key, group, consumer2, 1, []string{result[0].Id}, opts)
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Printf("Claimed %d message\n", len(response))
 
-// 	// Output: map[]
-// }
+	// Output: Claimed 1 message
+}
 
-// func ExampleGlideClient_XRangeWithOptions() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+func ExampleGlideClient_XClaimJustId() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	streamId := "12345-1"
+	group := "g12345"
+	consumer1 := "c12345-1"
+	consumer2 := "c12345-2"
 
-// 	options := options.NewStreamRangeOptions().
-// 		SetCount(100)
-// 	response, err := client.XRangeWithOptions("mystream", options.StreamBoundary{}, options.StreamBoundary{}, options)
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+	client.XGroupCreateWithOptions(key, group, "0", options.NewXGroupCreateOptions().SetMakeStream())
+	client.XGroupCreateConsumer(key, group, consumer1)
+	client.XAddWithOptions(
+		key,
+		[][]string{{"entry1_field1", "entry1_value1"}, {"entry1_field2", "entry1_value2"}},
+		options.NewXAddOptions().SetId(streamId),
+	)
+	client.XReadGroup(group, consumer1, map[string]string{key: ">"})
 
-// 	// Output: map[]
-// }
+	result, err := client.XPendingWithOptions(
+		key,
+		group,
+		options.NewXPendingOptions("-", "+", 10).SetConsumer(consumer1),
+	)
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	if len(result) == 0 {
+		fmt.Println("No pending messages")
+		return
+	}
 
-// func ExampleGlideClient_XRevRange() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+	response, err := client.XClaimJustId(key, group, consumer2, 1, []string{result[0].Id})
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println(response)
 
-// 	response, err := client.XRevRange("mystream", options.StreamBoundary{}, options.StreamBoundary{})
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+	// Output: [12345-1]
+}
 
-// 	// Output: map[]
-// }
+func ExampleGlideClient_XClaimJustIdWithOptions() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	streamId := "12345-1"
+	group := "g12345"
+	consumer1 := "c12345-1"
+	consumer2 := "c12345-2"
 
-// func ExampleGlideClient_XRevRangeWithOptions() {
-// 	var client *GlideClient = getExampleGlideClient() // example helper function
+	client.XGroupCreateWithOptions(key, group, "0", options.NewXGroupCreateOptions().SetMakeStream())
+	client.XGroupCreateConsumer(key, group, consumer1)
+	client.XAddWithOptions(
+		key,
+		[][]string{{"entry1_field1", "entry1_value1"}, {"entry1_field2", "entry1_value2"}},
+		options.NewXAddOptions().SetId(streamId),
+	)
+	client.XReadGroup(group, consumer1, map[string]string{key: ">"})
 
-// 	options := options.NewStreamRangeOptions().
-// 		SetCount(100)
-// 	response, err := client.XRevRangeWithOptions("mystream", options.StreamBoundary{}, options.StreamBoundary{}, options)
-// 	if err != nil {
-// 		fmt.Println("Glide example failed with an error: ", err)
-// 	}
-// 	fmt.Println(response)
+	result, err := client.XPendingWithOptions(
+		key,
+		group,
+		options.NewXPendingOptions("-", "+", 10).SetConsumer(consumer1),
+	)
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	if len(result) == 0 {
+		fmt.Println("No pending messages")
+		return
+	}
 
-// 	// Output: map[]
-// }
+	opts := options.NewStreamClaimOptions().SetRetryCount(3)
+	response, err := client.XClaimJustIdWithOptions(key, group, consumer2, 1, []string{result[0].Id}, opts)
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println(response)
+
+	// Output: [12345-1]
+}
+
+func ExampleGlideClient_XRange() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+
+	client.XAdd(key, [][]string{{"field1", "value1"}})
+	client.XAdd(key, [][]string{{"field2", "value2"}})
+
+	response, err := client.XRange(key,
+		options.NewInfiniteStreamBoundary(options.NegativeInfinity),
+		options.NewInfiniteStreamBoundary(options.PositiveInfinity))
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println(len(response))
+
+	// TODO: This output is incorrect. It should be an slice since the values should be ordered.
+	// Output: 2
+}
+
+func ExampleGlideClient_XRangeWithOptions() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+
+	streamId1, _ := client.XAdd(key, [][]string{{"field1", "value1"}})
+	streamId2, _ := client.XAdd(key, [][]string{{"field2", "value2"}})
+
+	response, err := client.XRangeWithOptions(key,
+		options.NewStreamBoundary(streamId1.Value(), true),
+		options.NewStreamBoundary(streamId2.Value(), true),
+		options.NewStreamRangeOptions().SetCount(1))
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println(len(response))
+
+	// Output: 1
+}
+
+func ExampleGlideClient_XRevRange() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	streamId1 := "12345-1"
+	streamId2 := "12345-2"
+
+	client.XAddWithOptions(key, [][]string{{"field1", "value1"}}, options.NewXAddOptions().SetId(streamId1))
+	client.XAddWithOptions(key, [][]string{{"field2", "value2"}}, options.NewXAddOptions().SetId(streamId2))
+
+	response, err := client.XRevRange(key,
+		options.NewStreamBoundary(streamId2, true),
+		options.NewStreamBoundary(streamId1, true))
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println(response)
+
+	//TODO: This output is incorrect. It should be an slice since the values should be ordered.
+	// Output: map[12345-1:[[field1 value1]] 12345-2:[[field2 value2]]]
+}
+
+func ExampleGlideClient_XRevRangeWithOptions() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+	key := "12345"
+	streamId1 := "12345-1"
+	streamId2 := "12345-2"
+
+	client.XAddWithOptions(key, [][]string{{"field1", "value1"}}, options.NewXAddOptions().SetId(streamId1))
+	client.XAddWithOptions(key, [][]string{{"field2", "value2"}}, options.NewXAddOptions().SetId(streamId2))
+
+	response, err := client.XRevRangeWithOptions(key,
+		options.NewStreamBoundary(streamId2, true),
+		options.NewStreamBoundary(streamId1, true),
+		options.NewStreamRangeOptions().SetCount(2))
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	fmt.Println(response)
+
+	//TODO: This output is incorrect. It should be an slice since the values should be ordered.
+	// Output: map[12345-1:[[field1 value1]] 12345-2:[[field2 value2]]]
+
+}

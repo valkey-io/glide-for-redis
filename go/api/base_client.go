@@ -512,8 +512,6 @@ func (client *baseClient) Decr(key string) (int64, error) {
 //
 //	The value of `key` after the decrement.
 //
-// For example:
-//
 // [valkey.io]: https://valkey.io/commands/decrby/
 func (client *baseClient) DecrBy(key string, amount int64) (int64, error) {
 	result, err := client.executeCommand(C.DecrBy, []string{key, utils.IntToString(amount)})
@@ -1418,14 +1416,6 @@ func (client *baseClient) SRem(key string, members []string) (int64, error) {
 //
 //	The number of elements in the resulting set.
 //
-// Example:
-//
-//	result, err := client.SUnionStore("my_set", []string{"set1", "set2"})
-//	if err != nil {
-//	    fmt.Println(result)
-//	}
-//	// Output: 2 - Two elements were stored at "my_set", and those elements are the union of "set1" and "set2".
-//
 // [valkey.io]: https://valkey.io/commands/sunionstore/
 func (client *baseClient) SUnionStore(destination string, keys []string) (int64, error) {
 	result, err := client.executeCommand(C.SUnionStore, append([]string{destination}, keys...))
@@ -1449,12 +1439,6 @@ func (client *baseClient) SUnionStore(destination string, keys []string) (int64,
 //	A `map[string]struct{}` containing all members of the set.
 //	Returns an empty collection if key does not exist.
 //
-// For example:
-//
-//	// Assume set "my_set" contains: "member1", "member2"
-//	result, err := client.SMembers("my_set")
-//	// result: map[string]struct{}{ "member1": {}, "member2": {} }
-//
 // [valkey.io]: https://valkey.io/commands/smembers/
 func (client *baseClient) SMembers(key string) (map[string]struct{}, error) {
 	result, err := client.executeCommand(C.SMembers, []string{key})
@@ -1476,11 +1460,6 @@ func (client *baseClient) SMembers(key string) (map[string]struct{}, error) {
 // Return value:
 //
 //	The cardinality (number of elements) of the set, or `0` if the key does not exist.
-//
-// Example:
-//
-//	result, err := client.SCard("my_set")
-//	// result: 3
 //
 // [valkey.io]: https://valkey.io/commands/scard/
 func (client *baseClient) SCard(key string) (int64, error) {
@@ -1506,15 +1485,6 @@ func (client *baseClient) SCard(key string) (int64, error) {
 //	A bool containing true if the member exists in the set, false otherwise.
 //	If key doesn't exist, it is treated as an empty set and the method returns false.
 //
-// Example:
-//
-//	result1, err := client.SIsMember("mySet", "member1")
-//	// result1: true
-//	// Indicates that "member1" exists in the set "mySet".
-//	result2, err := client.SIsMember("mySet", "nonExistingMember")
-//	// result2: false
-//	// Indicates that "nonExistingMember" does not exist in the set "mySet".
-//
 // [valkey.io]: https://valkey.io/commands/sismember/
 func (client *baseClient) SIsMember(key string, member string) (bool, error) {
 	result, err := client.executeCommand(C.SIsMember, []string{key, member})
@@ -1539,12 +1509,6 @@ func (client *baseClient) SIsMember(key string, member string) (bool, error) {
 //
 //	A `map[string]struct{}` representing the difference between the sets.
 //	If a key does not exist, it is treated as an empty set.
-//
-// Example:
-//
-//	result, err := client.SDiff([]string{"set1", "set2"})
-//	// result: map[string]struct{}{ "element": {} }
-//	// Indicates that "element" is present in "set1", but missing in "set2"
 //
 // [valkey.io]: https://valkey.io/commands/sdiff/
 func (client *baseClient) SDiff(keys []string) (map[string]struct{}, error) {
@@ -1572,12 +1536,6 @@ func (client *baseClient) SDiff(keys []string) (map[string]struct{}, error) {
 //
 //	The number of elements in the resulting set.
 //
-// Example:
-//
-//	result, err := client.SDiffStore("mySet", []string{"set1", "set2"})
-//	// result: 5
-//	// Indicates that the resulting set "mySet" contains 5 elements
-//
 // [valkey.io]: https://valkey.io/commands/sdiffstore/
 func (client *baseClient) SDiffStore(destination string, keys []string) (int64, error) {
 	result, err := client.executeCommand(C.SDiffStore, append([]string{destination}, keys...))
@@ -1603,12 +1561,6 @@ func (client *baseClient) SDiffStore(destination string, keys []string) (int64, 
 //	A `map[string]struct{}` containing members which are present in all given sets.
 //	If one or more sets do not exist, an empty collection will be returned.
 //
-// Example:
-//
-//	result, err := client.SInter([]string{"set1", "set2"})
-//	// result: map[string]struct{}{ "element": {} }
-//	// Indicates that "element" is present in both "set1" and "set2"
-//
 // [valkey.io]: https://valkey.io/commands/sinter/
 func (client *baseClient) SInter(keys []string) (map[string]struct{}, error) {
 	result, err := client.executeCommand(C.SInter, keys)
@@ -1633,16 +1585,6 @@ func (client *baseClient) SInter(keys []string) (map[string]struct{}, error) {
 // Return value:
 //
 //	The number of elements in the resulting set.
-//
-// Example:
-//
-//	result, err := client.SInterStore("my_set", []string{"set1", "set2"})
-//	if err != nil {
-//	    fmt.Println(result)
-//	}
-//	// Output: 2 - Two elements were stored at "my_set", and those elements are the intersection of "set1" and "set2".
-//
-// [valkey.io]: https://valkey.io/commands/sinterstore/
 func (client *baseClient) SInterStore(destination string, keys []string) (int64, error) {
 	result, err := client.executeCommand(C.SInterStore, append([]string{destination}, keys...))
 	if err != nil {
@@ -1669,14 +1611,6 @@ func (client *baseClient) SInterStore(destination string, keys []string) (int64,
 // Return value:
 //
 //	The cardinality of the intersection result. If one or more sets do not exist, `0` is returned.
-//
-// Example:
-//
-//	result, err := client.SInterCard([]string{"set1", "set2"})
-//	// result: 2
-//	// Indicates that the intersection of "set1" and "set2" contains 2 elements
-//	result, err := client.SInterCard([]string{"set1", "nonExistingSet"})
-//	// result: 0
 //
 // [valkey.io]: https://valkey.io/commands/sintercard/
 func (client *baseClient) SInterCard(keys []string) (int64, error) {
@@ -1709,13 +1643,6 @@ func (client *baseClient) SInterCard(keys []string) (int64, error) {
 //	If one or more sets do not exist, `0` is returned.
 //	If the intersection cardinality reaches 'limit' partway through the computation, returns 'limit' as the cardinality.
 //
-// Example:
-//
-//	result, err := client.SInterCardLimit([]string{"set1", "set2"}, 3)
-//	// result: 2
-//	// Indicates that the intersection of "set1" and "set2" contains 2 elements (or at least 3 if the actual
-//	// intersection is larger)
-//
 // [valkey.io]: https://valkey.io/commands/sintercard/
 func (client *baseClient) SInterCardLimit(keys []string, limit int64) (int64, error) {
 	args := utils.Concat([]string{utils.IntToString(int64(len(keys)))}, keys, []string{"LIMIT", utils.IntToString(limit)})
@@ -1741,13 +1668,6 @@ func (client *baseClient) SInterCardLimit(keys []string, limit int64) (int64, er
 //	A Result[string] containing a random element from the set.
 //	Returns api.CreateNilStringResult() if key does not exist.
 //
-// Example:
-//
-//	client.SAdd("test", []string{"one"})
-//	response, err := client.SRandMember("test")
-//	// response.Value(): "one"
-//	// err: nil
-//
 // [valkey.io]: https://valkey.io/commands/srandmember/
 func (client *baseClient) SRandMember(key string) (Result[string], error) {
 	result, err := client.executeCommand(C.SRandMember, []string{key})
@@ -1771,14 +1691,7 @@ func (client *baseClient) SRandMember(key string) (Result[string], error) {
 //	A Result[string] containing the value of the popped member.
 //	Returns a NilResult if key does not exist.
 //
-// Example:
-//
-//	value1, err := client.SPop("mySet")
-//	// value1.Value() might be "value1"
-//	// err: nil
-//	value2, err := client.SPop("nonExistingSet")
-//	// value2.IsNil(): true
-//	// err: nil
+
 //
 // [valkey.io]: https://valkey.io/commands/spop/
 func (client *baseClient) SPop(key string) (Result[string], error) {
@@ -1801,17 +1714,6 @@ func (client *baseClient) SPop(key string) (Result[string], error) {
 // Return value:
 //
 //	A []bool containing whether each member is a member of the set stored at key.
-//
-// Example:
-//
-//	client.SAdd("myKey", []string{"one", "two"})
-//	value1, err := client.SMIsMember("myKey", []string{"two", "three"})
-//	// value1[0]: true
-//	// value1[1]: false
-//	// err: nil
-//	value2, err := client.SMIsMember("nonExistingKey", []string{"one"})
-//	// value2[0]: false
-//	// err: nil
 //
 // [valkey.io]: https://valkey.io/commands/smismember/
 func (client *baseClient) SMIsMember(key string, members []string) ([]bool, error) {
@@ -1837,24 +1739,6 @@ func (client *baseClient) SMIsMember(key string, members []string) ([]bool, erro
 //
 //	A `map[string]struct{}` of members which are present in at least one of the given sets.
 //	If none of the sets exist, an empty collection will be returned.
-//
-// Example:
-//
-//	result1, err := client.SAdd("my_set1", []string {"member1", "member2"})
-//	// result.Value(): 2
-//	// result.IsNil(): false
-//
-//	result2, err := client.SAdd("my_set2", []string {"member2", "member3"})
-//	// result.Value(): 2
-//	// result.IsNil(): false
-//
-//	result3, err := client.SUnion([]string {"my_set1", "my_set2"})
-//	// result3: "{'member1', 'member2', 'member3'}"
-//	// err: nil
-//
-//	result4, err := client.SUnion([]string {"my_set1", "non_existing_set"})
-//	// result4: "{'member1', 'member2'}"
-//	// err: nil
 //
 // [valkey.io]: https://valkey.io/commands/sunion/
 func (client *baseClient) SUnion(keys []string) (map[string]struct{}, error) {
@@ -1885,25 +1769,6 @@ func (client *baseClient) SUnion(keys []string) (map[string]struct{}, error) {
 //	for the next iteration of results. The `cursor` will be `"0"` on the last iteration of the set.
 //	The second element is always an array of the subset of the set held in `key`.
 //
-// Example:
-//
-//	// assume "key" contains a set
-//	resCursor, resCol, err := client.sscan("key", "0")
-//	fmt.Println("Cursor: ", resCursor)
-//	fmt.Println("Members: ", resCol)
-//	for resCursor != "0" {
-//		resCursor, resCol, err = client.sscan("key", "0")
-//		fmt.Println("Cursor: ", resCursor)
-//	 	fmt.Println("Members: ", resCol)
-//	}
-//	// Output:
-//	// Cursor:  48
-//	// Members:  ['3', '118', '120', '86', '76', '13', '61', '111', '55', '45']
-//	// Cursor:  24
-//	// Members:  ['38', '109', '11', '119', '34', '24', '40', '57', '20', '17']
-//	// Cursor:  0
-//	// Members:  ['47', '122', '1', '53', '10', '14', '80']
-//
 // [valkey.io]: https://valkey.io/commands/sscan/
 func (client *baseClient) SScan(key string, cursor string) (string, []string, error) {
 	result, err := client.executeCommand(C.SScan, []string{key, cursor})
@@ -1932,26 +1797,6 @@ func (client *baseClient) SScan(key string, cursor string) (string, []string, er
 //	An array of the cursor and the subset of the set held by `key`. The first element is always the `cursor` and
 //	for the next iteration of results. The `cursor` will be `"0"` on the last iteration of the set.
 //	The second element is always an array of the subset of the set held in `key`.
-//
-// Example:
-//
-//	// assume "key" contains a set
-//	resCursor, resCol, err := client.sscan("key", "0", opts)
-//	fmt.Println("Cursor: ", resCursor)
-//	fmt.Println("Members: ", resCol)
-//	for resCursor != "0" {
-//		opts := options.NewBaseScanOptionsBuilder().SetMatch("*")
-//		resCursor, resCol, err = client.sscan("key", "0", opts)
-//		fmt.Println("Cursor: ", resCursor)
-//		fmt.Println("Members: ", resCol)
-//	}
-//	// Output:
-//	// Cursor:  48
-//	// Members:  ['3', '118', '120', '86', '76', '13', '61', '111', '55', '45']
-//	// Cursor:  24
-//	// Members:  ['38', '109', '11', '119', '34', '24', '40', '57', '20', '17']
-//	// Cursor:  0
-//	// Members:  ['47', '122', '1', '53', '10', '14', '80']
 //
 // [valkey.io]: https://valkey.io/commands/sscan/
 func (client *baseClient) SScanWithOptions(
@@ -1987,11 +1832,6 @@ func (client *baseClient) SScanWithOptions(
 // Return value:
 //
 //	`true` on success, or `false` if the `source` set does not exist or the element is not a member of the source set.
-//
-// Example:
-//
-//	moved := SMove("set1", "set2", "element")
-//	fmt.Println(moved.Value()) // Output: true
 //
 // [valkey.io]: https://valkey.io/commands/smove/
 func (client *baseClient) SMove(source string, destination string, member string) (bool, error) {
@@ -3453,23 +3293,6 @@ func (client *baseClient) XReadGroup(
 // A `map[string]map[string][][]string` of stream keys to a map of stream entry IDs mapped to an array entries or `nil` if
 // a key does not exist or does not contain requiested entries.
 //
-// For example:
-//
-//	options := options.NewXReadGroupOptions().SetNoAck()
-//	result, err := client.XReadGroupWithOptions({"stream1": "0-0", "stream2": "0-1", "stream3": "0-1"}, options)
-//	err == nil: true
-//	result: map[string]map[string][][]string{
-//	  "stream1": {
-//	    "0-1": {{"field1", "value1"}},
-//	    "0-2": {{"field2", "value2"}, {"field2", "value3"}},
-//	  },
-//	  "stream2": {
-//	    "1526985676425-0": {{"name", "Virginia"}, {"surname", "Woolf"}},
-//	    "1526985685298-0": nil,                                               // entry was deleted
-//	  },
-//	  "stream3": {},                                                          // stream is empty
-//	}
-//
 // [valkey.io]: https://valkey.io/commands/xreadgroup/
 func (client *baseClient) XReadGroupWithOptions(
 	group string,
@@ -4635,13 +4458,6 @@ func (client *baseClient) XPendingWithOptions(
 //
 //	`"OK"`.
 //
-// Example:
-//
-//	ok, err := client.XGroupCreate("mystream", "mygroup", "0-0")
-//	if ok != "OK" || err != nil {
-//		// handle error
-//	}
-//
 // [valkey.io]: https://valkey.io/commands/xgroup-create/
 func (client *baseClient) XGroupCreate(key string, group string, id string) (string, error) {
 	return client.XGroupCreateWithOptions(key, group, id, options.NewXGroupCreateOptions())
@@ -4662,14 +4478,6 @@ func (client *baseClient) XGroupCreate(key string, group string, id string) (str
 // Return value:
 //
 //	`"OK"`.
-//
-// Example:
-//
-//	opts := options.NewXGroupCreateOptions().SetMakeStream()
-//	ok, err := client.XGroupCreateWithOptions("mystream", "mygroup", "0-0", opts)
-//	if ok != "OK" || err != nil {
-//		// handle error
-//	}
 //
 // [valkey.io]: https://valkey.io/commands/xgroup-create/
 func (client *baseClient) XGroupCreateWithOptions(
@@ -4813,13 +4621,6 @@ func (client *baseClient) Echo(message string) (Result[string], error) {
 // Return value:
 //
 //	`true` if the consumer group is destroyed. Otherwise, `false`.
-//
-// Example:
-//
-//	ok, err := client.XGroupDestroy("mystream", "mygroup")
-//	if !ok || err != nil {
-//		// handle errors
-//	}
 //
 // [valkey.io]: https://valkey.io/commands/xgroup-destroy/
 func (client *baseClient) XGroupDestroy(key string, group string) (bool, error) {
@@ -5332,14 +5133,6 @@ func (client *baseClient) SortStoreWithOptions(
 //
 //	Returns `true` if the consumer is created. Otherwise, returns `false`.
 //
-// Example:
-//
-//	// Creates the consumer "myconsumer" in consumer group "mygroup"
-//	success, err := client.xgroupCreateConsumer("mystream", "mygroup", "myconsumer")
-//	if err == nil && success {
-//	 fmt.Println("Consumer created")
-//	}
-//
 // [valkey.io]: https://valkey.io/commands/xgroup-createconsumer/
 func (client *baseClient) XGroupCreateConsumer(
 	key string,
@@ -5364,15 +5157,6 @@ func (client *baseClient) XGroupCreateConsumer(
 //	consumer - The consumer to delete.
 //
 // Returns the number of pending messages the `consumer` had before it was deleted.
-//
-// Example:
-//
-//	// Deletes the consumer "myconsumer" in consumer group "mygroup"
-//	pendingMsgCount, err := client.XGroupDelConsumer("mystream", "mygroup", "myconsumer")
-//	if err != nil {
-//	    // handle error
-//	}
-//	fmt.Printf("Consumer 'myconsumer' had %d pending messages unclaimed.\n", pendingMsgCount)
 //
 // [valkey.io]: https://valkey.io/commands/xgroup-delconsumer/
 func (client *baseClient) XGroupDelConsumer(
@@ -5402,12 +5186,6 @@ func (client *baseClient) XGroupDelConsumer(
 // Return value:
 //
 //	The number of messages that were successfully acknowledged.
-//
-// Example:
-//
-//	// Assuming streamId1 and streamId2 already exist.
-//	xackResult, err := client.XAck("key", "groupName", []string{"streamId1", "streamId2"})
-//	fmt.Println(xackResult) // 2
 //
 // [valkey.io]: https://valkey.io/commands/xack/
 func (client *baseClient) XAck(key string, group string, ids []string) (int64, error) {
@@ -5575,11 +5353,6 @@ func (client *baseClient) BitCountWithOptions(key string, opts *options.BitCount
 //	A `map of message entries with the format `{"entryId": [["entry", "data"], ...], ...}` that were claimed by
 //	the consumer.
 //
-// Example:
-//
-//	result, err := client.XClaim("key", "group", "consumer", 1000, []string{"streamId1", "streamId2"})
-//	fmt.Println(result) // Output: map[streamId1:[["entry1", "data1"], ["entry2", "data2"]] streamId2:[["entry3", "data3"]]]
-//
 // [valkey.io]: https://valkey.io/commands/xclaim/
 func (client *baseClient) XClaim(
 	key string,
@@ -5608,18 +5381,6 @@ func (client *baseClient) XClaim(
 //
 //	A `map` of message entries with the format `{"entryId": [["entry", "data"], ...], ...}` that were claimed by
 //	the consumer.
-//
-// Example:
-//
-//	result, err := client.XClaimWithOptions(
-//		"key",
-//		"group",
-//		"consumer",
-//		1000,
-//		[]string{"streamId1", "streamId2"},
-//		options.NewStreamClaimOptions().SetIdleTime(1),
-//	)
-//	fmt.Println(result) // Output: map[streamId1:[["entry1", "data1"], ["entry2", "data2"]] streamId2:[["entry3", "data3"]]]
 //
 // [valkey.io]: https://valkey.io/commands/xclaim/
 func (client *baseClient) XClaimWithOptions(
@@ -5663,17 +5424,6 @@ func (client *baseClient) XClaimWithOptions(
 //
 //	An array of the ids of the entries that were claimed by the consumer.
 //
-// Example:
-//
-//	result, err := client.XClaimJustId(
-//		"key",
-//		"group",
-//		"consumer",
-//		1000,
-//		[]string{"streamId1", "streamId2"},
-//	)
-//	fmt.Println(result) // Output: ["streamId1", "streamId2"]
-//
 // [valkey.io]: https://valkey.io/commands/xclaim/
 func (client *baseClient) XClaimJustId(
 	key string,
@@ -5702,18 +5452,6 @@ func (client *baseClient) XClaimJustId(
 // Return value:
 //
 //	An array of the ids of the entries that were claimed by the consumer.
-//
-// Example:
-//
-//	result, err := client.XClaimJustIdWithOptions(
-//		"key",
-//		"group",
-//		"consumer",
-//		1000,
-//		[]string{"streamId1", "streamId2"},
-//		options.NewStreamClaimOptions().SetIdleTime(1),
-//	)
-//	fmt.Println(result) // Output: ["streamId1", "streamId2"]
 //
 // [valkey.io]: https://valkey.io/commands/xclaim/
 func (client *baseClient) XClaimJustIdWithOptions(
@@ -5821,24 +5559,6 @@ func (client *baseClient) CopyWithOptions(
 //	A `map` of key to stream entry data, where entry data is an array of
 //	pairings with format `[[field, entry], [field, entry], ...]`. Returns `nil` if `count` is non-positive.
 //
-// Example:
-//
-//	// Retrieve all stream entries
-//	res, err := client.XRange(
-//		"key",
-//		options.NewInfiniteStreamBoundary(options.NegativeInfinity),
-//		options.NewInfiniteStreamBoundary(options.PositiveInfinity),
-//	)
-//	fmt.Println(res) // map[key:[["field1", "entry1"], ["field2", "entry2"]]]
-//
-//	// Retrieve exactly one stream entry by id
-//	res, err := client.XRange(
-//		"key",
-//		options.NewStreamBoundary(streamId, true),
-//		options.NewStreamBoundary(streamId, true),
-//	)
-//	fmt.Println(res) // map[key:[["field1", "entry1"]]
-//
 // [valkey.io]: https://valkey.io/commands/xrange/
 func (client *baseClient) XRange(
 	key string,
@@ -5867,26 +5587,6 @@ func (client *baseClient) XRange(
 //
 //	A `map` of key to stream entry data, where entry data is an array of
 //	pairings with format `[[field, entry], [field, entry], ...]`. Returns `nil` if `count` is non-positive.
-//
-// Example:
-//
-//	// Retrieve all stream entries
-//	res, err := client.XRangeWithOptions(
-//		"key",
-//		options.NewInfiniteStreamBoundary(options.NegativeInfinity),
-//		options.NewInfiniteStreamBoundary(options.PositiveInfinity),
-//		options.NewStreamRangeOptions().SetCount(10),
-//	)
-//	fmt.Println(res) // map[key:[["field1", "entry1"], ["field2", "entry2"]]]
-//
-//	// Retrieve exactly one stream entry by id
-//	res, err := client.XRangeWithOptions(
-//		"key",
-//		options.NewStreamBoundary(streamId, true),
-//		options.NewStreamBoundary(streamId, true),
-//		options.NewStreamRangeOptions().SetCount(1),
-//	)
-//	fmt.Println(res) // map[key:[["field1", "entry1"]]
 //
 // [valkey.io]: https://valkey.io/commands/xrange/
 func (client *baseClient) XRangeWithOptions(
@@ -5930,16 +5630,6 @@ func (client *baseClient) XRangeWithOptions(
 //	A `map` of key to stream entry data, where entry data is an array of
 //	pairings with format `[[field, entry], [field, entry], ...]`.
 //
-// Example:
-//
-//	// Retrieve all stream entries
-//	res, err := client.XRevRange(
-//		"key",
-//		options.NewInfiniteStreamBoundary(options.PositiveInfinity),
-//		options.NewInfiniteStreamBoundary(options.NegativeInfinity),
-//	)
-//	fmt.Println(res) // map[key:[["field2", "entry2"], ["field1", "entry1"]]]
-//
 // [valkey.io]: https://valkey.io/commands/xrevrange/
 func (client *baseClient) XRevRange(
 	key string,
@@ -5970,17 +5660,6 @@ func (client *baseClient) XRevRange(
 //	A `map` of key to stream entry data, where entry data is an array of
 //	pairings with format `[[field, entry], [field, entry], ...]`.
 //	Returns `nil` if `count` is non-positive.
-//
-// Example:
-//
-//	// Retrieve all stream entries
-//	res, err := client.XRevRangeWithOptions(
-//		"key",
-//		options.NewInfiniteStreamBoundary(options.PositiveInfinity),
-//		options.NewInfiniteStreamBoundary(options.NegativeInfinity),
-//		options.NewStreamRangeOptions().SetCount(10),
-//	)
-//	fmt.Println(res) // map[key:[["field2", "entry2"], ["field1", "entry1"]]]
 //
 // [valkey.io]: https://valkey.io/commands/xrevrange/
 func (client *baseClient) XRevRangeWithOptions(
