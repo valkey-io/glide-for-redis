@@ -66,6 +66,7 @@ class TestAuthCommands:
         assert value == b"test_value"
         await glide_client.update_connection_password(None)
         await kill_connections(management_client)
+        await asyncio.sleep(1)
         # Verify that the client is able to immediateAuth with the new password after client is killed
         result = await glide_client.update_connection_password(
             NEW_PASSWORD, immediate_auth=True

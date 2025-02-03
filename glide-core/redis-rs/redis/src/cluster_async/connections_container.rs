@@ -173,10 +173,6 @@ impl RefreshTaskNotifier {
 //   The status transitions from `Reconnecting` to `ReconnectingTooLong` under specific
 //   conditions (e.g., after one attempt of reconnecting inside the task or after a timeout).
 //
-// The transition from `Reconnecting` to `ReconnectingTooLong` is managed exclusively
-// within the `update_refreshed_connection` function in `poll_flush`. This ensures that
-// all requests maintain a consistent view of the connections.
-//
 // When transitioning from `Reconnecting` to `ReconnectingTooLong`, the associated
 // notifier is triggered to unblock all awaiting tasks.
 #[derive(Clone, Debug)]
@@ -223,6 +219,7 @@ impl RefreshTaskStatus {
         }
     }
 
+    #[allow(dead_code)]
     pub fn notify_waiting_requests(&mut self) {
         if let RefreshTaskStatus::Reconnecting(notifier) = self {
             debug!("RefreshTaskStatus::notify_waiting_requests notify");
@@ -271,22 +268,17 @@ impl Drop for RefreshTaskState {
 }
 
 // This struct is used to track the status of each address refresh
-pub(crate) struct RefreshConnectionStates<Connection> {
-    // Holds all the failed addresses that started a refresh task.
-    pub(crate) refresh_addresses_started: HashSet<String>,
+#[derive(Default)]
+pub(crate) struct RefreshConnectionStates {
     // Follow the refresh ops on the connections
     pub(crate) refresh_address_in_progress: HashMap<String, RefreshTaskState>,
-    // Holds all the refreshed addresses that are ready to be inserted into the connection_map
-    pub(crate) refresh_addresses_done: HashMap<String, Option<ClusterNode<Connection>>>,
 }
 
-impl<Connection> RefreshConnectionStates<Connection> {
+impl RefreshConnectionStates {
     // Clears all ongoing refresh connection tasks and resets associated state tracking.
     //
     // - This method removes all entries in the `refresh_address_in_progress` map.
     // - The `Drop` trait is responsible for notifying the associated notifiers and aborting any unfinished refresh tasks.
-    // - Additionally, this method clears `refresh_addresses_started` and `refresh_addresses_done`
-    //   to ensure no stale data remains in the refresh state tracking.
     pub(crate) fn clear_refresh_state(&mut self) {
         debug!(
             "clear_refresh_state: removing all in-progress refresh connection tasks for addresses: {:?}",
@@ -297,8 +289,6 @@ impl<Connection> RefreshConnectionStates<Connection> {
         self.refresh_address_in_progress.clear();
 
         // Clear other state tracking
-        self.refresh_addresses_started.clear();
-        self.refresh_addresses_done.clear();
     }
 
     // Collects the notifiers for the given addresses and returns them as a vector.
@@ -331,22 +321,12 @@ impl<Connection> RefreshConnectionStates<Connection> {
     }
 }
 
-impl<Connection> Default for RefreshConnectionStates<Connection> {
-    fn default() -> Self {
-        Self {
-            refresh_addresses_started: HashSet::new(),
-            refresh_address_in_progress: HashMap::new(),
-            refresh_addresses_done: HashMap::new(),
-        }
-    }
-}
-
 pub(crate) struct ConnectionsContainer<Connection> {
     connection_map: DashMap<String, ClusterNode<Connection>>,
     pub(crate) slot_map: SlotMap,
     read_from_replica_strategy: ReadFromReplicaStrategy,
     topology_hash: TopologyHash,
-    pub(crate) refresh_conn_state: RefreshConnectionStates<Connection>,
+    pub(crate) refresh_conn_state: RefreshConnectionStates,
 }
 
 impl<Connection> Drop for ConnectionsContainer<Connection> {
