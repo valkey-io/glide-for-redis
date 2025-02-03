@@ -52,3 +52,6 @@ utils/TestUtils.js
 
 # java compiled files.
 *.class
+
+# generaged files (e.g. protobuf)
+generated/
