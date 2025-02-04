@@ -10,7 +10,7 @@ mod cluster_client_tests {
     use cluster::{setup_cluster_with_replicas, LONG_CLUSTER_TEST_TIMEOUT};
     use glide_core::client::Client;
     use glide_core::connection_request::{
-        self, PubSubChannelsOrPatterns, PubSubSubscriptions, ReadFrom,
+        self, OpenTelemetryConfig, PubSubChannelsOrPatterns, PubSubSubscriptions, ReadFrom,
     };
     use redis::cluster_routing::{
         MultipleNodeRoutingInfo, Route, RoutingInfo, SingleNodeRoutingInfo, SlotAddr,
@@ -299,6 +299,47 @@ mod cluster_client_tests {
                     panic!("Could not determine engine version from INFO result");
                 }
             }
+        });
+    }
+
+    #[rstest]
+    #[timeout(SHORT_CLUSTER_TEST_TIMEOUT)]
+    fn test_async_open_telemetry_config() {
+        block_on_all(async {
+            let test_basics = setup_cluster_with_replicas(
+                TestConfiguration {
+                    cluster_mode: ClusterMode::Enabled,
+                    shared_server: false,
+                    ..Default::default()
+                },
+                0,
+                3,
+            )
+            .await;
+
+            let cluster = test_basics.cluster.unwrap();
+            let mut addresses = cluster.get_server_addresses();
+            addresses.truncate(1);
+
+            let mut connection_request = connection_request::ConnectionRequest::new();
+            connection_request.addresses = addresses.iter().map(get_address_info).collect();
+
+            let mut op = OpenTelemetryConfig::new();
+            op.collector_end_point = "http://valid-url.com".into();
+            op.span_flush_interval = Some(300);
+
+            connection_request.opentelemetry_config = protobuf::MessageField::from_option(Some(op));
+
+            let result = std::panic::catch_unwind(|| {
+                tokio::task::block_in_place(|| {
+                    futures::executor::block_on(async {
+                        let _client = Client::new(connection_request.clone().into(), None)
+                            .await
+                            .unwrap();
+                    });
+                });
+            });
+            assert!(result.is_err(), "Expected a panic but no panic occurred");
         });
     }
 }

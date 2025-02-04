@@ -32,7 +32,7 @@
         "NAMED_OS": "linux",
         "ARCH": "arm64",
         "TARGET": "aarch64-unknown-linux-musl",
-        "RUNNER": ["self-hosted", "Linux", "ARM64"],
+        "RUNNER": ["self-hosted", "Linux", "ARM64", "ephemeral"],
         "IMAGE": "node:lts-alpine",
         "CONTAINER_OPTIONS": "--user root --privileged --rm",
         "PACKAGE_MANAGERS": ["npm"],
