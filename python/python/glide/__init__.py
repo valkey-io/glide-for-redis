@@ -33,7 +33,7 @@ from glide.async_commands.core import (
     OnlyIfEqual,
     UpdateOptions,
 )
-from glide.async_commands.server_modules import ft, glide_json, json_transaction
+from glide.async_commands.server_modules import ft, glide_json, json_pipeline
 from glide.async_commands.server_modules.ft_options.ft_aggregate_options import (
     FtAggregateApply,
     FtAggregateClause,
@@ -273,7 +273,7 @@ __all__ = [
     "PubSubMsg",
     # Json
     "glide_json",
-    "json_transaction",
+    "json_pipeline",
     "JsonGetOptions",
     "JsonArrIndexOptions",
     "JsonArrPopOptions",

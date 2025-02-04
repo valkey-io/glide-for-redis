@@ -9,7 +9,7 @@ from typing import List
 import pytest
 from glide.async_commands.core import ConditionalChange, InfoSection
 from glide.async_commands.server_modules import glide_json as json
-from glide.async_commands.server_modules import json_transaction
+from glide.async_commands.server_modules import json_pipeline
 from glide.async_commands.server_modules.glide_json import (
     JsonArrIndexOptions,
     JsonArrPopOptions,
@@ -2115,22 +2115,22 @@ class TestJson:
         json_value2 = {"a": 1.0, "b": [1, 2]}
 
         # Test 'set', 'get', and 'clear' commands
-        json_transaction.set(transaction, key, "$", OuterJson.dumps(json_value1))
-        json_transaction.clear(transaction, key, "$")
-        json_transaction.set(transaction, key, "$", OuterJson.dumps(json_value1))
-        json_transaction.get(transaction, key, ".")
+        json_pipeline.set(transaction, key, "$", OuterJson.dumps(json_value1))
+        json_pipeline.clear(transaction, key, "$")
+        json_pipeline.set(transaction, key, "$", OuterJson.dumps(json_value1))
+        json_pipeline.get(transaction, key, ".")
 
         # Test array related commands
-        json_transaction.set(transaction, key, "$", OuterJson.dumps(json_value2))
-        json_transaction.arrappend(transaction, key, "$.b", ["3", "4"])
-        json_transaction.arrindex(transaction, key, "$.b", "2")
-        json_transaction.arrinsert(transaction, key, "$.b", 2, ["5"])
-        json_transaction.arrlen(transaction, key, "$.b")
-        json_transaction.arrpop(
+        json_pipeline.set(transaction, key, "$", OuterJson.dumps(json_value2))
+        json_pipeline.arrappend(transaction, key, "$.b", ["3", "4"])
+        json_pipeline.arrindex(transaction, key, "$.b", "2")
+        json_pipeline.arrinsert(transaction, key, "$.b", 2, ["5"])
+        json_pipeline.arrlen(transaction, key, "$.b")
+        json_pipeline.arrpop(
             transaction, key, JsonArrPopOptions(path="$.b", index=2)
         )
-        json_transaction.arrtrim(transaction, key, "$.b", 1, 2)
-        json_transaction.get(transaction, key, ".")
+        json_pipeline.arrtrim(transaction, key, "$.b", 1, 2)
+        json_pipeline.get(transaction, key, ".")
 
         result = await glide_client.exec(transaction)
         assert isinstance(result, list)
@@ -2161,43 +2161,43 @@ class TestJson:
         key3 = f"{{key}}-3{get_random_string(5)}"
         json_value = {"a": [1, 2], "b": [3, 4], "c": "c", "d": True}
 
-        json_transaction.set(transaction, key, "$", OuterJson.dumps(json_value))
+        json_pipeline.set(transaction, key, "$", OuterJson.dumps(json_value))
 
         # Test debug commands
-        json_transaction.debug_memory(transaction, key, "$.a")
-        json_transaction.debug_fields(transaction, key, "$.a")
+        json_pipeline.debug_memory(transaction, key, "$.a")
+        json_pipeline.debug_fields(transaction, key, "$.a")
 
         # Test obj commands
-        json_transaction.objlen(transaction, key, ".")
-        json_transaction.objkeys(transaction, key, ".")
+        json_pipeline.objlen(transaction, key, ".")
+        json_pipeline.objkeys(transaction, key, ".")
 
         # Test num commands
-        json_transaction.numincrby(transaction, key, "$.a[*]", 10.0)
-        json_transaction.nummultby(transaction, key, "$.a[*]", 10.0)
+        json_pipeline.numincrby(transaction, key, "$.a[*]", 10.0)
+        json_pipeline.nummultby(transaction, key, "$.a[*]", 10.0)
 
         # Test str commands
-        json_transaction.strappend(transaction, key, '"-test"', "$.c")
-        json_transaction.strlen(transaction, key, "$.c")
+        json_pipeline.strappend(transaction, key, '"-test"', "$.c")
+        json_pipeline.strlen(transaction, key, "$.c")
 
         # Test type command
-        json_transaction.type(transaction, key, "$.a")
+        json_pipeline.type(transaction, key, "$.a")
 
         # Test mget command
         json_value2 = {"b": [3, 4], "c": "c", "d": True}
-        json_transaction.set(transaction, key2, "$", OuterJson.dumps(json_value2))
-        json_transaction.mget(transaction, [key, key2, key3], "$.a")
+        json_pipeline.set(transaction, key2, "$", OuterJson.dumps(json_value2))
+        json_pipeline.mget(transaction, [key, key2, key3], "$.a")
 
         # Test toggle command
-        json_transaction.toggle(transaction, key, "$.d")
+        json_pipeline.toggle(transaction, key, "$.d")
 
         # Test resp command
-        json_transaction.resp(transaction, key, "$")
+        json_pipeline.resp(transaction, key, "$")
 
         # Test del command
-        json_transaction.delete(transaction, key, "$.d")
+        json_pipeline.delete(transaction, key, "$.d")
 
         # Test forget command
-        json_transaction.forget(transaction, key, "$.c")
+        json_pipeline.forget(transaction, key, "$.c")
 
         result = await glide_client.exec(transaction)
         assert isinstance(result, list)
