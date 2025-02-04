@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/valkey-io/valkey-glide/go/glide/api/options"
@@ -448,4 +449,31 @@ func ExampleGlideClient_ZRemRangeByScore() {
 	// Output:
 	// 4
 	// 4
+}
+
+func ExampleGlideClient_BZMPop() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+
+	client.ZAdd("key1", map[string]float64{"a": 1.0, "b": 2.0, "c": 3.0, "d": 4.0})
+	result, err := client.BZMPop([]string{"key1"}, MAX, float64(0.5))
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	jsonSummary, _ := json.Marshal(result.Value())
+	fmt.Println(string(jsonSummary))
+	// Output: {"Key":"key1","MembersAndScores":[{"Member":"d","Score":4}]}
+}
+
+func ExampleGlideClient_BZMPopWithOptions() {
+	var client *GlideClient = getExampleGlideClient() // example helper function
+
+	client.ZAdd("key1", map[string]float64{"a": 1.0, "b": 2.0, "c": 3.0, "d": 4.0})
+
+	result, err := client.BZMPopWithOptions([]string{"key1"}, MAX, 0.1, options.NewZMPopOptions().SetCount(2))
+	if err != nil {
+		fmt.Println("Glide example failed with an error: ", err)
+	}
+	jsonSummary, _ := json.Marshal(result.Value())
+	fmt.Println(string(jsonSummary))
+	// Output: {"Key":"key1","MembersAndScores":[{"Member":"c","Score":3},{"Member":"d","Score":4}]}
 }

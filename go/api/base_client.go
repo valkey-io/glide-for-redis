@@ -3672,12 +3672,6 @@ func (client *baseClient) BZPopMin(keys []string, timeoutSecs float64) (Result[K
 //	- An array of member scores of the popped elements.
 //	Returns `nil` if no member could be popped and the timeout expired.
 //
-// For example:
-//
-//	result, err := client.ZAdd("my_list", map[string]float64{"five": 5.0, "six": 6.0})
-//	result, err := client.BZMPop([]string{"my_list"}, api.MAX, float64(0.1))
-//	result["my_list"] = []MemberAndScore{{Member: "six", Score: 6.0}}
-//
 // [valkey.io]: https://valkey.io/commands/bzmpop/
 // [Blocking Commands]: https://github.com/valkey-io/valkey-glide/wiki/General-Concepts#blocking-commands
 func (client *baseClient) BZMPop(
@@ -3737,12 +3731,6 @@ func (client *baseClient) BZMPop(
 //	- The key name of the set from which the element was popped.
 //	- An array of member scores of the popped elements.
 //	Returns `nil` if no member could be popped and the timeout expired.
-//
-// For example:
-//
-//	result, err := client.ZAdd("my_list", map[string]float64{"five": 5.0, "six": 6.0})
-//	result, err := client.BZMPopWithOptions([]string{"my_list"}, api.MAX, 0.1, options.NewZMPopOptions().SetCount(2))
-//	result["my_list"] = []MemberAndScore{{Member: "six", Score: 6.0}, {Member: "five", Score 5.0}}
 //
 // [valkey.io]: https://valkey.io/commands/bzmpop/
 // [Blocking Commands]: https://github.com/valkey-io/valkey-glide/wiki/General-Concepts#blocking-commands
