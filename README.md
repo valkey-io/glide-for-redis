@@ -12,14 +12,15 @@ Valkey GLIDE is API-compatible with the following engine versions:
 ## Current Status and upcoming releases
 In the current release, Valkey GLIDE is available for Python, Java and Node.js. Support for GO is actively under development, with plans to include more programming languages in the future.
 
-#### v1.2 (Dec. 2024)
-- Vector Similarity Search and JSON modules support
-- Availability zone routing for Read from Replica
+#### v1.2 (Nov. 2024 - GA)
+- Support JSON and Vector Similarity Search(VSS) modules
+- Support Availability Zone(AZ) Awareness (AZ Affinity) as a reading strategy
+- Monitoring for tracking resources (connections, clients)
 
 #### v1.3 (Feb. 2025)
 - Public preview for GO support
 - Observability with Open Telemetry
-- Client side metrics
+- Enhanced monitoring with more client-side metrics
 
 ## Getting Started
 -   [Java](./java/README.md)
