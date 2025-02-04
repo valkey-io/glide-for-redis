@@ -1,0 +1,57 @@
+
+name: The OSS Review Toolkit (ORT) NEW
+
+on:
+    workflow_dispatch:
+        inputs:
+            branch-name:
+                description: 'The branch to run against the ORT tool'
+                required: false
+                default: 'main'
+            commit-id:
+                description: 'Commit ID to run against the ORT tool'
+                required: false
+                default: ''
+
+jobs:
+    run-ort:
+        if: github.repository_owner == 'valkey-io'
+        name: Create attribution files
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+        env: 
+            PYTHON_ATTRIBUTIONS: "python/THIRD_PARTY_LICENSES_PYTHON"
+            NODE_ATTRIBUTIONS: "node/THIRD_PARTY_LICENSES_NODE"
+            RUST_ATTRIBUTIONS: "glide-core/THIRD_PARTY_LICENSES_RUST"
+            JAVA_ATTRIBUTIONS: "java/THIRD_PARTY_LICENSES_JAVA"
+        steps:
+          - name: Check mutually exclusive branch-name and commit-id
+            id: validate
+            run: |
+                if [[ -n "$INPUT_TARGET_BRANCH" && -n "$INPUT_TARGET_COMMIT" ]]; then
+                    echo "Error: Both branch-name and commit-id are provided. Only one should be specified."
+                    exit 1
+                elif [[ -z "$INPUT_TARGET_BRANCH" && -z "$INPUT_TARGET_COMMIT" ]]; then
+                    echo "Error: Neither branch-name nor commit-id are provided. One must be specified."
+                    exit 1
+                fi
+            env:
+                INPUT_TARGET_BRANCH: ${{ github.event.inputs.branch-name }}
+                INPUT_TARGET_COMMIT: ${{ github.event.inputs.commit-id }}
+
+          - name: Proceed with workflow
+            if: success()
+            run: echo "Inputs are valid. Proceeding with workflow execution..."
+
+          - name: Set the commit-id
+            shell: bash
+            run: |
+                if [[ -z "$INPUT_TARGET_COMMIT" ]]; then
+                  echo "TARGET_COMMIT=`git rev-parse`" >> $GITHUB_ENV
+                else
+                  echo "TARGET_COMMIT=${INPUT_TARGET_COMMIT}" >> $GITHUB_ENV
+                fi
+            env:
+                INPUT_TARGET_BRANCH: ${{ github.event.inputs.branch-name }}
+                INPUT_TARGET_COMMIT: ${{ github.event.inputs.commit-id }}

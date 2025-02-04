@@ -1,0 +1,20 @@
+name: ilia-test
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_input:
+        description: 'Input for testing'
+        required: false
+        default: 'default value'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Display Input
+        run: echo "The input is ${{ github.event.inputs.test_input }}"
+      - name: Run a command
+        run: echo "Testing workflow dispatch on branch ${{ github.ref_name }}"
