@@ -40,10 +40,13 @@ use crate::{
     commands::cluster_scan::{cluster_scan, ClusterScanArgs, ScanStateRC},
     FromRedisValue, InfoDict,
 };
+use connections_container::{RefreshTaskState, RefreshTaskStatus};
 use dashmap::DashMap;
 use std::{
     collections::{HashMap, HashSet},
-    fmt, io, mem,
+    fmt, io,
+    iter::once,
+    mem,
     net::{IpAddr, SocketAddr},
     pin::Pin,
     sync::{
@@ -1341,13 +1344,13 @@ where
         }
 
         // identify nodes with closed connection
-        let mut addrs_to_refresh = Vec::new();
+        let mut addrs_to_refresh = HashSet::new();
         for (addr, con_fut) in &all_valid_conns {
             let con = con_fut.clone().await;
             // connection object might be present despite the transport being closed
             if con.is_closed() {
                 // transport is closed, need to refresh
-                addrs_to_refresh.push(addr.clone());
+                addrs_to_refresh.insert(addr.clone());
             }
         }
 
@@ -1361,7 +1364,7 @@ where
 
         if !addrs_to_refresh.is_empty() {
             // don't try existing nodes since we know a. it does not exist. b. exist but its connection is closed
-            Self::refresh_connections(
+            Self::trigger_refresh_connection_tasks(
                 inner.clone(),
                 addrs_to_refresh,
                 RefreshConnectionType::AllConnections,
@@ -1371,62 +1374,147 @@ where
         }
     }
 
-    async fn refresh_connections(
+    // Creates refresh tasks, await on the tasks' notifier and the update the connection_container.
+    // Awaiting on the notifier guaranties at least one reconnect attempt on each address.
+    async fn refresh_and_update_connections(
         inner: Arc<InnerCore<C>>,
-        addresses: Vec<String>,
+        addresses: HashSet<String>,
         conn_type: RefreshConnectionType,
         check_existing_conn: bool,
     ) {
-        info!("Started refreshing connections to {:?}", addresses);
-        let mut tasks = FuturesUnordered::new();
-        let inner = inner.clone();
+        trace!("refresh_and_update_connections: calling trigger_refresh_connection_tasks");
+        Self::trigger_refresh_connection_tasks(
+            inner.clone(),
+            addresses.clone(),
+            conn_type,
+            check_existing_conn,
+        )
+        .await;
 
-        for address in addresses.into_iter() {
-            let inner = inner.clone();
+        trace!("refresh_and_update_connections: Await on all tasks' refresh notifier");
+        // Await on all tasks' refresh notifier if exists
+        let refresh_task_notifiers = inner
+            .clone()
+            .conn_lock
+            .read()
+            .expect(MUTEX_READ_ERR)
+            .refresh_conn_state
+            .collect_refresh_notifiers(&addresses);
+        let futures: Vec<_> = refresh_task_notifiers
+            .iter()
+            .map(|notify| notify.notified())
+            .collect();
+        futures::future::join_all(futures).await;
+    }
 
-            tasks.push(async move {
-                let node_option = if check_existing_conn {
-                    let connections_container = inner.conn_lock.read().expect(MUTEX_READ_ERR);
-                    connections_container.remove_node(&address)
-                } else {
-                    None
-                };
+    async fn trigger_refresh_connection_tasks(
+        inner: Arc<InnerCore<C>>,
+        addresses: HashSet<String>,
+        conn_type: RefreshConnectionType,
+        check_existing_conn: bool,
+    ) {
+        debug!("Triggering refresh connections tasks to {:?} ", addresses);
 
-                // Override subscriptions for this connection
-                let mut cluster_params = inner.cluster_params.read().expect(MUTEX_READ_ERR).clone();
-                let subs_guard = inner.subscriptions_by_address.read().await;
-                cluster_params.pubsub_subscriptions = subs_guard.get(&address).cloned();
+        for address in addresses {
+            if inner
+                .conn_lock
+                .read()
+                .expect(MUTEX_READ_ERR)
+                .refresh_conn_state
+                .refresh_address_in_progress
+                .contains_key(&address)
+            {
+                info!("Skipping refresh for {}: already in progress", address);
+                continue;
+            }
+
+            let inner_clone = inner.clone();
+            let address_clone = address.clone();
+            let address_clone_for_task = address.clone();
+
+            let mut node_option = inner
+                .conn_lock
+                .read()
+                .expect(MUTEX_READ_ERR)
+                .remove_node(&address);
+
+            if !check_existing_conn {
+                node_option = None;
+            }
+
+            let handle = tokio::spawn(async move {
+                info!(
+                    "refreshing connection task to {:?} started",
+                    address_clone_for_task
+                );
+
+                let mut cluster_params = inner_clone
+                    .cluster_params
+                    .read()
+                    .expect(MUTEX_READ_ERR)
+                    .clone();
+                let subs_guard = inner_clone.subscriptions_by_address.read().await;
+                cluster_params.pubsub_subscriptions =
+                    subs_guard.get(&address_clone_for_task).cloned();
                 drop(subs_guard);
 
-                let node = get_or_create_conn(
-                    &address,
+                let node_result = get_or_create_conn(
+                    &address_clone_for_task,
                     node_option,
                     &cluster_params,
                     conn_type,
-                    inner.glide_connection_options.clone(),
+                    inner_clone.glide_connection_options.clone(),
                 )
                 .await;
 
-                (address, node)
-            });
-        }
+                match node_result {
+                    Ok(node) => {
+                        debug!(
+                            "Succeeded to refresh connection for node {}.",
+                            address_clone_for_task
+                        );
+                        inner_clone
+                            .conn_lock
+                            .write()
+                            .expect(MUTEX_READ_ERR)
+                            .replace_or_add_connection_for_address(
+                                address_clone_for_task.clone(),
+                                node,
+                            );
+                    }
+                    Err(err) => {
+                        warn!(
+                            "Failed to refresh connection for node {}. Error: `{:?}`",
+                            address_clone_for_task, err
+                        );
+                    }
+                }
 
-        // Poll connection tasks as soon as each one finishes
-        while let Some(result) = tasks.next().await {
-            match result {
-                (address, Ok(node)) => {
-                    let connections_container = inner.conn_lock.read().expect(MUTEX_READ_ERR);
-                    connections_container.replace_or_add_connection_for_address(address, node);
-                }
-                (address, Err(err)) => {
-                    warn!(
-                        "Failed to refresh connection for node {}. Error: `{:?}`",
-                        address, err
-                    );
-                }
-            }
+                // Note!! - TODO
+                // Need to notify here the awaiting requests inorder to awake the context of the poll_flush as
+                // it awaits on this notifier inside the get_connection in the poll_next inside poll_complete.
+                // Otherwise poll_flush won't be polled until the next start_send or other requests I/O.
+                inner_clone
+                    .conn_lock
+                    .write()
+                    .expect(MUTEX_READ_ERR)
+                    .refresh_conn_state
+                    .refresh_address_in_progress
+                    .remove(&address_clone_for_task);
+
+                info!("Refreshing connection task to {:?} is done", address_clone);
+            });
+
+            // Keep the task handle into the RefreshState of this address
+            inner
+                .conn_lock
+                .write()
+                .expect(MUTEX_READ_ERR)
+                .refresh_conn_state
+                .refresh_address_in_progress
+                .insert(address.clone(), RefreshTaskState::new(handle));
         }
-        debug!("refresh connections completed");
+        debug!("trigger_refresh_connection_tasks: Done");
     }
 
     async fn aggregate_results(
@@ -1760,9 +1848,9 @@ where
 
         if !addrs_to_refresh.is_empty() {
             // immediately trigger connection reestablishment
-            Self::refresh_connections(
+            Self::refresh_and_update_connections(
                 inner.clone(),
-                addrs_to_refresh.into_iter().collect(),
+                addrs_to_refresh,
                 RefreshConnectionType::AllConnections,
                 false,
             )
@@ -1775,7 +1863,8 @@ where
     /// Returns true if change was detected, otherwise false.
     async fn check_for_topology_diff(inner: Arc<InnerCore<C>>) -> bool {
         let num_of_nodes = inner.conn_lock.read().expect(MUTEX_READ_ERR).len();
-        let num_of_nodes_to_query = std::cmp::max(num_of_nodes.ilog2() as usize, 1);
+        let num_of_nodes_to_query =
+            std::cmp::max(num_of_nodes.checked_ilog2().unwrap_or(0) as usize, 1);
         let (res, failed_connections) = calculate_topology_from_random_nodes(
             &inner,
             num_of_nodes_to_query,
@@ -1796,9 +1885,10 @@ where
         }
 
         if !failed_connections.is_empty() {
-            Self::refresh_connections(
+            trace!("check_for_topology_diff: calling trigger_refresh_connection_tasks");
+            Self::trigger_refresh_connection_tasks(
                 inner,
-                failed_connections,
+                failed_connections.into_iter().collect::<HashSet<String>>(),
                 RefreshConnectionType::OnlyManagementConnection,
                 true,
             )
@@ -1899,6 +1989,9 @@ where
         info!("refresh_slots found nodes:\n{new_connections}");
         // Reset the current slot map and connection vector with the new ones
         let mut write_guard = inner.conn_lock.write().expect(MUTEX_WRITE_ERR);
+        // Clear the refresh tasks of the prev instance
+        // TODO - Maybe we can take the running refresh tasks and use them instead of running new connection creation
+        write_guard.refresh_conn_state.clear_refresh_state();
         let read_from_replicas = inner
             .get_cluster_param(|params| params.read_from_replicas.clone())
             .expect(MUTEX_READ_ERR);
@@ -2215,13 +2308,16 @@ where
                     )
             }
             InternalSingleNodeRouting::SpecificNode(route) => {
-                if let Some((conn, address)) = core
-                    .conn_lock
-                    .read()
-                    .expect(MUTEX_READ_ERR)
-                    .connection_for_route(&route)
-                {
-                    ConnectionCheck::Found((conn, address))
+                // Step 1: Attempt to get the connection directly using the route.
+                let conn_check = {
+                    let conn_lock = core.conn_lock.read().expect(MUTEX_READ_ERR);
+                    conn_lock
+                        .connection_for_route(&route)
+                        .map(ConnectionCheck::Found)
+                };
+
+                if let Some(conn_check) = conn_check {
+                    conn_check
                 } else {
                     // No connection is found for the given route:
                     // - For key-based commands, attempt redirection to a random node,
@@ -2229,6 +2325,9 @@ where
                     // - For non-key-based commands, avoid attempting redirection to a random node
                     //   as it wouldn't result in MOVED hints and can lead to unwanted results
                     //   (e.g., sending management command to a different node than the user asked for); instead, raise the error.
+                    let mut conn_check = ConnectionCheck::RandomConnection;
+
+                    // Step 2: Handle cases where no connection is found for the route.
                     let routable_cmd = cmd.and_then(|cmd| Routable::command(&*cmd));
                     if routable_cmd.is_some()
                         && !RoutingInfo::is_key_routing_command(&routable_cmd.unwrap())
@@ -2239,10 +2338,51 @@ where
                             format!("{route:?}"),
                         )
                             .into());
-                    } else {
-                        warn!("No connection found for route `{route:?}`. Attempting redirection to a random node.");
-                        ConnectionCheck::RandomConnection
                     }
+
+                    debug!(
+                        "SpecificNode: No connection found for route `{route:?}`. Checking for reconnect tasks before redirecting to a random node."
+                    );
+
+                    // Step 3: Obtain the reconnect notifier, ensuring the lock is released immediately after.
+                    let reconnect_notifier = {
+                        let conn_lock = core.conn_lock.write().expect(MUTEX_READ_ERR);
+                        conn_lock.notifier_for_route(&route).clone()
+                    };
+
+                    // Step 4: If a notifier exists, wait for it to signal completion.
+                    if let Some(notifier) = reconnect_notifier {
+                        debug!(
+                            "SpecificNode: Waiting on reconnect notifier for route `{route:?}`."
+                        );
+
+                        // Drop the lock before awaiting
+                        notifier.notified().await;
+
+                        debug!(
+                            "SpecificNode: Finished waiting on notifier for route `{route:?}`. Retrying connection lookup."
+                        );
+
+                        // Step 5: Retry the connection lookup after waiting for the reconnect task.
+                        if let Some((conn, address)) = core
+                            .conn_lock
+                            .read()
+                            .expect(MUTEX_READ_ERR)
+                            .connection_for_route(&route)
+                        {
+                            conn_check = ConnectionCheck::Found((conn, address));
+                        } else {
+                            debug!(
+                                "SpecificNode: No connection found for route `{route:?}` after waiting on reconnect notifier. Proceeding to random node."
+                            );
+                        }
+                    } else {
+                        debug!(
+                            "SpecificNode: No active reconnect task for route `{route:?}`. Proceeding to random node."
+                        );
+                    }
+
+                    conn_check
                 }
             }
             InternalSingleNodeRouting::Random => ConnectionCheck::RandomConnection,
@@ -2270,32 +2410,80 @@ where
 
         let (address, mut conn) = match conn_check {
             ConnectionCheck::Found((address, connection)) => (address, connection.await),
-            ConnectionCheck::OnlyAddress(addr) => {
-                let mut this_conn_params = core.get_cluster_param(|params| params.clone())?;
-                let subs_guard = core.subscriptions_by_address.read().await;
-                this_conn_params.pubsub_subscriptions = subs_guard.get(addr.as_str()).cloned();
-                drop(subs_guard);
-                match connect_and_check::<C>(
-                    &addr,
-                    this_conn_params,
-                    None,
+            ConnectionCheck::OnlyAddress(address) => {
+                // No connection for this address in the conn_map
+                Self::trigger_refresh_connection_tasks(
+                    core.clone(),
+                    HashSet::from_iter(once(address.clone())),
                     RefreshConnectionType::AllConnections,
-                    None,
-                    core.glide_connection_options.clone(),
+                    false,
                 )
-                .await
-                .get_node()
+                .await;
+
+                let reconnect_notifier: Option<Arc<Notify>> = match core
+                    .conn_lock
+                    .read()
+                    .expect(MUTEX_READ_ERR)
+                    .refresh_conn_state
+                    .refresh_address_in_progress
+                    .get(&address)
                 {
-                    Ok(node) => {
-                        let connection_clone = node.user_connection.conn.clone().await;
-                        let connections = core.conn_lock.read().expect(MUTEX_READ_ERR);
-                        let address = connections.replace_or_add_connection_for_address(addr, node);
-                        drop(connections);
-                        (address, connection_clone)
+                    Some(refresh_task_state) => {
+                        match &refresh_task_state.status {
+                            // If the task status is `Reconnecting`, grab the notifier.
+                            RefreshTaskStatus::Reconnecting(refresh_notifier) => {
+                                Some(refresh_notifier.get_notifier())
+                            }
+                            RefreshTaskStatus::ReconnectingTooLong => {
+                                debug!(
+                                    "get_connection: Address {} is in ReconnectingTooLong state, skipping notifier wait.",
+                                    address
+                                );
+                                None
+                            }
+                        }
                     }
-                    Err(err) => {
-                        return Err(err);
+                    None => {
+                        debug!(
+                            "get_connection: No refresh task found in progress for address: {}",
+                            address
+                        );
+                        None
                     }
+                };
+
+                let mut conn_option = None;
+                if let Some(refresh_notifier) = reconnect_notifier {
+                    debug!(
+                        "get_connection: Waiting on the refresh notifier for address: {}",
+                        address
+                    );
+                    // Wait for the refresh task to notify that it's done reconnecting (or transitioning).
+                    refresh_notifier.notified().await;
+                    debug!(
+                        "get_connection: After waiting on the refresh notifier for address: {}",
+                        address
+                    );
+
+                    conn_option = core
+                        .conn_lock
+                        .read()
+                        .expect(MUTEX_READ_ERR)
+                        .connection_for_address(&address);
+                }
+
+                if let Some((address, conn)) = conn_option {
+                    debug!("get_connection: Connection found for address: {}", address);
+                    // If found, return the connection
+                    (address, conn.await)
+                } else {
+                    // Otherwise, return an error indicating the connection wasn't found
+                    return Err((
+                        ErrorKind::ConnectionNotFoundForRoute,
+                        "Requested connection not found",
+                        address,
+                    )
+                        .into());
                 }
             }
             ConnectionCheck::RandomConnection => {
@@ -2326,6 +2514,7 @@ where
     }
 
     fn poll_recover(&mut self, cx: &mut task::Context<'_>) -> Poll<Result<(), RedisError>> {
+        trace!("entered poll_recovere");
         let recover_future = match &mut self.state {
             ConnectionState::PollComplete => return Poll::Ready(Ok(())),
             ConnectionState::Recover(future) => future,
@@ -2497,8 +2686,8 @@ where
                     }
                 }
                 Next::Reconnect { request, target } => {
-                    poll_flush_action =
-                        poll_flush_action.change_state(PollFlushAction::Reconnect(vec![target]));
+                    poll_flush_action = poll_flush_action
+                        .change_state(PollFlushAction::Reconnect(HashSet::from_iter([target])));
                     if let Some(request) = request {
                         self.inner.pending_requests.lock().unwrap().push(request);
                     }
@@ -2543,7 +2732,7 @@ where
 enum PollFlushAction {
     None,
     RebuildSlots,
-    Reconnect(Vec<String>),
+    Reconnect(HashSet<String>),
     ReconnectFromInitialConnections,
 }
 
@@ -2629,7 +2818,7 @@ where
                 }
                 PollFlushAction::Reconnect(addresses) => {
                     self.state = ConnectionState::Recover(RecoverFuture::Reconnect(Box::pin(
-                        ClusterConnInner::refresh_connections(
+                        ClusterConnInner::trigger_refresh_connection_tasks(
                             self.inner.clone(),
                             addresses,
                             RefreshConnectionType::OnlyUserConnection,

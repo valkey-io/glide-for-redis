@@ -218,7 +218,7 @@ async def glide_client(
     protocol: ProtocolVersion,
 ) -> AsyncGenerator[TGlideClient, None]:
     "Get async socket client for tests"
-    client = await create_client(request, cluster_mode, protocol=protocol)
+    client = await create_client(request, cluster_mode, protocol=protocol, request_timeout=10000)
     yield client
     await test_teardown(request, cluster_mode, protocol)
     await client.close()
