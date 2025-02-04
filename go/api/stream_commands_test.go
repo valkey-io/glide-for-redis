@@ -1,10 +1,9 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
-
-	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/valkey-io/valkey-glide/go/glide/api/options"
@@ -20,11 +19,13 @@ func ExampleGlideClient_XAdd() {
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
-	matches, _ := regexp.Match(`^\d{13}-0$`, []byte(result.Value())) // matches a number that is 13 digits long followed by "-0"
+	matches, _ := regexp.Match(
+		`^\d{13}-0$`,
+		[]byte(result.Value()),
+	) // matches a number that is 13 digits long followed by "-0"
 	fmt.Println(matches)
 
 	// Output: true
-
 }
 
 func ExampleGlideClient_XAddWithOptions() {
@@ -99,7 +100,8 @@ func ExampleGlideClient_XAutoClaim() {
 	}
 	fmt.Println(response)
 
-	// Output: {0-0 map[0-1:[[entry1_field1 entry1_value1] [entry1_field2 entry1_value2]] 0-2:[[entry2_field1 entry2_value1]]] []}
+	// Output: {0-0 map[0-1:[[entry1_field1 entry1_value1] [entry1_field2 entry1_value2]] 0-2:[[entry2_field1 entry2_value1]]]
+	// []}
 }
 
 func ExampleGlideClient_XAutoClaimWithOptions() {
@@ -278,7 +280,10 @@ func ExampleGlideClient_XReadWithOptions() {
 		options.NewXAddOptions().SetId(genStreamId(key, streambase, 1)),
 	)
 
-	response, err := client.XReadWithOptions(map[string]string{key: genStreamId(key, streambase, 0)}, options.NewXReadOptions().SetCount(1))
+	response, err := client.XReadWithOptions(
+		map[string]string{key: genStreamId(key, streambase, 0)},
+		options.NewXReadOptions().SetCount(1),
+	)
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -480,7 +485,6 @@ func ExampleGlideClient_XGroupDestroy() {
 	fmt.Println(success)
 
 	// Output: true
-
 }
 
 func ExampleGlideClient_XGroupCreateConsumer() {
@@ -763,7 +767,7 @@ func ExampleGlideClient_XRevRange() {
 	}
 	fmt.Println(response)
 
-	//TODO: This output is incorrect. It should be an slice since the values should be ordered.
+	// TODO: This output is incorrect. It should be an slice since the values should be ordered.
 	// Output: map[12345-1:[[field1 value1]] 12345-2:[[field2 value2]]]
 }
 
@@ -785,7 +789,6 @@ func ExampleGlideClient_XRevRangeWithOptions() {
 	}
 	fmt.Println(response)
 
-	//TODO: This output is incorrect. It should be an slice since the values should be ordered.
+	// TODO: This output is incorrect. It should be an slice since the values should be ordered.
 	// Output: map[12345-1:[[field1 value1]] 12345-2:[[field2 value2]]]
-
 }

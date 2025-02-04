@@ -207,7 +207,6 @@ func ExampleGlideClient_ZRange() {
 		options.NewInfiniteScoreBoundary(options.NegativeInfinity)).SetReverse()
 	result2, err := client.ZRange("key1", query)
 	// `result` contains members which have scores within the range of negative infinity to 3, in descending order
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -231,7 +230,6 @@ func ExampleGlideClient_ZRangeWithScores() {
 		options.NewScoreBoundary(3, false),
 		options.NewInfiniteScoreBoundary(options.NegativeInfinity)).SetReverse()
 	result2, err := client.ZRangeWithScores("key1", query)
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -250,7 +248,6 @@ func ExampleGlideClient_ZRank() {
 
 	result, err := client.ZAdd("key1", map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0})
 	result1, err := client.ZRank("key1", "two")
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -267,7 +264,6 @@ func ExampleGlideClient_ZRankWithScore() {
 
 	result, err := client.ZAdd("key1", map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0})
 	resRank, resScore, err := client.ZRankWithScore("key1", "two")
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -286,7 +282,6 @@ func ExampleGlideClient_ZRevRank() {
 
 	result, err := client.ZAdd("key1", map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0, "four": 4.0})
 	result1, err := client.ZRevRank("key1", "two")
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -303,7 +298,6 @@ func ExampleGlideClient_ZRevRankWithScore() {
 
 	result, err := client.ZAdd("key1", map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0, "four": 4.0})
 	resRank, resScore, err := client.ZRevRankWithScore("key1", "two")
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -322,7 +316,6 @@ func ExampleGlideClient_ZScore() {
 
 	result, err := client.ZAdd("key1", map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0, "four": 4.0})
 	result1, err := client.ZScore("key1", "three")
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -343,7 +336,6 @@ func ExampleGlideClient_ZCount() {
 	)
 	result, err := client.ZAdd("key1", map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0, "four": 4.0})
 	result1, err := client.ZCount("key1", zCountRange)
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -360,7 +352,6 @@ func ExampleGlideClient_ZScan() {
 
 	result, err := client.ZAdd("key1", map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0, "four": 4.0})
 	resCursor, resCol, err := client.ZScan("key1", "0")
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -380,7 +371,6 @@ func ExampleGlideClient_ZScanWithOptions() {
 	result, err := client.ZAdd("key1", map[string]float64{"one": 1.0, "two": 2.0, "three": 3.0, "four": 4.0})
 	resCursor, resCol, err := client.ZScanWithOptions("key1", "0",
 		options.NewZScanOptionsBuilder().SetMatch("*"))
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -402,7 +392,6 @@ func ExampleGlideClient_ZRemRangeByLex() {
 		"key1",
 		*options.NewRangeByLexQuery(options.NewLexBoundary("a", false), options.NewLexBoundary("c", true)),
 	)
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -419,7 +408,6 @@ func ExampleGlideClient_ZRemRangeByRank() {
 
 	result, err := client.ZAdd("key1", map[string]float64{"a": 1.0, "b": 2.0, "c": 3.0, "d": 4.0})
 	result1, err := client.ZRemRangeByRank("key1", 1, 3)
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}
@@ -439,7 +427,6 @@ func ExampleGlideClient_ZRemRangeByScore() {
 		options.NewInfiniteScoreBoundary(options.NegativeInfinity),
 		options.NewInfiniteScoreBoundary(options.PositiveInfinity),
 	))
-
 	if err != nil {
 		fmt.Println("Glide example failed with an error: ", err)
 	}

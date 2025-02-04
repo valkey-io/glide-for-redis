@@ -7,7 +7,6 @@ import (
 // getExampleGlideClient returns a GlideClient instance for testing purposes.
 // This function is used in the examples of the GlideClient methods.
 func getExampleGlideClient() *GlideClient {
-
 	config := NewGlideClientConfiguration().
 		WithAddress(new(NodeAddress)) // use default address
 
