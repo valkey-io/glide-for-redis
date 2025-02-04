@@ -31,7 +31,6 @@ type BaseClient interface {
 	SetCommands
 	StreamCommands
 	SortedSetCommands
-	ConnectionManagementCommands
 	HyperLogLogCommands
 	GenericBaseCommands
 	BitmapCommands
@@ -2505,44 +2504,6 @@ func (client *baseClient) BLMove(
 	}
 
 	return handleStringOrNilResponse(result)
-}
-
-// Pings the server.
-//
-// Return value:
-//
-//	Returns "PONG".
-//
-// [valkey.io]: https://valkey.io/commands/ping/
-func (client *baseClient) Ping() (string, error) {
-	result, err := client.executeCommand(C.Ping, []string{})
-	if err != nil {
-		return defaultStringResponse, err
-	}
-
-	return handleStringResponse(result)
-}
-
-// Pings the server with a custom message.
-//
-// Parameters:
-//
-//	message - A message to include in the `PING` command.
-//
-// Return value:
-//
-//	Returns the copy of message.
-//
-// [valkey.io]: https://valkey.io/commands/ping/
-func (client *baseClient) PingWithMessage(message string) (string, error) {
-	args := []string{message}
-
-	result, err := client.executeCommand(C.Ping, args)
-	if err != nil {
-		return defaultStringResponse, err
-	}
-
-	return handleStringResponse(result)
 }
 
 // Del removes the specified keys from the database. A key is ignored if it does not exist.
