@@ -16,7 +16,8 @@
         "csharp/lib/Cargo.toml",
         "glide-core/redis-rs/Cargo.toml",
         "benchmarks/rust/Cargo.toml",
-        "java/Cargo.toml"
+        "java/Cargo.toml",
+        "go/Cargo.toml",
     ],
     "rust-analyzer.runnableEnv": {
         "REDISRS_SERVER_TYPE": "tcp"
