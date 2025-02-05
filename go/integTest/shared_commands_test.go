@@ -8258,15 +8258,15 @@ func (suite *GlideTestSuite) TestZInterCard() {
 		assert.NoError(suite.T(), err)
 		assert.Equal(suite.T(), int64(0), res)
 
-		res, err = client.ZInterCardWithOptions([]string{key1, key2}, options.NewZInterCardOptionsBuilder().SetLimit(0))
+		res, err = client.ZInterCardWithOptions([]string{key1, key2}, options.NewZInterCardOptions().SetLimit(0))
 		assert.NoError(suite.T(), err)
 		assert.Equal(suite.T(), int64(2), res)
 
-		res, err = client.ZInterCardWithOptions([]string{key1, key2}, options.NewZInterCardOptionsBuilder().SetLimit(1))
+		res, err = client.ZInterCardWithOptions([]string{key1, key2}, options.NewZInterCardOptions().SetLimit(1))
 		assert.NoError(suite.T(), err)
 		assert.Equal(suite.T(), int64(1), res)
 
-		res, err = client.ZInterCardWithOptions([]string{key1, key2}, options.NewZInterCardOptionsBuilder().SetLimit(3))
+		res, err = client.ZInterCardWithOptions([]string{key1, key2}, options.NewZInterCardOptions().SetLimit(3))
 		assert.NoError(suite.T(), err)
 		assert.Equal(suite.T(), int64(2), res)
 
@@ -8274,7 +8274,7 @@ func (suite *GlideTestSuite) TestZInterCard() {
 		_, err = client.Set(key3, "bar")
 		assert.NoError(suite.T(), err)
 
-		_, err = client.ZInterCardWithOptions([]string{key1, key3}, options.NewZInterCardOptionsBuilder().SetLimit(3))
+		_, err = client.ZInterCardWithOptions([]string{key1, key3}, options.NewZInterCardOptions().SetLimit(3))
 		assert.NotNil(suite.T(), err)
 		assert.IsType(suite.T(), &errors.RequestError{}, err)
 	})

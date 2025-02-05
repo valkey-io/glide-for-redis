@@ -10,7 +10,7 @@ type ZInterCardOptions struct {
 	limit int64
 }
 
-func NewZInterCardOptionsBuilder() *ZInterCardOptions {
+func NewZInterCardOptions() *ZInterCardOptions {
 	return &ZInterCardOptions{limit: -1}
 }
 
