@@ -8223,3 +8223,58 @@ func (suite *GlideTestSuite) TestZDiffStore() {
 		assert.IsType(t, &errors.RequestError{}, err)
 	})
 }
+
+func (suite *GlideTestSuite) TestZInterCard() {
+	suite.runWithDefaultClients(func(client api.BaseClient) {
+		key1 := "{key}:1-" + uuid.NewString()
+		key2 := "{key}:2-" + uuid.NewString()
+		key3 := "{key}:3-" + uuid.NewString()
+
+		membersScores1 := map[string]float64{
+			"a": 1.0,
+			"b": 2.0,
+			"c": 3.0,
+		}
+		membersScores2 := map[string]float64{
+			"b": 1.0,
+			"c": 2.0,
+			"d": 3.0,
+		}
+
+		zAddResult1, err := client.ZAdd(key1, membersScores1)
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), int64(3), zAddResult1)
+
+		zAddResult2, err := client.ZAdd(key2, membersScores2)
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), int64(3), zAddResult2)
+
+		res, err := client.ZInterCard([]string{key1, key2})
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), int64(2), res)
+
+		res, err = client.ZInterCard([]string{key1, key3})
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), int64(0), res)
+
+		res, err = client.ZInterCardWithOptions([]string{key1, key2}, options.NewZInterCardOptionsBuilder().SetLimit(0))
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), int64(2), res)
+
+		res, err = client.ZInterCardWithOptions([]string{key1, key2}, options.NewZInterCardOptionsBuilder().SetLimit(1))
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), int64(1), res)
+
+		res, err = client.ZInterCardWithOptions([]string{key1, key2}, options.NewZInterCardOptionsBuilder().SetLimit(3))
+		assert.NoError(suite.T(), err)
+		assert.Equal(suite.T(), int64(2), res)
+
+		// key exists but not a set
+		_, err = client.Set(key3, "bar")
+		assert.NoError(suite.T(), err)
+
+		_, err = client.ZInterCardWithOptions([]string{key1, key3}, options.NewZInterCardOptionsBuilder().SetLimit(3))
+		assert.NotNil(suite.T(), err)
+		assert.IsType(suite.T(), &errors.RequestError{}, err)
+	})
+}

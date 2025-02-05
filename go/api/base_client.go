@@ -7518,3 +7518,60 @@ func (client *baseClient) ZInterStoreWithOptions(
 	}
 	return handleIntResponse(result)
 }
+
+// Returns the cardinality of the intersection of the sorted sets specified by `keys`.
+//
+// See [valkey.io] for details.
+//
+// Parameters:
+//
+//	keys - The keys of the sorted sets.
+//
+// Return value:
+//
+//	The cardinality of the intersection of the sorted sets.
+//
+// Example:
+//
+//	res, err := client.ZInterCard([]string{"key1", "key2", "key3"})
+//	fmt.Println(res) // 3
+//
+// [valkey.io]: https://valkey.io/commands/zintercard/
+func (client *baseClient) ZInterCard(keys []string) (int64, error) {
+	return client.ZInterCardWithOptions(keys, nil)
+}
+
+// Returns the cardinality of the intersection of the sorted sets specified by <code>keys</code>.
+// If the intersection cardinality reaches `options.limit` partway through the computation, the
+// algorithm will exit early and yield `options.limit` as the cardinality.
+//
+// See [valkey.io] for details.
+//
+// Parameters:
+//
+//	keys - The keys of the sorted sets.
+//	options - The options for the ZInterCard command, see - [options.ZInterCardOptions].
+//
+// Return value:
+//
+//	The cardinality of the intersection of the sorted sets.
+//
+// Example:
+//
+//	res, err := client.ZInterCardWithOptions([]string{"key1", "key2", "key3"}, options.NewZInterCardOptionsBuilder().SetLimit(5))
+//	fmt.Println(res) // 3
+func (client *baseClient) ZInterCardWithOptions(keys []string, options *options.ZInterCardOptions) (int64, error) {
+	args := append([]string{strconv.Itoa(len(keys))}, keys...)
+	if options != nil {
+		optionsArgs, err := options.ToArgs()
+		if err != nil {
+			return defaultIntResponse, err
+		}
+		args = append(args, optionsArgs...)
+	}
+	result, err := client.executeCommand(C.ZInterCard, args)
+	if err != nil {
+		return defaultIntResponse, err
+	}
+	return handleIntResponse(result)
+}

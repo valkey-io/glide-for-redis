@@ -13,6 +13,7 @@ const (
 	WithValues       string = "WITHVALUES" // Valkey API keyword to query hash values along their names in `HRANDFIELD`.
 	AggregateKeyWord string = "AGGREGATE"  // Valkey API keyword for the aggregate option for multiple commands.
 	WeightsKeyword   string = "WEIGHTS"    // Valkey API keyword for the weights option for multiple commands.
+	LimitKeyword     string = "LIMIT"      // Valkey API keyword for the limit option for multiple commands.
 )
 
 type InfBoundary string
