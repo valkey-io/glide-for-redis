@@ -11,14 +11,18 @@
     },
     "homepage": "https://github.com/valkey-io/valkey-glide#readme",
     "dependencies": {
-        "glide-rs": "file:rust-client",
         "long": "^5.2.3",
         "npmignore": "^0.3.1",
         "protobufjs": "^7.4.0"
     },
-    "bundleDependencies": [
-        "glide-rs"
-    ],
+    "optionalDependencies": {
+        "@valkey/glide-rs-linux-x64": "${package_version}",
+        "@valkey/glide-rs-linux-arm64": "${package_version}",
+        "@valkey/glide-rs-darwin-x64": "${package_version}",
+        "@valkey/glide-rs-darwin-arm64": "${package_version}",
+        "@valkey/glide-rs-linux-musl-x64": "${package_version}",
+        "@valkey/glide-rs-linux-musl-arm64": "${package_version}"
+    },
     "scripts": {
         "build": "npm run prereq && npm run build-internal && npm run build-protobuf && npm run build-external",
         "build:release": "npm run build-internal:release && npm run build-protobuf && npm run build-external:release",

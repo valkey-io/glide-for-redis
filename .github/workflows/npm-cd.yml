@@ -119,6 +119,31 @@ jobs:
                   EVENT_NAME: ${{ github.event_name }}
                   INPUT_VERSION: ${{ github.event.inputs.version }}
 
+            - name: Set platform-specific package name
+              shell: bash
+              run: |
+                  PLATFORM_NAME="${{ matrix.build.NAMED_OS }}${{ contains(matrix.build.TARGET, 'musl') && '-musl' || '' }}-${{ matrix.build.ARCH }}"
+                  echo "PLATFORM_NAME=${PLATFORM_NAME}" >> $GITHUB_ENV
+                  echo "NODE_OS=${{ matrix.build.NAMED_OS }}" >> $GITHUB_ENV
+                  echo "NODE_ARCH=${{ matrix.build.ARCH }}" >> $GITHUB_ENV
+                  echo "PACKAGE_VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
+
+            - name: Update Rust client package.json
+              working-directory: ./node/rust-client
+              run: |
+                  sed -i 's|\${PLATFORM_NAME}|'"${PLATFORM_NAME}"'|g' package.json
+                  sed -i 's|\${PACKAGE_VERSION}|'"${PACKAGE_VERSION}"'|g' package.json
+                  sed -i 's|\${NODE_OS}|'"${NODE_OS}"'|g' package.json
+                  sed -i 's|\${NODE_ARCH}|'"${NODE_ARCH}"'|g' package.json
+
+            - name: Validate Rust client package.json
+              working-directory: ./node/rust-client
+              run: |
+                  if ! grep -q "@valkey/glide-rs-${PLATFORM_NAME}" package.json; then
+                    echo "Error: package.json does not contain the correct package name"
+                    exit 1
+                  fi
+
             - name: Setup node
               if: ${{ !contains(matrix.build.TARGET, 'musl') }}
               uses: actions/setup-node@v4
@@ -178,7 +203,7 @@ jobs:
             - name: Publish to NPM
               if: github.event_name != 'pull_request'
               shell: bash
-              working-directory: ./node
+              working-directory: ./node/rust-client
               run: |
                   npm pkg fix
                   set +e  # Disable immediate exit on non-zero exit codes
@@ -196,7 +221,7 @@ jobs:
                     echo "Skipping publishing, package already published."
                   elif [[ ! -z "$npm_publish_err" ]]; then
                     echo "Failed to publish with error: $npm_publish_err"
-                  exit 1
+                    exit 1
                   fi
               env:
                   NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
@@ -216,7 +241,7 @@ jobs:
     publish-base-to-npm:
         if: github.event_name != 'pull_request'
         name: Publish the base NPM package
-        needs: publish-binaries
+        needs: [publish-binaries]
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
@@ -252,7 +277,7 @@ jobs:
                   envsubst < package.json.tmpl > "package.json"
                   cat package.json
                   # Fix index.ts based on the scope variable
-                  sed -i "s|@scope/|${scope}|g" index.ts
+                  sed -i "s|@scope/|${scope}|g" glide-rs.ts
               env:
                   NPM_SCOPE: ${{ vars.NPM_SCOPE }}
                   EVENT_NAME: ${{ github.event_name }}
@@ -276,7 +301,6 @@ jobs:
                     echo "This is a stable release"
                     export npm_tag="latest"
                   fi
-                  echo "NPM_TAG=${npm_tag}" >> $GITHUB_ENV
 
             - name: Publish the base package
               if: github.event_name != 'pull_request'
@@ -422,7 +446,7 @@ jobs:
                   echo "${PLATFORM_MATRIX}" > platform_matrix.json
 
                   while read -r pkg; do
-                      package_name="@valkey/valkey-glide-${pkg}"
+                      package_name="@valkey/glide-rs-${pkg}"
                       echo "Deprecating ${package_name}@${RELEASE_VERSION}"
                       npm deprecate "${package_name}@${RELEASE_VERSION}" "This version has been deprecated" --force || true
                   done < <(jq -r '.[] | "\(.NAMED_OS)\(.TARGET | test("musl") | if . then "-musl" else "" end)-\(.ARCH)"' platform_matrix.json)

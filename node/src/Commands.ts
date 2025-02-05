@@ -2,8 +2,11 @@
  * Copyright Valkey GLIDE Project Contributors - SPDX Identifier: Apache-2.0
  */
 
-import { createLeakedStringVec, MAX_REQUEST_ARGS_LEN } from "glide-rs";
 import Long from "long";
+import {
+    createLeakedStringVec,
+    MAX_REQUEST_ARGS_LEN,
+} from "../npm/glide/glide-rs";
 
 import {
     BaseClient, // eslint-disable-line @typescript-eslint/no-unused-vars

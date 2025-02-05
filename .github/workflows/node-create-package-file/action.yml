@@ -51,12 +51,12 @@ runs:
     steps:
         - name: Create package.json file
           shell: bash
-          working-directory: ./node
+          working-directory: ./node/rust-client
           run: |
               # echo -musl if inputs.target is musl
               export MUSL_FLAG=`if [[ "${{ inputs.target }}" =~ .*"musl".*  ]]; then echo "-musl"; fi`
               # set the package name
-              name="valkey-glide"
+              name="glide-rs"
               # derive the OS and architecture from the inputs
               export node_os="${{ inputs.named_os }}"
               export node_arch="${{ inputs.arch }}"

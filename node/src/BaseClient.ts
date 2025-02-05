@@ -1,6 +1,8 @@
 /**
  * Copyright Valkey GLIDE Project Contributors - SPDX Identifier: Apache-2.0
  */
+import * as net from "net";
+import { Buffer, BufferWriter, Long, Reader, Writer } from "protobufjs";
 import {
     DEFAULT_CONNECTION_TIMEOUT_IN_MILLISECONDS,
     DEFAULT_INFLIGHT_REQUESTS_LIMIT,
@@ -9,9 +11,7 @@ import {
     StartSocketConnection,
     getStatistics,
     valueFromSplitPointer,
-} from "glide-rs";
-import * as net from "net";
-import { Buffer, BufferWriter, Long, Reader, Writer } from "protobufjs";
+} from "../npm/glide/glide-rs";
 import {
     AggregationType,
     BaseScanOptions,
