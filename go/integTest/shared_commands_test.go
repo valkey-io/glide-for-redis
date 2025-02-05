@@ -8225,6 +8225,7 @@ func (suite *GlideTestSuite) TestZDiffStore() {
 }
 
 func (suite *GlideTestSuite) TestZInterCard() {
+	suite.SkipIfServerVersionLowerThanBy("7.0.0")
 	suite.runWithDefaultClients(func(client api.BaseClient) {
 		key1 := "{key}:1-" + uuid.NewString()
 		key2 := "{key}:2-" + uuid.NewString()
