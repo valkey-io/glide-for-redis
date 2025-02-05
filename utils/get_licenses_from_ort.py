@@ -11,7 +11,6 @@ The script outputs a set of licenses identified by the analyzer. GLIDE maintaine
 """
 
 APPROVED_LICENSES = [
-    "Unicode-DFS-2016",
     "(Apache-2.0 OR MIT) AND Unicode-DFS-2016",
     "Unicode-3.0",
     "(Apache-2.0 OR MIT) AND Unicode-3.0",
@@ -38,6 +37,9 @@ APPROVED_LICENSES = [
     "Zlib",
     "MIT OR Unlicense",
     "PSF-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
 ]
 
 # Packages with non-pre-approved licenses that received manual approval.

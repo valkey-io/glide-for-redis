@@ -54,6 +54,7 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "Unicode-DFS-2016",
+    "Unicode-3.0",
     "ISC",
     "OpenSSL",
     "MPL-2.0",
