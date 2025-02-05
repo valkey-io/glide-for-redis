@@ -55,22 +55,7 @@ sudo cp protoc /usr/bin/
 
 **Valkey installation**
 
-```bash
-# With yum (CentOS, Fedora, RHEL, AL2023)
-sudo yum install valkey
-
-# With apt (Debian, Ubuntu, Mint)
-sudo apt-get install valkey
-
-# With zypper (OpenSUSE)
-sudo zypper install valkey
-
-# Using package manager (Arch Linux)
-sudo pacman -S valkey
-
-# With brew (MacOS)
-brew install valkey
-```
+See the [Valkey installation guide](https://valkey.io/topics/installation/) to install the Valkey server and CLI.
 
 
 **Dependencies installation for Ubuntu**

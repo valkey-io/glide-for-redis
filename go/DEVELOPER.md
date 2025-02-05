@@ -28,7 +28,7 @@ Software Dependencies
 
 **Valkey installation**
 
-To install valkey-server and valkey-cli on your host, follow the [Valkey Installation Guide](https://github.com/valkey-io/valkey).
+See the [Valkey installation guide](https://valkey.io/topics/installation/) to install the Valkey server and CLI.
 
 **Dependencies installation for Ubuntu**
 
@@ -121,7 +121,7 @@ Before starting this step, make sure you've installed all software requirements.
     make build
     ```
 5. Run tests:
-    1. Ensure that you have installed valkey-server and valkey-cli on your host. You can find the Valkey installation guide at the following link: [Valkey Installation Guide](https://github.com/valkey-io/valkey).
+    1. Ensure that you have installed valkey-server and valkey-cli on your host. You can find the Valkey installation guide at the following link: [Valkey Installation Guide](https://valkey.io/topics/installation/).
     2. Execute the following command from the go folder:
         ```bash
         go test -race ./...
