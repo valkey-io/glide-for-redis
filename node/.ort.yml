@@ -7,7 +7,7 @@ excludes:
         - pattern: "npm/glide/**"
           reason: "BUILD_TOOL_OF"
           comment: "Template file for CD"
-          
+
         - pattern: "hybrid-node-tests/**"
           reason: "TEST_OF"
           comment: "Test files for hybrid node tests"
