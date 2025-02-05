@@ -7558,7 +7558,8 @@ func (client *baseClient) ZInterCard(keys []string) (int64, error) {
 //
 // Example:
 //
-//	res, err := client.ZInterCardWithOptions([]string{"key1", "key2", "key3"}, options.NewZInterCardOptionsBuilder().SetLimit(5))
+//	res, err := client.ZInterCardWithOptions([]string{"key1", "key2", "key3"},
+//		options.NewZInterCardOptionsBuilder().SetLimit(5))
 //	fmt.Println(res) // 3
 func (client *baseClient) ZInterCardWithOptions(keys []string, options *options.ZInterCardOptions) (int64, error) {
 	args := append([]string{strconv.Itoa(len(keys))}, keys...)
