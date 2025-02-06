@@ -3,9 +3,11 @@
 package integTest
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/valkey-io/valkey-glide/go/glide/api"
 	"github.com/valkey-io/valkey-glide/go/glide/api/config"
 	"github.com/valkey-io/valkey-glide/go/glide/protobuf"
 )
@@ -59,10 +61,10 @@ func TestSlotKeyRoute(t *testing.T) {
 }
 
 func TestByAddressRoute(t *testing.T) {
-	routeConfig := config.NewByAddressRoute("localhost", int32(6739))
+	routeConfig := config.NewByAddressRoute(api.DefaultHost, int32(api.DefaultPort))
 	expected := &protobuf.Routes{
 		Value: &protobuf.Routes_ByAddressRoute{
-			ByAddressRoute: &protobuf.ByAddressRoute{Host: "localhost", Port: 6739},
+			ByAddressRoute: &protobuf.ByAddressRoute{Host: api.DefaultHost, Port: api.DefaultPort},
 		},
 	}
 
@@ -73,10 +75,10 @@ func TestByAddressRoute(t *testing.T) {
 }
 
 func TestByAddressRouteWithHost(t *testing.T) {
-	routeConfig, _ := config.NewByAddressRouteWithHost("localhost:6739")
+	routeConfig, _ := config.NewByAddressRouteWithHost(fmt.Sprintf("%s:%d", api.DefaultHost, api.DefaultPort))
 	expected := &protobuf.Routes{
 		Value: &protobuf.Routes_ByAddressRoute{
-			ByAddressRoute: &protobuf.ByAddressRoute{Host: "localhost", Port: 6739},
+			ByAddressRoute: &protobuf.ByAddressRoute{Host: api.DefaultHost, Port: api.DefaultPort},
 		},
 	}
 
@@ -87,11 +89,11 @@ func TestByAddressRouteWithHost(t *testing.T) {
 }
 
 func TestByAddressRoute_MultiplePorts(t *testing.T) {
-	_, err := config.NewByAddressRouteWithHost("localhost:6739:6740")
+	_, err := config.NewByAddressRouteWithHost(fmt.Sprintf("%s:%d:%d", api.DefaultHost, api.DefaultPort, api.DefaultPort+1))
 	assert.NotNil(t, err)
 }
 
 func TestByAddressRoute_InvalidHost(t *testing.T) {
-	_, err := config.NewByAddressRouteWithHost("localhost")
+	_, err := config.NewByAddressRouteWithHost(api.DefaultHost)
 	assert.NotNil(t, err)
 }

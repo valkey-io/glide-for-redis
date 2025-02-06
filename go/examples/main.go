@@ -11,8 +11,8 @@ import (
 
 // TODO: Update the file based on the template used in other clients.
 func main() {
-	host := "localhost"
-	port := 6379
+	host := api.DefaultHost
+	port := api.DefaultPost
 
 	config := api.NewGlideClientConfiguration().
 		WithAddress(&api.NodeAddress{Host: host, Port: port})
