@@ -366,3 +366,46 @@ func (client *GlideClusterClient) EchoWithOptions(echoOptions options.ClusterEch
 	}
 	return createClusterSingleValue[string](data), nil
 }
+
+// Returns UNIX TIME of the last DB save timestamp or startup timestamp if no save was made since then.
+// The command will be routed to a random node.
+//
+// Parameters:
+//
+//	route - Specifies the routing configuration for the command. The client will route the
+//	        command to the nodes defined by route.
+//
+// Return value:
+//
+//	UNIX TIME of the last DB save executed with success.
+//
+// Example:
+//
+//	route := api.SimpleNodeRoute(api.RandomRoute)
+//	options := options.NewDBOptionsBuilder().SetRoute(route)
+//	result, err := client.LastSaveWithOptions(route)
+//	if err != nil {
+//	  // handle error
+//	}
+//	fmt.Println(result) // Output: 1123456
+//
+// [valkey.io]: https://valkey.io/commands/lastsave/
+func (client *GlideClusterClient) LastSaveWithOptions(opts options.RouteOption) (ClusterValue[int64], error) {
+	response, err := client.executeCommandWithRoute(C.LastSave, []string{}, opts.Route)
+	if err != nil {
+		return createEmptyClusterValue[int64](), err
+	}
+	if opts.Route != nil &&
+		(opts.Route).IsMultiNode() {
+		data, err := handleStringIntMapResponse(response)
+		if err != nil {
+			return createEmptyClusterValue[int64](), err
+		}
+		return createClusterMultiValue[int64](data), nil
+	}
+	data, err := handleIntResponse(response)
+	if err != nil {
+		return createEmptyClusterValue[int64](), err
+	}
+	return createClusterSingleValue[int64](data), nil
+}
