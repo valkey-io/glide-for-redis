@@ -11,4 +11,6 @@ type HyperLogLogCommands interface {
 	PfAdd(key string, elements []string) (int64, error)
 
 	PfCount(keys []string) (int64, error)
+
+	PfMerge(destination string, sourceKeys []string) (string, error)
 }

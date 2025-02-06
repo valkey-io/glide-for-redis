@@ -3781,6 +3781,64 @@ func (suite *GlideTestSuite) TestPfCount_NoExistingKeys() {
 	})
 }
 
+func (suite *GlideTestSuite) TestPfMerge() {
+	suite.runWithDefaultClients(func(client api.BaseClient) {
+		source1 := uuid.New().String() + "{group}"
+		source2 := uuid.New().String() + "{group}"
+		destination := uuid.New().String() + "{group}"
+
+		res, err := client.PfAdd(source1, []string{"a", "b", "c"})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), int64(1), res)
+
+		res, err = client.PfAdd(source2, []string{"c", "d", "e"})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), int64(1), res)
+
+		result, err := client.PfMerge(destination, []string{source1, source2})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), "OK", result)
+
+		count, err := client.PfCount([]string{destination})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), int64(5), count)
+	})
+}
+
+func (suite *GlideTestSuite) TestPfMerge_SingleSource() {
+	suite.runWithDefaultClients(func(client api.BaseClient) {
+		source := uuid.New().String() + "{group}"
+		destination := uuid.New().String() + "{group}"
+
+		res, err := client.PfAdd(source, []string{"a", "b", "c"})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), int64(1), res)
+
+		result, err := client.PfMerge(destination, []string{source})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), "OK", result)
+
+		count, err := client.PfCount([]string{destination})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), int64(3), count)
+	})
+}
+
+func (suite *GlideTestSuite) TestPfMerge_NonExistentSource() {
+	suite.runWithDefaultClients(func(client api.BaseClient) {
+		nonExistentKey := uuid.New().String() + "{group}"
+		destination := uuid.New().String() + "{group}"
+
+		result, err := client.PfMerge(destination, []string{nonExistentKey})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), "OK", result)
+
+		count, err := client.PfCount([]string{destination})
+		assert.Nil(suite.T(), err)
+		assert.Equal(suite.T(), int64(0), count)
+	})
+}
+
 func (suite *GlideTestSuite) TestSortWithOptions_AscendingOrder() {
 	suite.runWithDefaultClients(func(client api.BaseClient) {
 		key := uuid.New().String()
