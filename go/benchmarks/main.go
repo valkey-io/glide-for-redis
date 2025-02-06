@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/valkey-io/valkey-glide/go/glide/api"
 )
 
 type options struct {
@@ -77,8 +79,8 @@ func parseArguments() *options {
 	dataSize := flag.String("dataSize", "[100]", "Data block size")
 	concurrentTasks := flag.String("concurrentTasks", "[1 10 100 1000]", "Number of concurrent tasks")
 	clientNames := flag.String("clients", "all", "One of: all|go-redis|glide")
-	host := flag.String("host", "localhost", "Hostname")
-	port := flag.Int("port", 6379, "Port number")
+	host := flag.String("host", api.DefaultHost, "Hostname")
+	port := flag.Int("port", api.DefaultPort, "Port number")
 	clientCount := flag.String("clientCount", "[1]", "Number of clients to run")
 	tls := flag.Bool("tls", false, "Use TLS")
 	clusterModeEnabled := flag.Bool("clusterModeEnabled", false, "Is cluster mode enabled")

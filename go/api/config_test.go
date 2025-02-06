@@ -89,9 +89,9 @@ func TestNodeAddress(t *testing.T) {
 		input    NodeAddress
 		expected *protobuf.NodeAddress
 	}{
-		{NodeAddress{}, &protobuf.NodeAddress{Host: defaultHost, Port: defaultPort}},
-		{NodeAddress{Host: "host"}, &protobuf.NodeAddress{Host: "host", Port: defaultPort}},
-		{NodeAddress{Port: 1234}, &protobuf.NodeAddress{Host: defaultHost, Port: 1234}},
+		{NodeAddress{}, &protobuf.NodeAddress{Host: DefaultHost, Port: DefaultPort}},
+		{NodeAddress{Host: "host"}, &protobuf.NodeAddress{Host: "host", Port: DefaultPort}},
+		{NodeAddress{Port: 1234}, &protobuf.NodeAddress{Host: DefaultHost, Port: 1234}},
 		{NodeAddress{"host", 1234}, &protobuf.NodeAddress{Host: "host", Port: 1234}},
 	}
 

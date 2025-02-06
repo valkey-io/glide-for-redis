@@ -5,23 +5,23 @@ package api
 import "github.com/valkey-io/valkey-glide/go/glide/protobuf"
 
 const (
-	defaultHost = "localhost"
-	defaultPort = 6379
+	DefaultHost = "localhost"
+	DefaultPort = 6379
 )
 
 // NodeAddress represents the host address and port of a node in the cluster.
 type NodeAddress struct {
-	Host string // If not supplied, "localhost" will be used.
-	Port int    // If not supplied, 6379 will be used.
+	Host string // If not supplied, api.DefaultHost will be used.
+	Port int    // If not supplied, api.DefaultPost will be used.
 }
 
 func (addr *NodeAddress) toProtobuf() *protobuf.NodeAddress {
 	if addr.Host == "" {
-		addr.Host = defaultHost
+		addr.Host = DefaultHost
 	}
 
 	if addr.Port == 0 {
-		addr.Port = defaultPort
+		addr.Port = DefaultPort
 	}
 
 	return &protobuf.NodeAddress{Host: addr.Host, Port: uint32(addr.Port)}
@@ -176,9 +176,9 @@ func (config *GlideClientConfiguration) toProtobuf() *protobuf.ConnectionRequest
 //
 //	config := NewGlideClientConfiguration().
 //	    WithAddress(&NodeAddress{
-//	        Host: "sample-address-0001.use1.cache.amazonaws.com", Port: 6379}).
+//	        Host: "sample-address-0001.use1.cache.amazonaws.com", Port: api.DefaultPost}).
 //	    WithAddress(&NodeAddress{
-//	        Host: "sample-address-0002.use1.cache.amazonaws.com", Port: 6379})
+//	        Host: "sample-address-0002.use1.cache.amazonaws.com", Port: api.DefaultPost})
 func (config *GlideClientConfiguration) WithAddress(address *NodeAddress) *GlideClientConfiguration {
 	config.addresses = append(config.addresses, *address)
 	return config
@@ -264,9 +264,9 @@ func (config *GlideClusterClientConfiguration) toProtobuf() *protobuf.Connection
 //
 //	config := NewGlideClusterClientConfiguration().
 //	    WithAddress(&NodeAddress{
-//	        Host: "sample-address-0001.use1.cache.amazonaws.com", Port: 6379}).
+//	        Host: "sample-address-0001.use1.cache.amazonaws.com", Port: api.DefaultPost}).
 //	    WithAddress(&NodeAddress{
-//	        Host: "sample-address-0002.use1.cache.amazonaws.com", Port: 6379})
+//	        Host: "sample-address-0002.use1.cache.amazonaws.com", Port: api.DefaultPost})
 func (config *GlideClusterClientConfiguration) WithAddress(address *NodeAddress) *GlideClusterClientConfiguration {
 	config.addresses = append(config.addresses, *address)
 	return config
