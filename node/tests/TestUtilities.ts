@@ -197,8 +197,8 @@ export async function GetAndSetRandomValue(client: Client) {
 export function flushallOnPort(port: number): Promise<void> {
     return new Promise<void>((resolve, reject) => {
         Promise.all([
-            checkCliAvailability("redis-cli"),
             checkCliAvailability("valkey-cli"),
+            checkCliAvailability("redis-cli"),
         ])
 
             .then(([valkeyCli, redisCli]) => {
