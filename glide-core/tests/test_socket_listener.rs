@@ -30,6 +30,7 @@ mod socket_listener {
     use redis::{Cmd, ConnectionAddr, FromRedisValue, Value};
     use rstest::rstest;
     use std::mem::size_of;
+    use std::vec;
     use tokio::{net::UnixListener, runtime::Builder};
 
     /// An enum representing the values of the request type field for testing purposes
@@ -1246,8 +1247,9 @@ mod socket_listener {
             .expect("Failed to clone socket");
 
         const CALLBACK_INDEX: u32 = 0;
-        let key = generate_random_string(KEY_LENGTH);
-        let key2 = generate_random_string(KEY_LENGTH);
+        // making sure both keys are in a different slot
+        let key = format!("{{abc}}f{}", generate_random_string(KEY_LENGTH));
+        let key2 = format!("{{xyz}}f{}", generate_random_string(KEY_LENGTH));
 
         let commands = vec![
             CommandComponents {
@@ -1261,7 +1263,7 @@ mod socket_listener {
                 request_type: RequestType::CustomCommand.into(),
             },
             CommandComponents {
-                args: vec![key.clone().into(), key2.into()],
+                args: vec![key.clone().into(), key2.clone().into()],
                 args_pointer: false,
                 request_type: RequestType::MGet.into(),
             },
@@ -1271,7 +1273,12 @@ mod socket_listener {
                 request_type: RequestType::CustomCommand.into(),
             },
             CommandComponents {
-                args: vec![key.into()],
+                args: vec![],
+                args_pointer: false,
+                request_type: RequestType::DBSize.into(),
+            },
+            CommandComponents {
+                args: vec![key.clone().into()],
                 args_pointer: false,
                 request_type: RequestType::Get.into(),
             },
@@ -1279,6 +1286,31 @@ mod socket_listener {
                 args: vec!["HELLO".into()],
                 args_pointer: false,
                 request_type: RequestType::Ping.into(),
+            },
+            CommandComponents {
+                args: vec![
+                    key.into(),
+                    "bar".to_string().into(),
+                    key2.into(),
+                    "baz".to_string().into(),
+                ],
+                args_pointer: false,
+                request_type: RequestType::MSet.into(),
+            },
+            CommandComponents {
+                args: vec![],
+                args_pointer: false,
+                request_type: RequestType::DBSize.into(),
+            },
+            CommandComponents {
+                args: vec!["maxmemory".to_string().into(), "1000".to_string().into()],
+                args_pointer: false,
+                request_type: RequestType::ConfigSet.into(),
+            },
+            CommandComponents {
+                args: vec!["maxmemory".to_string().into()],
+                args_pointer: false,
+                request_type: RequestType::ConfigGet.into(),
             },
         ];
         let mut buffer = Vec::with_capacity(200);
@@ -1293,8 +1325,16 @@ mod socket_listener {
                 Value::BulkString(vec![b'b', b'a', b'r']),
                 Value::Array(vec![Value::BulkString(vec![b'b', b'a', b'r']), Value::Nil]),
                 Value::Okay,
+                Value::Int(0),
                 Value::Nil,
                 Value::BulkString(vec![b'H', b'E', b'L', b'L', b'O']),
+                Value::Okay,
+                Value::Int(2),
+                Value::Okay,
+                Value::Map(vec![(
+                    Value::BulkString(vec![b'm', b'a', b'x', b'm', b'e', b'm', b'o', b'r', b'y']),
+                    Value::BulkString(vec![b'1', b'0', b'0', b'0']),
+                )]),
             ]),
         );
     }
