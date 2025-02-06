@@ -21,7 +21,7 @@ mod socket_listener {
     use crate::utilities::mocks::{Mock, ServerMock};
 
     use super::*;
-    use command_request::{CommandRequest, RequestType};
+    use command_request::{CommandRequest, Pipeline, RequestType};
     use glide_core::command_request::command::{Args, ArgsArray};
     use glide_core::command_request::{Command, Transaction};
     use glide_core::response::{response, ConstantResponse, Response};
@@ -30,6 +30,7 @@ mod socket_listener {
     use redis::{Cmd, ConnectionAddr, FromRedisValue, Value};
     use rstest::rstest;
     use std::mem::size_of;
+    use std::vec;
     use tokio::{net::UnixListener, runtime::Builder};
 
     /// An enum representing the values of the request type field for testing purposes
@@ -304,6 +305,28 @@ mod socket_listener {
 
         request.command = Some(command_request::command_request::Command::Transaction(
             transaction,
+        ));
+
+        write_request(buffer, socket, request);
+    }
+
+    fn write_pipeline_request(
+        buffer: &mut Vec<u8>,
+        socket: &mut UnixStream,
+        callback_index: u32,
+        commands_components: Vec<CommandComponents>,
+    ) {
+        let mut request = CommandRequest::new();
+        request.callback_idx = callback_index;
+        let mut pipeline = Pipeline::new();
+        pipeline.commands.reserve(commands_components.len());
+
+        for components in commands_components {
+            pipeline.commands.push(get_command(components));
+        }
+
+        request.command = Some(command_request::command_request::Command::Pipeline(
+            pipeline,
         ));
 
         write_request(buffer, socket, request);
@@ -1211,6 +1234,169 @@ mod socket_listener {
         );
     }
 
+    #[rstest]
+    #[serial_test::serial]
+    #[timeout(SHORT_CLUSTER_TEST_TIMEOUT)]
+    fn test_send_pipeline_and_get_array_of_results(
+        #[values(RedisType::Cluster, RedisType::Standalone)] use_cluster: RedisType,
+    ) {
+        let test_basics = setup_test_basics(Tls::NoTls, TestServer::Shared, use_cluster);
+        let mut socket = test_basics
+            .socket
+            .try_clone()
+            .expect("Failed to clone socket");
+
+        const CALLBACK_INDEX: u32 = 0;
+        // making sure both keys are in a different slot
+        let key = format!("{{abc}}f{}", generate_random_string(KEY_LENGTH));
+        let key2 = format!("{{xyz}}f{}", generate_random_string(KEY_LENGTH));
+
+        let commands = vec![
+            CommandComponents {
+                args: vec![key.clone().into(), "bar".to_string().into()],
+                args_pointer: true,
+                request_type: RequestType::Set.into(),
+            },
+            CommandComponents {
+                args: vec!["GET".to_string().into(), key.clone().into()],
+                args_pointer: false,
+                request_type: RequestType::CustomCommand.into(),
+            },
+            CommandComponents {
+                args: vec![key.clone().into(), key2.clone().into()],
+                args_pointer: false,
+                request_type: RequestType::MGet.into(),
+            },
+            CommandComponents {
+                args: vec!["FLUSHALL".to_string().into()],
+                args_pointer: false,
+                request_type: RequestType::CustomCommand.into(),
+            },
+            CommandComponents {
+                args: vec![],
+                args_pointer: false,
+                request_type: RequestType::DBSize.into(),
+            },
+            CommandComponents {
+                args: vec![key.clone().into()],
+                args_pointer: false,
+                request_type: RequestType::Get.into(),
+            },
+            CommandComponents {
+                args: vec!["HELLO".into()],
+                args_pointer: false,
+                request_type: RequestType::Ping.into(),
+            },
+            CommandComponents {
+                args: vec![
+                    key.into(),
+                    "bar".to_string().into(),
+                    key2.into(),
+                    "baz".to_string().into(),
+                ],
+                args_pointer: false,
+                request_type: RequestType::MSet.into(),
+            },
+            CommandComponents {
+                args: vec![],
+                args_pointer: false,
+                request_type: RequestType::DBSize.into(),
+            },
+            CommandComponents {
+                args: vec!["appendonly".to_string().into(), "no".to_string().into()],
+                args_pointer: false,
+                request_type: RequestType::ConfigSet.into(),
+            },
+            CommandComponents {
+                args: vec!["appendonly".to_string().into()],
+                args_pointer: false,
+                request_type: RequestType::ConfigGet.into(),
+            },
+        ];
+        let mut buffer = Vec::with_capacity(200);
+        write_pipeline_request(&mut buffer, &mut socket, CALLBACK_INDEX, commands);
+
+        assert_value_response(
+            &mut buffer,
+            Some(&mut socket),
+            CALLBACK_INDEX,
+            Value::Array(vec![
+                Value::Okay,
+                Value::BulkString(vec![b'b', b'a', b'r']),
+                Value::Array(vec![Value::BulkString(vec![b'b', b'a', b'r']), Value::Nil]),
+                Value::Okay,
+                Value::Int(0),
+                Value::Nil,
+                Value::BulkString(vec![b'H', b'E', b'L', b'L', b'O']),
+                Value::Okay,
+                Value::Int(2),
+                Value::Okay,
+                Value::Map(vec![(
+                    Value::BulkString(vec![
+                        b'a', b'p', b'p', b'e', b'n', b'd', b'o', b'n', b'l', b'y',
+                    ]),
+                    Value::BulkString(vec![b'n', b'o']),
+                )]),
+            ]),
+        );
+    }
+
+    #[rstest]
+    #[serial_test::serial]
+    #[timeout(SHORT_CLUSTER_TEST_TIMEOUT)]
+    fn test_send_pipeline_and_get_error(
+        #[values(RedisType::Cluster, RedisType::Standalone)] use_cluster: RedisType,
+    ) {
+        let mut test_basics = setup_test_basics(Tls::NoTls, TestServer::Shared, use_cluster);
+        let mut socket = test_basics
+            .socket
+            .try_clone()
+            .expect("Failed to clone socket");
+
+        const CALLBACK_INDEX: u32 = 0;
+        let key = generate_random_string(KEY_LENGTH);
+        let commands = vec![
+            CommandComponents {
+                args: vec![key.clone().into(), "bar".to_string().into()],
+                args_pointer: true,
+                request_type: RequestType::Set.into(),
+            },
+            CommandComponents {
+                args: vec!["GET".to_string().into(), key.clone().into()],
+                args_pointer: false,
+                request_type: RequestType::CustomCommand.into(),
+            },
+            CommandComponents {
+                args: vec![key.clone().into(), "random_key".into()],
+                args_pointer: false,
+                request_type: RequestType::MGet.into(),
+            },
+            CommandComponents {
+                args: vec![key.clone().into()],
+                args_pointer: false,
+                request_type: RequestType::LLen.into(),
+            },
+            CommandComponents {
+                args: vec!["FLUSHALL".to_string().into()],
+                args_pointer: false,
+                request_type: RequestType::CustomCommand.into(),
+            },
+            CommandComponents {
+                args: vec![key.into()],
+                args_pointer: false,
+                request_type: RequestType::Get.into(),
+            },
+        ];
+        let mut buffer = Vec::with_capacity(200);
+        write_pipeline_request(&mut buffer, &mut socket, CALLBACK_INDEX, commands);
+
+        assert_error_response(
+            &mut buffer,
+            &mut test_basics.socket,
+            CALLBACK_INDEX,
+            ResponseType::RequestError,
+        );
+    }
     #[rstest]
     #[serial_test::serial]
     #[timeout(SHORT_CLUSTER_TEST_TIMEOUT)]
