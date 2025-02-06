@@ -12,7 +12,7 @@ import (
 // TODO: Update the file based on the template used in other clients.
 func main() {
 	host := api.DefaultHost
-	port := api.DefaultPost
+	port := api.DefaultPort
 
 	config := api.NewGlideClientConfiguration().
 		WithAddress(&api.NodeAddress{Host: host, Port: port})
