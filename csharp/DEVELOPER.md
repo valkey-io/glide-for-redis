@@ -1,6 +1,6 @@
 # Developer Guide
 
-This document describes how to set up your development environment to build and test the GLIDE for valkey C# wrapper.
+This document describes how to set up your development environment to build and test the Valkey GLIDE C# wrapper.
 
 ### Development Overview
 
@@ -11,7 +11,7 @@ The C# client contains the following parts:
 1. Rust part of the C# client located in `lib/src`; it communicates with [GLIDE core rust library](../glide-core/README.md).
 2. C# part of the client located in `lib`; it translates Rust async API into .Net async API.
 3. Integration tests for the C# client located in `tests` directory.
-4. A dedicated benchmarking tool designed to evaluate and compare the performance of GLIDE for valkey and other .Net clients. It is located in `<repo root>/benchmarks/csharp`.
+4. A dedicated benchmarking tool designed to evaluate and compare the performance of Valkey GLIDE and other .Net clients. It is located in `<repo root>/benchmarks/csharp`.
 
 TODO: examples, UT, design docs
 

@@ -7,7 +7,7 @@ const PORT_NUMBER = 4001;
 
 function checkCommandAvailability(command) {
     return new Promise((resolve) => {
-        execFile(command, ["--version"], (error) => {
+        execFile(`which`, [command], (error) => {
             resolve(!error);
         });
     });

@@ -57,7 +57,7 @@ source "$HOME/.cargo/env"
 ```
 
 **Valkey Server and CLI**
-For testing purposes, you need to install the Valkey server and CLI. You can follow the instructions [here](https://valkey.io/topics/installation/).
+See the [Valkey installation guide](https://valkey.io/topics/installation/) to install the Valkey server and CLI.
 Some distributions has a package manager for Valkey. You can install it using the following command, base on your distribution:
 
 ```bash

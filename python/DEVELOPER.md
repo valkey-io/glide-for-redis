@@ -125,7 +125,7 @@ maturin develop --release --strip
 ---
 
 Ensure you have installed `valkey-server` and `valkey-cli` on your host (or `redis-server` and `redis-cli`). 
-You can find the Valkey installation guide at the following link: [Valkey Installation Guide](https://valkey.io/topics/installation/).
+See the [Valkey installation guide](https://valkey.io/topics/installation/) to install the Valkey server and CLI.
 
 From a terminal, change directory to the GLIDE source folder and type:
 

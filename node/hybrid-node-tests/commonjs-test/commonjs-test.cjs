@@ -31,7 +31,7 @@ async function main() {
     }
 
     const server = valkeyServerAvailable ? "valkey-server" : "redis-server";
-    console.log(server);
+    console.log("Server is: " + server);
 
     const serverProcess = spawn(server, ["--port", port.toString()], {
         stdio: ["ignore", "pipe", "pipe"],

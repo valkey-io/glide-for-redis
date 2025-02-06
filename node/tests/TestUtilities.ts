@@ -196,19 +196,28 @@ export async function GetAndSetRandomValue(client: Client) {
 
 export function flushallOnPort(port: number): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-        checkCliAvailability("valkey-cli")
-            .then(async (redisCliAvailable) => {
-                const valkeyCliAvailable =
-                    await checkCliAvailability("redis-cli");
+        Promise.all([
+            checkCliAvailability("redis-cli"),
+            checkCliAvailability("valkey-cli"),
+        ])
 
-                if (!redisCliAvailable && !valkeyCliAvailable) {
-                    throw new Error(
-                        "Neither redis-cli nor valkey-cli is available",
+            .then(([valkeyCli, redisCli]) => {
+                const serverCli = valkeyCli
+                    ? "valkey-cli"
+                    : redisCli
+                      ? "redis-cli"
+                      : null;
+
+                if (!serverCli) {
+                    reject(
+                        new Error(
+                            "No available CLI found for FLUSHALL operation.",
+                        ),
                     );
+                    return;
                 }
 
-                const cli_1 = redisCliAvailable ? "valkey-cli" : "redis-cli";
-                exec(`${cli_1} -p ${port} FLUSHALL`, (error, _, stderr) => {
+                exec(`${serverCli} -p ${port} FLUSHALL`, (error, _, stderr) => {
                     if (error) {
                         console.error(stderr);
                         reject(error);
@@ -217,7 +226,10 @@ export function flushallOnPort(port: number): Promise<void> {
                     }
                 });
             })
-            .catch(reject);
+            .catch((error) => {
+                console.error("CLI availability check failed:", error);
+                reject(error);
+            });
     });
 }
 
@@ -2134,7 +2146,7 @@ export function checkCliAvailability(command: string): Promise<boolean> {
 }
 
 /**
- * Starts a Redis-compatible server on the specified port
+ * Starts a Valkey/Redis-compatible server on the specified port
  */
 export function startServer(
     port: number,
@@ -2144,7 +2156,13 @@ export function startServer(
             checkCliAvailability("valkey-server"),
             checkCliAvailability("redis-server"),
         ]).then(([valkeyExists, redisExists]) => {
-            if (!valkeyExists && !redisExists) {
+            const serverCmd = valkeyExists
+                ? "valkey-server"
+                : redisExists
+                  ? "redis-server"
+                  : null;
+
+            if (!serverCmd) {
                 reject(
                     new Error(
                         "Neither valkey-server nor redis-server is available",
@@ -2153,7 +2171,6 @@ export function startServer(
                 return;
             }
 
-            const serverCmd = valkeyExists ? "valkey-server" : "redis-server";
             const process = exec(
                 `${serverCmd} --port ${port}`,
                 (error, stdout, stderr) => {
