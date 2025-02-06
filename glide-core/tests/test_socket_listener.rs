@@ -1303,12 +1303,12 @@ mod socket_listener {
                 request_type: RequestType::DBSize.into(),
             },
             CommandComponents {
-                args: vec!["maxmemory".to_string().into(), "1000".to_string().into()],
+                args: vec!["appendonly".to_string().into(), "no".to_string().into()],
                 args_pointer: false,
                 request_type: RequestType::ConfigSet.into(),
             },
             CommandComponents {
-                args: vec!["maxmemory".to_string().into()],
+                args: vec!["appendonly".to_string().into()],
                 args_pointer: false,
                 request_type: RequestType::ConfigGet.into(),
             },
@@ -1332,8 +1332,10 @@ mod socket_listener {
                 Value::Int(2),
                 Value::Okay,
                 Value::Map(vec![(
-                    Value::BulkString(vec![b'm', b'a', b'x', b'm', b'e', b'm', b'o', b'r', b'y']),
-                    Value::BulkString(vec![b'1', b'0', b'0', b'0']),
+                    Value::BulkString(vec![
+                        b'a', b'p', b'p', b'e', b'n', b'd', b'o', b'n', b'l', b'y',
+                    ]),
+                    Value::BulkString(vec![b'n', b'o']),
                 )]),
             ]),
         );
