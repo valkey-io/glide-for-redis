@@ -85,3 +85,27 @@ runs:
               envsubst < package.json.tmpl > "package.json"
               cat package.json
               echo $(ls *json*)
+        - name: Create package.json file in npm/glide package
+          shell: bash
+          working-directory: ./node/npm/glide
+          run: |
+              name="valkey-glide"
+              export node_os="${{ inputs.named_os }}"
+              export node_arch="${{ inputs.arch }}"
+              echo "The workflow is: ${{env.EVENT_NAME}}"
+              if ${{ env.EVENT_NAME == 'workflow_dispatch' }}; then
+                R_VERSION="${{ env.INPUT_VERSION }}"
+              else
+                R_VERSION=${GITHUB_REF:11}
+              fi
+              echo "RELEASE_VERSION=${R_VERSION}" >> $GITHUB_ENV
+              export package_version=${R_VERSION}
+              export scope=`if [ "${{ inputs.npm_scope }}" != ''  ]; then echo "${{ inputs.npm_scope }}/"; fi`
+              export MUSL_FLAG=`if [[ "${{ inputs.target }}" =~ .*"musl".*  ]]; then echo "-musl"; fi`
+              export pkg_name="${name}-${node_os}${MUSL_FLAG}-${node_arch}"
+              export dev_dependency_name="${scope}${pkg_name}"
+              # Create package.json and append devDependency
+              mv package.json package.json.tmpl
+              envsubst < package.json.tmpl > "package.json"
+              jq --arg dev_dependency_name "$dev_dependency_name" --arg path "../.." '.devDependencies += {($dev_dependency_name): $path}' package.json > package.tmpl.json && mv package.tmpl.json package.json
+              cat package.json

@@ -287,7 +287,7 @@ import { command_request } from "./ProtobufMessage";
  * console.log(result); // Output: ['OK', 'value']
  * ```
  */
-export class BaseTransaction<T extends BaseTransaction<T>> {
+class BaseTransaction<T extends BaseTransaction<T>> {
     /**
      * @internal
      */

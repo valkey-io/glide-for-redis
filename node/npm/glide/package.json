@@ -1,5 +1,5 @@
 {
-    "name": "${scope}${pkg_name}",
+    "name": "valkey-glide",
     "types": "build-ts/index.d.ts",
     "version": "${package_version}",
     "description": "General Language Independent Driver for the Enterprise (GLIDE) for Valkey",
@@ -33,6 +33,11 @@
     },
     "homepage": "https://github.com/valkey-io/valkey-glide#readme",
     "devDependencies": {
+        "@jest/globals": "^29.7.0",
+        "@types/jest": "^29.5.14",
+        "ts-jest": "^29.2.5",
+        "jest": "^29.7.0",
+        "jest-html-reporter": "^3.10.2",
         "@types/node": "^18.11.18",
         "@typescript-eslint/eslint-plugin": "^5.48.0",
         "@typescript-eslint/parser": "^5.48.0",

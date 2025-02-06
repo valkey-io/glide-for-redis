@@ -58,7 +58,7 @@ export type VectorField = BaseField & {
 /**
  * Base class for defining vector field attributes to be used after the vector algorithm name.
  */
-export interface VectorFieldAttributes {
+interface VectorFieldAttributes {
     /** Number of dimensions in the vector. Equivalent to `DIM` in the module API. */
     dimensions: number;
     /**
