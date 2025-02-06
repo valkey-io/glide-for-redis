@@ -1,6 +1,9 @@
 use crate::aio::ConnectionLike;
 use crate::cluster_async::ClusterConnInner;
 use crate::cluster_async::Connect;
+use crate::cluster_routing::RoutingInfo;
+use cluster_routing::RoutingInfo::{MultiNode, SingleNode};
+
 use crate::cluster_routing::{
     command_for_multi_slot_indices, MultipleNodeRoutingInfo, ResponsePolicy, SingleNodeRoutingInfo,
 };
@@ -80,21 +83,6 @@ pub fn add_command_to_node_pipeline_map<C>(
         .add_command(cmd, index, inner_index);
 }
 
-/// Adds a command to a random existing node pipeline in the pipeline map
-pub fn add_command_to_random_existing_node<C>(
-    pipeline_map: &mut NodePipelineMap<C>,
-    cmd: Cmd,
-    index: usize,
-) -> RedisResult<()> {
-    let mut rng = rand::thread_rng();
-    if let Some(node_context) = pipeline_map.values_mut().choose(&mut rng) {
-        node_context.add_command(cmd, index, None);
-        Ok(())
-    } else {
-        Err(RedisError::from((ErrorKind::IoError, "No nodes available")))
-    }
-}
-
 /// Maps the commands in a pipeline to the appropriate nodes based on their routing information.
 ///
 /// This function processes each command in the given pipeline, determines its routing information,
@@ -111,41 +99,39 @@ pub fn add_command_to_random_existing_node<C>(
 ///
 /// # Returns
 ///
-/// A `RedisResult` containing a tuple:
-///
+/// A `Result` containing a tuple:
 /// - A `NodePipelineMap<C>` where commands are grouped by their corresponding nodes (as pipelines).
 /// - A `Vec<(usize, MultipleNodeRoutingInfo, Option<ResponsePolicy>)>` containing the routing information
 ///   and response policies for multi-node commands, along with the index of the command in the pipeline, for aggregating the responses later.
 pub async fn map_pipeline_to_nodes<C>(
     pipeline: &crate::Pipeline,
     core: Core<C>,
-) -> RedisResult<(
-    NodePipelineMap<C>,
-    Vec<(usize, MultipleNodeRoutingInfo, Option<ResponsePolicy>)>,
-)>
+) -> Result<
+    (
+        NodePipelineMap<C>,
+        Vec<(usize, MultipleNodeRoutingInfo, Option<ResponsePolicy>)>,
+    ),
+    (OperationTarget, RedisError),
+>
 where
     C: Clone + ConnectionLike + Connect + Send + Sync + 'static,
 {
-    let mut pipelines_by_connection = NodePipelineMap::new();
+    let mut pipelines_per_node = NodePipelineMap::new();
     let mut response_policies = Vec::new();
 
     for (index, cmd) in pipeline.cmd_iter().enumerate() {
-        match cluster_routing::RoutingInfo::for_routable(cmd).unwrap_or(
-            cluster_routing::RoutingInfo::SingleNode(SingleNodeRoutingInfo::Random),
-        ) {
-            cluster_routing::RoutingInfo::SingleNode(route) => {
+        match RoutingInfo::for_routable(cmd).unwrap_or(SingleNode(SingleNodeRoutingInfo::Random)) {
+            SingleNode(route) => {
                 handle_pipeline_single_node_routing(
-                    &mut pipelines_by_connection,
+                    &mut pipelines_per_node,
                     cmd.clone(),
                     route.into(),
                     core.clone(),
                     index,
                 )
-                .await
-                .map_err(|(_target, err)| err)?;
+                .await?;
             }
-
-            cluster_routing::RoutingInfo::MultiNode((multi_node_routing, response_policy)) => {
+            MultiNode((multi_node_routing, response_policy)) => {
                 //save the routing info and response policy, so we will be able to aggregate the results later
                 response_policies.push((index, multi_node_routing.clone(), response_policy));
                 match multi_node_routing {
@@ -158,9 +144,19 @@ where
                                 lock.all_primary_connections().collect()
                             }
                         };
+
+                        if connections.is_empty() {
+                            return Err((
+                                OperationTarget::NotFound,
+                                RedisError::from((
+                                    ErrorKind::AllConnectionsUnavailable, // should use different kind? ConnectionNotFoundForRoute
+                                    "No available connections",
+                                )),
+                            ));
+                        }
                         for (inner_index, (address, conn)) in connections.into_iter().enumerate() {
                             add_command_to_node_pipeline_map(
-                                &mut pipelines_by_connection,
+                                &mut pipelines_per_node,
                                 address,
                                 conn.await,
                                 cmd.clone(),
@@ -171,19 +167,19 @@ where
                     }
                     MultipleNodeRoutingInfo::MultiSlot((slots, _)) => {
                         handle_pipeline_multi_slot_routing(
-                            &mut pipelines_by_connection,
+                            &mut pipelines_per_node,
                             core.clone(),
                             cmd,
                             index,
                             slots,
                         )
-                        .await;
+                        .await?;
                     }
                 }
             }
         }
     }
-    Ok((pipelines_by_connection, response_policies))
+    Ok((pipelines_per_node, response_policies))
 }
 
 /// Handles pipeline commands that require single-node routing.
@@ -208,18 +204,20 @@ where
     C: Clone + ConnectionLike + Connect + Send + Sync + 'static,
 {
     if matches!(routing, InternalSingleNodeRouting::Random) && !pipeline_map.is_empty() {
-        // The routing info is to a random node, and we already have sub-pipelines within our pipelines map, so just add it to a random sub-pipeline
-        add_command_to_random_existing_node(pipeline_map, cmd, index)
-            .map_err(|err| (OperationTarget::NotFound, err))?;
-        Ok(())
-    } else {
-        let (address, conn) =
-            ClusterConnInner::get_connection(routing, core, Some(Arc::new(cmd.clone())))
-                .await
-                .map_err(|err| (OperationTarget::NotFound, err))?;
-        add_command_to_node_pipeline_map(pipeline_map, address, conn, cmd, index, None);
-        Ok(())
+        // Adds the command to a random existing node pipeline in the pipeline map
+        let mut rng = rand::thread_rng();
+        if let Some(node_context) = pipeline_map.values_mut().choose(&mut rng) {
+            node_context.add_command(cmd, index, None);
+            return Ok(());
+        }
     }
+
+    let (address, conn) =
+        ClusterConnInner::get_connection(routing, core, Some(Arc::new(cmd.clone())))
+            .await
+            .map_err(|err| (OperationTarget::NotFound, err))?;
+    add_command_to_node_pipeline_map(pipeline_map, address, conn, cmd, index, None);
+    Ok(())
 }
 
 /// Handles multi-slot commands within a pipeline.
@@ -242,7 +240,8 @@ pub async fn handle_pipeline_multi_slot_routing<C>(
     cmd: &Cmd,
     index: usize,
     slots: Vec<(Route, Vec<usize>)>,
-) where
+) -> Result<(), (OperationTarget, RedisError)>
+where
     C: Clone,
 {
     // inner_index is used to keep track of the index of the sub-command inside cmd
@@ -262,8 +261,70 @@ pub async fn handle_pipeline_multi_slot_routing<C>(
                 index,
                 Some(inner_index),
             );
+        } else {
+            return Err((
+                OperationTarget::NotFound,
+                RedisError::from((
+                    ErrorKind::ConnectionNotFoundForRoute,
+                    "No available connections",
+                )),
+            ));
         }
     }
+    Ok(())
+}
+
+/// Collects and sends pending requests for the given pipeline map, and waits for their responses.
+///
+/// This function creates `PendingRequest` objects for each pipeline in the provided pipeline map,
+/// adds them to the core's pending requests queue, and waits for all responses to be received.
+///
+/// # Arguments
+///
+/// * `pipeline_map` - A map of node pipelines where the commands are grouped by their corresponding nodes.
+/// * `core` - The core object that provides access to connection locks and other resources.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// - A vector of results for each sub-pipeline execution.
+/// - A vector of (address, indices) pairs indicating where each response should be placed.
+pub async fn collect_and_send_pending_requests<C>(
+    pipeline_map: NodePipelineMap<C>,
+    core: Core<C>,
+) -> (
+    Vec<Result<RedisResult<Response>, RecvError>>,
+    Vec<(String, Vec<(usize, Option<usize>)>)>,
+)
+where
+    C: Clone + ConnectionLike + Connect + Send + Sync + 'static,
+{
+    // Processes the sub-pipelines to generate pending requests for execution on specific nodes.
+    // Each pending request encapsulates all the necessary details for executing commands on a node.
+    //
+    // Returns:
+    // - `receivers`: A vector of `oneshot::Receiver` instances, enabling asynchronous retrieval
+    //   of the results from the execution of each sub-pipeline.
+    // - `pending_requests`: A vector of `PendingRequest` objects, each representing a scheduled command
+    //   for execution on a node.
+    // - `addresses_and_indices`: A vector of tuples where each tuple contains a node address and a list
+    //   of command indices for each sub-pipeline, allowing the results to be mapped back to their original command within the original pipeline.
+    let (receivers, pending_requests, addresses_and_indices) =
+        collect_pipeline_requests(pipeline_map);
+
+    // Add the pending requests to the pending_requests queue
+    core.pending_requests
+        .lock()
+        .unwrap()
+        .extend(pending_requests.into_iter());
+
+    // Wait for all receivers to complete and collect the responses
+    let responses: Vec<_> = futures::future::join_all(receivers.into_iter())
+        .await
+        .into_iter()
+        .collect();
+
+    (responses, addresses_and_indices)
 }
 
 /// Creates `PendingRequest` objects for each pipeline in the provided pipeline map.

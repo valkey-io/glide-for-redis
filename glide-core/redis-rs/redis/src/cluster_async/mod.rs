@@ -44,7 +44,7 @@ use crate::{
 };
 use dashmap::DashMap;
 use pipeline_routing::{
-    collect_pipeline_requests, map_pipeline_to_nodes, process_pipeline_responses,
+    collect_and_send_pending_requests, map_pipeline_to_nodes, process_pipeline_responses,
     route_for_pipeline, PipelineResponses,
 };
 use std::{
@@ -2130,72 +2130,7 @@ where
                     .await
                 } else {
                     // The pipeline is not atomic and not already splitted, we need to split it into sub-pipelines and send them separately.
-
-                    // Distribute pipeline commands across cluster nodes based on routing information.
-                    // Returns:
-                    // - pipelines_by_connection: Map of node addresses to their pipeline contexts
-                    // - response_policies: List of response aggregation policies for multi-node operations
-                    let (pipelines_by_connection, response_policies) =
-                        map_pipeline_to_nodes(&pipeline, core.clone())
-                            .await
-                            .map_err(|err| (OperationTarget::FanOut, err))?;
-
-                    // Initialize `PipelineResponses` to store responses for each pipeline command.
-                    // This will be used to store the responses from the different sub-pipelines to the pipeline commands.
-                    // A command can have one or more responses (e.g MultiNode commands).
-                    // Each entry in `PipelineResponses` corresponds to a command in the original pipeline and contains
-                    // a vector of tuples where each tuple holds a response to the command and the address of the node that provided it.
-                    let mut pipeline_responses: PipelineResponses =
-                        vec![Vec::new(); pipeline.len()];
-
-                    let mut final_responses: Vec<Value> = Vec::with_capacity(pipeline.len());
-
-                    // Processes the sub-pipelines to generate pending requests for execution on specific nodes.
-                    // Each pending request encapsulates all the necessary details for executing commands on a node.
-                    //
-                    // Returns:
-                    // - `receivers`: A vector of `oneshot::Receiver` instances, enabling asynchronous retrieval
-                    //   of the results from the execution of each sub-pipeline.
-                    // - `pending_requests`: A vector of `PendingRequest` objects, each representing a scheduled command
-                    //   for execution on a node.
-                    // - `addresses_and_indices`: A vector of tuples where each tuple contains a node address and a list
-                    //   of command indices for each sub-pipeline, allowing the results to be mapped back to their original command within the original pipeline.
-                    let (receivers, pending_requests, addresses_and_indices) =
-                        collect_pipeline_requests(pipelines_by_connection);
-
-                    // Add the pending requests to the pending_requests queue
-                    core.pending_requests
-                        .lock()
-                        .unwrap()
-                        .extend(pending_requests.into_iter());
-
-                    // Wait for all receivers to complete and collect the responses
-                    let responses: Vec<_> = futures::future::join_all(receivers.into_iter())
-                        .await
-                        .into_iter()
-                        .collect();
-
-                    // Process the responses and update the pipeline_responses
-                    process_pipeline_responses(
-                        &mut pipeline_responses,
-                        responses,
-                        addresses_and_indices,
-                    )?;
-
-                    // Process response policies after all tasks are complete
-                    Self::aggregate_pipeline_multi_node_commands(
-                        &mut pipeline_responses,
-                        response_policies,
-                    )
-                    .await?;
-
-                    // Collect final responses
-                    for mut value in pipeline_responses.into_iter() {
-                        // unwrap() is safe here because we know that the vector is not empty
-                        final_responses.push(value.pop().unwrap().0);
-                    }
-
-                    Ok(Response::Multiple(final_responses))
+                    Self::handle_pipeline_request(&pipeline, core).await
                 }
             }
 
@@ -2223,6 +2158,68 @@ where
         }
     }
 
+    /// Handles the execution of a non-atomic pipeline request by splitting it into sub-pipelines and sending them to the appropriate cluster nodes.
+    ///
+    /// This function distributes the commands in the pipeline across the cluster nodes based on routing information, collects the responses,
+    /// and aggregates them if necessary according to the specified response policies.
+    ///
+    /// # Arguments
+    /// * `pipeline` - A reference to the pipeline to be executed.
+    /// * `core` - A reference to the core cluster connection state.
+    ///
+    /// # Returns
+    /// * `OperationResult` - Returns a result containing the aggregated responses from the sub-pipelines, or an error if the operation fails.
+    async fn handle_pipeline_request(pipeline: &crate::Pipeline, core: Core<C>) -> OperationResult {
+        // Distribute pipeline commands across cluster nodes based on routing information.
+        // Returns:
+        // - pipelines_by_node: Map of node addresses to their pipeline contexts
+        // - response_policies: List of response aggregation policies for multi-node operations
+        let (pipelines_by_node, response_policies) =
+            map_pipeline_to_nodes(pipeline, core.clone()).await?;
+
+        // Initialize `PipelineResponses` to store responses for each pipeline command.
+        // This will be used to store the responses from the different sub-pipelines to the pipeline commands.
+        // A command can have one or more responses (e.g MultiNode commands).
+        // Each entry in `PipelineResponses` corresponds to a command in the original pipeline and contains
+        // a vector of tuples where each tuple holds a response to the command and the address of the node that provided it.
+        let mut pipeline_responses: PipelineResponses = vec![Vec::new(); pipeline.len()];
+
+        // Send the requests to each node and collect thw responses
+        let (responses, addresses_and_indices) =
+            collect_and_send_pending_requests(pipelines_by_node, core.clone()).await;
+
+        // Process the responses and update the pipeline_responses
+        process_pipeline_responses(&mut pipeline_responses, responses, addresses_and_indices)?;
+
+        // Process response policies after all tasks are complete
+        Self::aggregate_pipeline_multi_node_commands(&mut pipeline_responses, response_policies)
+            .await?;
+
+        // Collect final responses, ensuring no missing or invalid responses.
+        let final_responses: Result<Vec<Value>, (OperationTarget, RedisError)> = pipeline_responses
+            .into_iter()
+            .enumerate()
+            .map(|(index, mut value)| {
+                value.pop().map(|(response, _)| response).ok_or_else(|| {
+                    (
+                        OperationTarget::FanOut,
+                        RedisError::from((
+                            ErrorKind::ResponseError,
+                            "No response found for command: ",
+                            pipeline
+                                .get_command(index)
+                                .map_or("no command available".to_string(), |cmd| {
+                                    format!("{:?}", cmd)
+                                }),
+                        )),
+                    )
+                })
+            })
+            .collect();
+
+        Ok(Response::Multiple(final_responses?))
+    }
+
     /// Aggregates pipeline responses for multi-node commands and updates the `pipeline_responses` vector.
     ///
     /// Pipeline commands with multi-node routing info, will be splitted into multiple pipelines, therefore, after executing each pipeline and storing the results in `pipeline_responses`,
@@ -2243,9 +2240,6 @@ where
     ///     - The index of the command in the pipeline that has a multi-node routing info.
     ///     - The routing information for the command.
     ///     - An optional response policy that dictates how the responses should be aggregated.
-    ///
-    /// # Returns
-    /// * `Result<(), (OperationTarget, RedisError)>` - Returns `Ok(())` if the aggregation is successful, or an error tuple containing the operation target and the Redis error if it fails.
     ///
     /// # Example
     /// Suppose we have a pipeline with multiple commands that were split and executed on different nodes.

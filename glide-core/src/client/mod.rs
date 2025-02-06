@@ -395,6 +395,11 @@ impl Client {
         routing: Option<RoutingInfo>,
     ) -> redis::RedisFuture<'a, Value> {
         let command_count = pipeline.cmd_iter().count();
+        // The offset is set to command_count + 1 to account for:
+        // 1. The first command, which is the "MULTI" command, that returns "OK"
+        // 2. The "QUEUED" responses for each of the commands in the pipeline (before EXEC)
+        // After these initial responses (OK and QUEUED), we expect a single response,
+        // which is an array containing the results of all the commands in the pipeline.
         let offset = command_count + 1;
         run_with_timeout(Some(self.request_timeout), async move {
             let values = match self.internal_client {
@@ -420,7 +425,6 @@ impl Client {
         pipeline: &'a redis::Pipeline,
     ) -> redis::RedisFuture<'a, Value> {
         let command_count = pipeline.cmd_iter().count();
-        let _offset = command_count + 1; //TODO: check
 
         run_with_timeout(Some(self.request_timeout), async move {
             let values = match self.internal_client {

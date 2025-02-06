@@ -221,6 +221,11 @@ impl Pipeline {
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
     }
+
+    /// Returns the command at the given index, or `None` if the index is out of bounds.
+    pub fn get_command(&self, index: usize) -> Option<&Cmd> {
+        self.commands.get(index)
+    }
 }
 
 fn encode_pipeline(cmds: &[Cmd], atomic: bool) -> Vec<u8> {
