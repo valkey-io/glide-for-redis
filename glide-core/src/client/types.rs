@@ -25,6 +25,8 @@ pub struct ConnectionRequest {
     pub periodic_checks: Option<PeriodicCheck>,
     pub pubsub_subscriptions: Option<redis::PubSubSubscriptionInfo>,
     pub inflight_requests_limit: Option<u32>,
+    pub otel_endpoint: Option<String>,
+    pub otel_span_flush_interval_ms: Option<u64>,
 }
 
 pub struct AuthenticationInfo {
@@ -206,6 +208,9 @@ impl From<protobuf::ConnectionRequest> for ConnectionRequest {
 
         let inflight_requests_limit = none_if_zero(value.inflight_requests_limit);
 
+        let otel_endpoint = chars_to_string_option(&value.opentelemetry_config.collector_end_point);
+        let otel_span_flush_interval_ms = value.opentelemetry_config.span_flush_interval;
+
         ConnectionRequest {
             read_from,
             client_name,
@@ -221,6 +226,8 @@ impl From<protobuf::ConnectionRequest> for ConnectionRequest {
             periodic_checks,
             pubsub_subscriptions,
             inflight_requests_limit,
+            otel_endpoint,
+            otel_span_flush_interval_ms,
         }
     }
 }

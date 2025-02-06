@@ -4,7 +4,7 @@ on:
 
 jobs:
     hello-world:
-        runs-on: [self-hosted, linux, ARM64]
+        runs-on: [self-hosted, Linux, ARM64, ephemeral]
         steps:
             - name: print Hello World
               run: echo "Hello World"

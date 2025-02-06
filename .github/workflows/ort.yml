@@ -74,11 +74,11 @@ jobs:
               with:
                   repository: "oss-review-toolkit/ort"
                   path: "./ort"
-                  ref: "26.0.0"
+                  ref: "44.0.0"
                   submodules: recursive
 
             - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@1.78
+              uses: dtolnay/rust-toolchain@1.82
 
             - name: Build and install ORT
               if: steps.cache-ort.outputs.cache-hit != 'true'
@@ -100,10 +100,8 @@ jobs:
                   cat ~/.ort/config/config.yml
 
               ### NodeJS ###
-            - name: Set up Node.js 16.x
+            - name: Set up Node.js
               uses: actions/setup-node@v4
-              with:
-                  node-version: 16.x
 
             - name: Create package.json file for the Node wrapper
               uses: ./.github/workflows/node-create-package-file
@@ -157,6 +155,17 @@ jobs:
               with:
                   distribution: "temurin"
                   java-version: 11
+
+            - name: Install protoc (protobuf)
+              uses: arduino/setup-protoc@v3
+              with:
+                  version: "29.1"
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Build java artifact
+              working-directory: ./java
+              run: |
+                  ./gradlew publishToMavenLocal -x buildRust -x javadoc
 
             - name: Run ORT tools for Java
               uses: ./.github/workflows/run-ort-tools

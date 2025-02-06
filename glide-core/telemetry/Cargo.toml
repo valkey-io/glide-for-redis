@@ -12,6 +12,7 @@ serde_json = "1"
 chrono = "0"
 futures-util = "0"
 tokio = { version = "1", features = ["macros", "time"] }
+url = "2"
 
 opentelemetry = "0"
 opentelemetry_sdk = { version = "0", features = ["rt-tokio"] }

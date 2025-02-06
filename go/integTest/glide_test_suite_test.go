@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/valkey-io/valkey-glide/go/glide/api"
+	"github.com/valkey-io/valkey-glide/go/glide/api/config"
 )
 
 type GlideTestSuite struct {
@@ -24,8 +25,8 @@ type GlideTestSuite struct {
 	clusterHosts    []api.NodeAddress
 	tls             bool
 	serverVersion   string
-	clients         []api.GlideClient
-	clusterClients  []api.GlideClusterClient
+	clients         []api.GlideClientCommands
+	clusterClients  []api.GlideClusterClientCommands
 }
 
 var (
@@ -141,17 +142,16 @@ func runClusterManager(suite *GlideTestSuite, args []string, ignoreExitCode bool
 func getServerVersion(suite *GlideTestSuite) string {
 	var err error = nil
 	if len(suite.standaloneHosts) > 0 {
-		config := api.NewGlideClientConfiguration().
+		clientConfig := api.NewGlideClientConfiguration().
 			WithAddress(&suite.standaloneHosts[0]).
 			WithUseTLS(suite.tls).
 			WithRequestTimeout(5000)
 
-		client, err := api.NewGlideClient(config)
+		client, err := api.NewGlideClient(clientConfig)
 		if err == nil && client != nil {
 			defer client.Close()
-			// TODO use info command
-			info, _ := client.CustomCommand([]string{"info", "server"})
-			return extractServerVersion(suite, info.(string))
+			info, _ := client.InfoWithOptions(api.InfoOptions{Sections: []api.Section{api.Server}})
+			return extractServerVersion(suite, info)
 		}
 	}
 	if len(suite.clusterHosts) == 0 {
@@ -161,19 +161,22 @@ func getServerVersion(suite *GlideTestSuite) string {
 		suite.T().Fatal("No server hosts configured")
 	}
 
-	config := api.NewGlideClusterClientConfiguration().
+	clientConfig := api.NewGlideClusterClientConfiguration().
 		WithAddress(&suite.clusterHosts[0]).
 		WithUseTLS(suite.tls).
 		WithRequestTimeout(5000)
 
-	client, err := api.NewGlideClusterClient(config)
+	client, err := api.NewGlideClusterClient(clientConfig)
 	if err == nil && client != nil {
 		defer client.Close()
-		// TODO use info command with route
-		info, _ := client.CustomCommand([]string{"info", "server"})
-		for _, value := range info.Value().(map[string]interface{}) {
-			return extractServerVersion(suite, value.(string))
-		}
+
+		info, _ := client.InfoWithOptions(
+			api.ClusterInfoOptions{
+				InfoOptions: &api.InfoOptions{Sections: []api.Section{api.Server}},
+				Route:       config.RandomRoute.ToPtr(),
+			},
+		)
+		return extractServerVersion(suite, info.SingleValue())
 	}
 	suite.T().Fatalf("Can't connect to any server to get version: %s", err.Error())
 	return ""
@@ -227,7 +230,7 @@ func (suite *GlideTestSuite) getDefaultClients() []api.BaseClient {
 	return []api.BaseClient{suite.defaultClient(), suite.defaultClusterClient()}
 }
 
-func (suite *GlideTestSuite) defaultClient() api.GlideClient {
+func (suite *GlideTestSuite) defaultClient() api.GlideClientCommands {
 	config := api.NewGlideClientConfiguration().
 		WithAddress(&suite.standaloneHosts[0]).
 		WithUseTLS(suite.tls).
@@ -235,7 +238,7 @@ func (suite *GlideTestSuite) defaultClient() api.GlideClient {
 	return suite.client(config)
 }
 
-func (suite *GlideTestSuite) client(config *api.GlideClientConfiguration) api.GlideClient {
+func (suite *GlideTestSuite) client(config *api.GlideClientConfiguration) api.GlideClientCommands {
 	client, err := api.NewGlideClient(config)
 
 	assert.Nil(suite.T(), err)
@@ -245,7 +248,7 @@ func (suite *GlideTestSuite) client(config *api.GlideClientConfiguration) api.Gl
 	return client
 }
 
-func (suite *GlideTestSuite) defaultClusterClient() api.GlideClusterClient {
+func (suite *GlideTestSuite) defaultClusterClient() api.GlideClusterClientCommands {
 	config := api.NewGlideClusterClientConfiguration().
 		WithAddress(&suite.clusterHosts[0]).
 		WithUseTLS(suite.tls).
@@ -253,7 +256,7 @@ func (suite *GlideTestSuite) defaultClusterClient() api.GlideClusterClient {
 	return suite.clusterClient(config)
 }
 
-func (suite *GlideTestSuite) clusterClient(config *api.GlideClusterClientConfiguration) api.GlideClusterClient {
+func (suite *GlideTestSuite) clusterClient(config *api.GlideClusterClientConfiguration) api.GlideClusterClientCommands {
 	client, err := api.NewGlideClusterClient(config)
 
 	assert.Nil(suite.T(), err)

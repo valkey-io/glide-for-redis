@@ -41,7 +41,10 @@ subprojects {
         // finalizedBy jacocoTestReport, jacocoTestCoverageVerification
     }
 
-    ext.failedTests = []
+    ext {
+        defaultReleaseVersion = "255.255.255"
+        failedTests = []
+    }
 
     tasks.withType(Test) {
         afterTest { TestDescriptor descriptor, TestResult result ->

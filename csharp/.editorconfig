@@ -351,3 +351,190 @@ dotnet_naming_style.s_camelcase.word_separator =
 dotnet_naming_style.s_camelcase.capitalization = camel_case
 
 dotnet_analyzer_diagnostic.category-Style.severity = error
+
+### xUnit Analyzers #### see https://dotnet_diagnostic.xUnit.net/dotnet_diagnostic.xUnit.analyzers/rules/ for details
+
+## Usage Analyzers
+
+# Test classes must be public
+dotnet_diagnostic.xUnit1000.severity = error
+# Fact methods cannot have parameters
+dotnet_diagnostic.xUnit1001.severity = error
+# Test methods cannot have multiple Fact or Theory attributes
+dotnet_diagnostic.xUnit1002.severity = error
+# Theory methods must have test data
+dotnet_diagnostic.xUnit1003.severity = error
+# Test methods should not be skipped
+dotnet_diagnostic.xUnit1004.severity = suggestion
+# Fact methods should not have test data
+dotnet_diagnostic.xUnit1005.severity = error
+# Theory methods should have parameters
+dotnet_diagnostic.xUnit1006.severity = error
+# ClassData must point at a valid class
+dotnet_diagnostic.xUnit1007.severity = error
+# Test data attribute should only be used on a Theory
+dotnet_diagnostic.xUnit1008.severity = error
+# InlineData values must match the number of method parameters
+dotnet_diagnostic.xUnit1009.severity = error
+# The value is not convertible to the method parameter type
+dotnet_diagnostic.xUnit1010.severity = error
+# There is no matching method parameter
+dotnet_diagnostic.xUnit1011.severity = error
+# Null should not be used for value type parameters
+dotnet_diagnostic.xUnit1012.severity = error
+# Public method should be marked as test
+dotnet_diagnostic.xUnit1013.severity = error
+# MemberData should use nameof operator for member name
+dotnet_diagnostic.xUnit1014.severity = error
+# MemberData must reference an existing member
+dotnet_diagnostic.xUnit1015.severity = error
+# MemberData must reference a public member
+dotnet_diagnostic.xUnit1016.severity = error
+# MemberData must reference a static member
+dotnet_diagnostic.xUnit1017.severity = error
+# MemberData must reference a valid member kind
+dotnet_diagnostic.xUnit1018.severity = error
+# MemberData must reference a member providing a valid data type
+dotnet_diagnostic.xUnit1019.severity = error
+# MemberData must reference a property with a getter
+dotnet_diagnostic.xUnit1020.severity = error
+# MemberData should not have parameters if the referenced member is not a method
+dotnet_diagnostic.xUnit1021.severity = error
+# Theory methods cannot have a parameter array
+dotnet_diagnostic.xUnit1022.severity = error
+# Theory methods cannot have default parameter values
+dotnet_diagnostic.xUnit1023.severity = error
+# Test methods cannot have overloads
+dotnet_diagnostic.xUnit1024.severity = error
+# InlineData should be unique within the Theory it belongs to
+dotnet_diagnostic.xUnit1025.severity = error
+# Theory methods should use all of their parameters
+dotnet_diagnostic.xUnit1026.severity = error
+# Collection definition classes must be public
+dotnet_diagnostic.xUnit1027.severity = error
+# Test method must have valid return type
+dotnet_diagnostic.xUnit1028.severity = error
+# Local functions cannot be test functions
+dotnet_diagnostic.xUnit1029.severity = error
+# Do not call ConfigureAwait in test method
+dotnet_diagnostic.xUnit1030.severity = error
+# Do not use blocking task operations in test method
+dotnet_diagnostic.xUnit1031.severity = suggestion
+# Test classes cannot be nested within a generic class
+dotnet_diagnostic.xUnit1032.severity = error
+# Test classes decorated with 'dotnet_diagnostic.xUnit.IClassFixture' or 'dotnet_diagnostic.xUnit.ICollectionFixture' should add a constructor argument of type TFixture
+dotnet_diagnostic.xUnit1033.severity = suggestion
+# Null should only be used for nullable parameters
+dotnet_diagnostic.xUnit1034.severity = error
+# The value is not convertible to the method parameter type
+dotnet_diagnostic.xUnit1035.severity = error
+# There is no matching method parameter
+dotnet_diagnostic.xUnit1036.severity = error
+# There are fewer theory data type arguments than required by the parameters of the test method
+dotnet_diagnostic.xUnit1037.severity = error
+# There are more theory data type arguments than allowed by the parameters of the test method
+dotnet_diagnostic.xUnit1038.severity = error
+# The type argument to theory data is not compatible with the type of the corresponding test method parameter
+dotnet_diagnostic.xUnit1039.severity = error
+# The type argument to theory data is nullable, while the type of the corresponding test method parameter is not
+dotnet_diagnostic.xUnit1040.severity = error
+# Fixture arguments to test classes must have fixture sources
+dotnet_diagnostic.xUnit1041.severity = error
+# The member referenced by the MemberData attribute returns untyped data rows
+dotnet_diagnostic.xUnit1042.severity = error
+# Constructors on classes derived from FactAttribute must be public when used on test methods
+dotnet_diagnostic.xUnit1043.severity = error
+# Avoid using TheoryData type arguments that are not serializable
+dotnet_diagnostic.xUnit1044.severity = error
+# Avoid using TheoryData type arguments that might not be serializable
+dotnet_diagnostic.xUnit1045.severity = error
+# Avoid using TheoryDataRow arguments that are not serializable
+dotnet_diagnostic.xUnit1046.severity = error
+# Avoid using TheoryDataRow arguments that might not be serializable
+dotnet_diagnostic.xUnit1047.severity = error
+# Avoid using 'async void' for test methods as it is deprecated in dotnet_diagnostic.xUnit.net v3
+dotnet_diagnostic.xUnit1048.severity = error
+# Do not use 'async void' for test methods as it is no longer supported
+dotnet_diagnostic.xUnit1049.severity = error
+# The class referenced by the ClassData attribute returns untyped data rows
+dotnet_diagnostic.xUnit1050.severity = error
+# Calls to methods which accept CancellationToken should use TestContext.Current.CancellationToken
+dotnet_diagnostic.xUnit1051.severity = suggestion
+
+## Assertion Analyzers
+
+# Constants and literals should be the expected argument
+dotnet_diagnostic.xUnit2000.severity = error
+# Do not use invalid equality check
+dotnet_diagnostic.xUnit2001.severity = error
+# Do not use null check on value type
+dotnet_diagnostic.xUnit2002.severity = error
+# Do not use equality check to test for null value
+dotnet_diagnostic.xUnit2003.severity = error
+# Do not use equality check to test for boolean conditions
+dotnet_diagnostic.xUnit2004.severity = error
+# Do not use identity check on value type
+dotnet_diagnostic.xUnit2005.severity = error
+# Do not use invalid string equality check
+dotnet_diagnostic.xUnit2006.severity = error
+# Do not use typeof expression to check the type
+dotnet_diagnostic.xUnit2007.severity = error
+# Do not use boolean check to match on regular expressions
+dotnet_diagnostic.xUnit2008.severity = error
+# Do not use boolean check to check for substrings
+dotnet_diagnostic.xUnit2009.severity = error
+# Do not use boolean check to check for string equality
+dotnet_diagnostic.xUnit2010.severity = error
+# Do not use empty collection check
+dotnet_diagnostic.xUnit2011.severity = error
+# Do not use Enumerable.Any() to check if a value exists in a collection
+dotnet_diagnostic.xUnit2012.severity = error
+# Do not use equality check to check for collection size.
+dotnet_diagnostic.xUnit2013.severity = error
+# Do not use throws check to check for asynchronously thrown exception
+dotnet_diagnostic.xUnit2014.severity = error
+# Do not use typeof expression to check the exception type
+dotnet_diagnostic.xUnit2015.severity = error
+# Keep precision in the allowed range when asserting equality of doubles or decimals.
+dotnet_diagnostic.xUnit2016.severity = error
+# Do not use Contains() to check if a value exists in a collection
+dotnet_diagnostic.xUnit2017.severity = error
+# Do not compare an object's exact type to an abstract class or interface
+dotnet_diagnostic.xUnit2018.severity = error
+# Do not use obsolete throws check to check for asynchronously thrown exception
+dotnet_diagnostic.xUnit2019.severity = error
+# Do not use always-failing boolean assertion to fail a test
+dotnet_diagnostic.xUnit2020.severity = error
+# Async assertions should be awaited
+dotnet_diagnostic.xUnit2021.severity = error
+# Boolean assertions should not be negated
+dotnet_diagnostic.xUnit2022.severity = error
+# Do not use collection methods for single-item collections
+dotnet_diagnostic.xUnit2023.severity = error
+# Do not use boolean asserts for simple equality tests
+dotnet_diagnostic.xUnit2024.severity = error
+# The boolean assertion statement can be simplified
+dotnet_diagnostic.xUnit2025.severity = error
+# Comparison of sets must be done with IEqualityComparer
+dotnet_diagnostic.xUnit2026.severity = error
+# Comparison of sets to linear containers have undefined results
+dotnet_diagnostic.xUnit2027.severity = error
+# Do not use Assert.Empty or Assert.NotEmpty with problematic types
+dotnet_diagnostic.xUnit2028.severity = error
+# Do not use Assert.Empty to check if a value does not exist in a collection
+dotnet_diagnostic.xUnit2029.severity = error
+# Do not use Assert.NotEmpty to check if a value exists in a collection
+dotnet_diagnostic.xUnit2030.severity = error
+# Do not use Where clause with Assert.Single
+dotnet_diagnostic.xUnit2031.severity = error
+# Type assertions based on 'assignable from' are confusingly named
+dotnet_diagnostic.xUnit2032.severity = error
+
+## Extensibility Analyzers
+
+# Classes which cross AppDomain boundaries must derive directly or indirectly from LongLivedMarshalByRefObject
+dotnet_diagnostic.xUnit3000.severity = error
+# Classes that are marked as serializable (or created by the test framework at runtime) must have a public parameterless constructor
+dotnet_diagnostic.xUnit3001.severity = error
+# Classes which are JSON serializable should not be tested for their concrete type
+dotnet_diagnostic.xUnit3002.severity = error

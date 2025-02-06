@@ -106,6 +106,7 @@ jobs:
                   make -k unit-test integ-test
 
             - uses: ./.github/workflows/test-benchmark
+              if: ${{ matrix.engine.version == '8.0' && matrix.host.OS == 'ubuntu' && matrix.host.RUNNER == 'ubuntu-latest' && matrix.go == '1.22.0' }}
               with:
                   language-flag: -go
 

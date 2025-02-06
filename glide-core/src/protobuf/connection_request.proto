@@ -52,6 +52,12 @@ message PubSubSubscriptions
     map<uint32, PubSubChannelsOrPatterns> channels_or_patterns_by_type = 1;
 }
 
+message OpenTelemetryConfig
+{
+    string collector_end_point = 1;
+    optional uint64 span_flush_interval= 2;
+}
+
 // IMPORTANT - if you add fields here, you probably need to add them also in client/mod.rs:`sanitized_request_string`.
 message ConnectionRequest {
     repeated NodeAddress addresses = 1;
@@ -72,6 +78,7 @@ message ConnectionRequest {
     uint32 inflight_requests_limit = 14;
     string client_az = 15;
     uint32 connection_timeout = 16;
+    OpenTelemetryConfig opentelemetry_config = 17;
 }
 
 message ConnectionRetryStrategy {

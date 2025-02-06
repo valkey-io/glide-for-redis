@@ -23,6 +23,32 @@ type KeyWithMemberAndScore struct {
 	Score  float64
 }
 
+// Response of the [ZMPop] and [BZMPop] command.
+type KeyWithArrayOfMembersAndScores struct {
+	Key              string
+	MembersAndScores []MemberAndScore
+}
+
+// MemberAndScore is used by ZRANDMEMBER, which return an object consisting of the sorted set member, and its score.
+type MemberAndScore struct {
+	Member string
+	Score  float64
+}
+
+// Response type of [XAutoClaim] command.
+type XAutoClaimResponse struct {
+	NextEntry       string
+	ClaimedEntries  map[string][][]string
+	DeletedMessages []string
+}
+
+// Response type of [XAutoClaimJustId] command.
+type XAutoClaimJustIdResponse struct {
+	NextEntry       string
+	ClaimedEntries  []string
+	DeletedMessages []string
+}
+
 func (result Result[T]) IsNil() bool {
 	return result.isNil
 }
@@ -63,18 +89,29 @@ func CreateNilKeyWithMemberAndScoreResult() Result[KeyWithMemberAndScore] {
 	return Result[KeyWithMemberAndScore]{val: KeyWithMemberAndScore{"", "", 0.0}, isNil: true}
 }
 
+func CreateKeyWithArrayOfMembersAndScoresResult(
+	kmsVals KeyWithArrayOfMembersAndScores,
+) Result[KeyWithArrayOfMembersAndScores] {
+	return Result[KeyWithArrayOfMembersAndScores]{val: kmsVals, isNil: false}
+}
+
+func CreateNilKeyWithArrayOfMembersAndScoresResult() Result[KeyWithArrayOfMembersAndScores] {
+	return Result[KeyWithArrayOfMembersAndScores]{val: KeyWithArrayOfMembersAndScores{"", nil}, isNil: true}
+}
+
 // Enum to distinguish value types stored in `ClusterValue`
 type ValueType int
 
 const (
 	SingleValue ValueType = 1
 	MultiValue  ValueType = 2
+	NoValue     ValueType = 3
 )
 
 // Enum-like structure which stores either a single-node response or multi-node response.
 // Multi-node response stored in a map, where keys are hostnames or "<ip>:<port>" strings.
 //
-// For example:
+// Example:
 //
 //	// Command failed:
 //	value, err := clusterClient.CustomCommand(args)
@@ -82,25 +119,33 @@ const (
 //	err != nil: true
 //
 //	// Command returns response from multiple nodes:
-//	value, _ := clusterClient.info()
-//	node, nodeResponse := range value.Value().(map[string]interface{}) {
-//	    response := nodeResponse.(string)
+//	value, _ := clusterClient.Info()
+//	for node, nodeResponse := range value.MultiValue() {
+//	    response := nodeResponse
 //	    // `node` stores cluster node IP/hostname, `response` stores the command output from that node
 //	}
 //
 //	// Command returns a response from single node:
-//	value, _ := clusterClient.infoWithRoute(Random{})
-//	response := value.Value().(string)
+//	value, _ := clusterClient.InfoWithOptions(api.ClusterInfoOptions{InfoOptions: nil, Route: api.RandomRoute.ToPtr()})
+//	response := value.SingleValue()
 //	// `response` stores the command output from a cluster node
 type ClusterValue[T any] struct {
-	valueType ValueType
-	value     Result[T]
+	valueType   ValueType
+	singleValue T
+	mutiValue   map[string]T
 }
 
-func (value ClusterValue[T]) Value() T {
-	return value.value.Value()
+// Get the single value stored (value returned by a single cluster node).
+func (value ClusterValue[T]) SingleValue() T {
+	return value.singleValue
 }
 
+// Get the multi value stored (value returned by multiple cluster nodes).
+func (value ClusterValue[T]) MultiValue() map[string]T {
+	return value.mutiValue
+}
+
+// Get the value type
 func (value ClusterValue[T]) ValueType() ValueType {
 	return value.valueType
 }
@@ -114,35 +159,81 @@ func (value ClusterValue[T]) IsMultiValue() bool {
 }
 
 func (value ClusterValue[T]) IsEmpty() bool {
-	return value.value.IsNil()
+	return value.valueType == NoValue
 }
 
-func CreateClusterValue[T any](data T) ClusterValue[T] {
+func createClusterValue[T any](data any) ClusterValue[T] {
 	switch any(data).(type) {
 	case map[string]interface{}:
-		return CreateClusterMultiValue(data)
+		return createClusterMultiValue(data.(map[string]T))
 	default:
-		return CreateClusterSingleValue(data)
+		return createClusterSingleValue(data.(T))
 	}
 }
 
-func CreateClusterSingleValue[T any](data T) ClusterValue[T] {
+func createClusterSingleValue[T any](data T) ClusterValue[T] {
 	return ClusterValue[T]{
-		valueType: SingleValue,
-		value:     Result[T]{val: data, isNil: false},
+		valueType:   SingleValue,
+		singleValue: data,
 	}
 }
 
-func CreateClusterMultiValue[T any](data T) ClusterValue[T] {
+func createClusterMultiValue[T any](data map[string]T) ClusterValue[T] {
 	return ClusterValue[T]{
 		valueType: MultiValue,
-		value:     Result[T]{val: data, isNil: false},
+		mutiValue: data,
 	}
 }
 
-func CreateEmptyClusterValue() ClusterValue[interface{}] {
-	var empty interface{}
-	return ClusterValue[interface{}]{
-		value: Result[interface{}]{val: empty, isNil: true},
+func createEmptyClusterValue[T any]() ClusterValue[T] {
+	return ClusterValue[T]{
+		valueType: NoValue,
 	}
+}
+
+// XPendingSummary represents a summary of pending messages in a stream group.
+// It includes the total number of pending messages, the ID of the first and last pending messages,
+// and a list of consumer pending messages.
+type XPendingSummary struct {
+	// NumOfMessages is the total number of pending messages in the stream group.
+	NumOfMessages int64
+
+	// StartId is the ID of the first pending message in the stream group.
+	StartId Result[string]
+
+	// EndId is the ID of the last pending message in the stream group.
+	EndId Result[string]
+
+	// ConsumerMessages is a list of pending messages for each consumer in the stream group.
+	ConsumerMessages []ConsumerPendingMessage
+}
+
+// ConsumerPendingMessage represents a pending message for a consumer in a Redis stream group.
+// It includes the consumer's name and the count of pending messages for that consumer.
+type ConsumerPendingMessage struct {
+	// ConsumerName is the name of the consumer.
+	ConsumerName string
+
+	// MessageCount is the number of pending messages for the consumer.
+	MessageCount int64
+}
+
+// XPendingDetail represents the details of a pending message in a stream group.
+// It includes the message ID, the consumer's name, the idle time, and the delivery count.
+type XPendingDetail struct {
+	// Id is the ID of the pending message.
+	Id string
+
+	// ConsumerName is the name of the consumer who has the pending message.
+	ConsumerName string
+
+	// IdleTime is the amount of time (in milliseconds) that the message has been idle.
+	IdleTime int64
+
+	// DeliveryCount is the number of times the message has been delivered.
+	DeliveryCount int64
+}
+
+func CreateNilXPendingSummary() XPendingSummary {
+	return XPendingSummary{0, CreateNilStringResult(), CreateNilStringResult(), make([]ConsumerPendingMessage, 0)}
 }

@@ -223,6 +223,7 @@ import static glide.api.models.commands.FlushMode.SYNC;
 import static glide.api.models.commands.LInsertOptions.InsertPosition.BEFORE;
 import static glide.api.models.commands.ScoreFilter.MAX;
 import static glide.api.models.commands.SetOptions.ConditionalSet.ONLY_IF_DOES_NOT_EXIST;
+import static glide.api.models.commands.SetOptions.ConditionalSet.ONLY_IF_EQUAL;
 import static glide.api.models.commands.SetOptions.ConditionalSet.ONLY_IF_EXISTS;
 import static glide.api.models.commands.SetOptions.RETURN_OLD_VALUE;
 import static glide.api.models.commands.SortBaseOptions.ALPHA_COMMAND_STRING;
@@ -951,6 +952,100 @@ public class GlideClientTest {
         // verify
         assertNotNull(response);
         assertEquals(value, response.get());
+    }
+
+    @SneakyThrows
+    @Test
+    public void set_with_SetOptions_OnlyIfEqual_success() {
+        // setup
+        String key = "key";
+        String value = "value";
+        String newValue = "newValue";
+
+        // Set `key` to `value` initially
+        CompletableFuture<String> initialSetResponse = new CompletableFuture<>();
+        initialSetResponse.complete("OK");
+        String[] initialArguments = new String[] {key, value};
+        when(commandManager.<String>submitNewCommand(eq(pSet), eq(initialArguments), any()))
+                .thenReturn(initialSetResponse);
+
+        CompletableFuture<String> initialResponse = service.set(key, value);
+        assertNotNull(initialResponse);
+        assertEquals("OK", initialResponse.get());
+
+        // Set `key` to `newValue` with the correct condition
+        SetOptions setOptions =
+                SetOptions.builder()
+                        .conditionalSetOnlyIfEqualTo(value) // Key must currently have `value`
+                        .expiry(Expiry.UnixSeconds(60L))
+                        .build();
+        String[] correctConditionArguments =
+                new String[] {key, newValue, ONLY_IF_EQUAL.getValkeyApi(), value, "EXAT", "60"};
+        CompletableFuture<String> correctSetResponse = new CompletableFuture<>();
+        correctSetResponse.complete("OK");
+        when(commandManager.<String>submitNewCommand(eq(pSet), eq(correctConditionArguments), any()))
+                .thenReturn(correctSetResponse);
+
+        CompletableFuture<String> correctResponse = service.set(key, newValue, setOptions);
+        assertNotNull(correctResponse);
+        assertEquals("OK", correctResponse.get());
+
+        // Verify that the key is now set to `newValue`
+        CompletableFuture<String> fetchValueResponse = new CompletableFuture<>();
+        fetchValueResponse.complete(newValue);
+        when(commandManager.<String>submitNewCommand(eq(Get), eq(new String[] {key}), any()))
+                .thenReturn(fetchValueResponse);
+
+        CompletableFuture<String> finalValue = service.get(key);
+        assertEquals(newValue, finalValue.get());
+    }
+
+    @SneakyThrows
+    @Test
+    public void set_with_SetOptions_OnlyIfEqual_fails() {
+        // Key-Value setup
+        String key = "key";
+        String value = "value";
+        String newValue = "newValue";
+
+        // Set `key` to `value` initially
+        CompletableFuture<String> initialSetResponse = new CompletableFuture<>();
+        initialSetResponse.complete("OK");
+        String[] initialArguments = new String[] {key, value};
+        when(commandManager.<String>submitNewCommand(eq(pSet), eq(initialArguments), any()))
+                .thenReturn(initialSetResponse);
+
+        CompletableFuture<String> initialResponse = service.set(key, value);
+        assertNotNull(initialResponse);
+        assertEquals("OK", initialResponse.get());
+
+        // Attempt to set `key` to `newValue` with the wrong condition
+        SetOptions wrongConditionOptions =
+                SetOptions.builder()
+                        .conditionalSetOnlyIfEqualTo(newValue) // Incorrect: current value of key is `value`
+                        .expiry(Expiry.UnixSeconds(60L))
+                        .build();
+
+        String[] wrongConditionArguments =
+                new String[] {key, newValue, ONLY_IF_EQUAL.getValkeyApi(), newValue, "EXAT", "60"};
+
+        CompletableFuture<String> failedSetResponse = new CompletableFuture<>();
+        failedSetResponse.complete(null);
+        when(commandManager.<String>submitNewCommand(eq(pSet), eq(wrongConditionArguments), any()))
+                .thenReturn(failedSetResponse);
+
+        CompletableFuture<String> failedResponse = service.set(key, newValue, wrongConditionOptions);
+        assertNotNull(failedResponse);
+        assertNull(failedResponse.get()); // Ensure the set operation failed
+
+        // Verify that the key remains set to `value`
+        CompletableFuture<String> fetchValueResponse = new CompletableFuture<>();
+        fetchValueResponse.complete(value);
+        when(commandManager.<String>submitNewCommand(eq(Get), eq(new String[] {key}), any()))
+                .thenReturn(fetchValueResponse);
+
+        CompletableFuture<String> finalValue = service.get(key);
+        assertEquals(value, finalValue.get());
     }
 
     @SneakyThrows

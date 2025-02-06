@@ -5,6 +5,8 @@ package api
 import (
 	"strconv"
 
+	"github.com/valkey-io/valkey-glide/go/glide/api/config"
+	"github.com/valkey-io/valkey-glide/go/glide/api/errors"
 	"github.com/valkey-io/valkey-glide/go/glide/utils"
 )
 
@@ -63,7 +65,7 @@ func (opts *SetOptions) toArgs() ([]string, error) {
 		case KeepExisting:
 			args = append(args, string(opts.Expiry.Type))
 		default:
-			err = &RequestError{"Invalid expiry type"}
+			err = &errors.RequestError{Msg: "Invalid expiry type"}
 		}
 	}
 
@@ -101,7 +103,7 @@ func (opts *GetExOptions) toArgs() ([]string, error) {
 		case Persist:
 			args = append(args, string(opts.Expiry.Type))
 		default:
-			err = &RequestError{"Invalid expiry type"}
+			err = &errors.RequestError{Msg: "Invalid expiry type"}
 		}
 	}
 
@@ -144,7 +146,7 @@ func (expireCondition ExpireCondition) toString() (string, error) {
 	case NewExpiryLessThanCurrent:
 		return string(NewExpiryLessThanCurrent), nil
 	default:
-		return "", &RequestError{"Invalid expire condition"}
+		return "", &errors.RequestError{Msg: "Invalid expire condition"}
 	}
 }
 
@@ -254,7 +256,7 @@ func (insertPosition InsertPosition) toString() (string, error) {
 	case After:
 		return string(After), nil
 	default:
-		return "", &RequestError{"Invalid insert position"}
+		return "", &errors.RequestError{Msg: "Invalid insert position"}
 	}
 }
 
@@ -275,6 +277,210 @@ func (listDirection ListDirection) toString() (string, error) {
 	case Right:
 		return string(Right), nil
 	default:
-		return "", &RequestError{"Invalid list direction"}
+		return "", &errors.RequestError{Msg: "Invalid list direction"}
 	}
+}
+
+// Mandatory option for [ZMPop] and for [BZMPop].
+// Defines which elements to pop from the sorted set.
+type ScoreFilter string
+
+const (
+	// Pop elements with the highest scores.
+	MAX ScoreFilter = "MAX"
+	// Pop elements with the lowest scores.
+	MIN ScoreFilter = "MIN"
+)
+
+func (scoreFilter ScoreFilter) toString() (string, error) {
+	switch scoreFilter {
+	case MAX:
+		return string(MAX), nil
+	case MIN:
+		return string(MIN), nil
+	default:
+		return "", &errors.RequestError{Msg: "Invalid score filter"}
+	}
+}
+
+// Optional arguments to Restore(key string, ttl int64, value string, option *RestoreOptions)
+//
+// Note IDLETIME and FREQ modifiers cannot be set at the same time.
+//
+// [valkey.io]: https://valkey.io/commands/restore/
+type RestoreOptions struct {
+	// Subcommand string to replace existing key.
+	replace string
+	// Subcommand string to represent absolute timestamp (in milliseconds) for TTL.
+	absTTL string
+	// It represents the idletime/frequency of object.
+	eviction Eviction
+}
+
+func NewRestoreOptionsBuilder() *RestoreOptions {
+	return &RestoreOptions{}
+}
+
+const (
+	// Subcommand string to replace existing key.
+	Replace_keyword = "REPLACE"
+
+	// Subcommand string to represent absolute timestamp (in milliseconds) for TTL.
+	ABSTTL_keyword string = "ABSTTL"
+)
+
+// Custom setter methods to replace existing key.
+func (restoreOption *RestoreOptions) SetReplace() *RestoreOptions {
+	restoreOption.replace = Replace_keyword
+	return restoreOption
+}
+
+// Custom setter methods to represent absolute timestamp (in milliseconds) for TTL.
+func (restoreOption *RestoreOptions) SetABSTTL() *RestoreOptions {
+	restoreOption.absTTL = ABSTTL_keyword
+	return restoreOption
+}
+
+// For eviction purpose, you may use IDLETIME or FREQ modifiers.
+type Eviction struct {
+	// It represent IDLETIME or FREQ.
+	Type EvictionType
+	// It represents count(int) of the idletime/frequency of object.
+	Count int64
+}
+
+type EvictionType string
+
+const (
+	// It represents the idletime of object
+	IDLETIME EvictionType = "IDLETIME"
+	// It represents the frequency of object
+	FREQ EvictionType = "FREQ"
+)
+
+// Custom setter methods set the idletime/frequency of object.
+func (restoreOption *RestoreOptions) SetEviction(evictionType EvictionType, count int64) *RestoreOptions {
+	restoreOption.eviction.Type = evictionType
+	restoreOption.eviction.Count = count
+	return restoreOption
+}
+
+func (opts *RestoreOptions) toArgs() ([]string, error) {
+	args := []string{}
+	var err error
+	if opts.replace != "" {
+		args = append(args, string(opts.replace))
+	}
+	if opts.absTTL != "" {
+		args = append(args, string(opts.absTTL))
+	}
+	if (opts.eviction != Eviction{}) {
+		args = append(args, string(opts.eviction.Type), utils.IntToString(opts.eviction.Count))
+	}
+	return args, err
+}
+
+type Section string
+
+const (
+	// SERVER: General information about the server
+	Server Section = "server"
+	// CLIENTS: Client connections section
+	Clients Section = "clients"
+	// MEMORY: Memory consumption related information
+	Memory Section = "memory"
+	// PERSISTENCE: RDB and AOF related information
+	Persistence Section = "persistence"
+	// STATS: General statistics
+	Stats Section = "stats"
+	// REPLICATION: Master/replica replication information
+	Replication Section = "replication"
+	// CPU: CPU consumption statistics
+	Cpu Section = "cpu"
+	// COMMANDSTATS: Valkey command statistics
+	Commandstats Section = "commandstats"
+	// LATENCYSTATS: Valkey command latency percentile distribution statistics
+	Latencystats Section = "latencystats"
+	// SENTINEL: Valkey Sentinel section (only applicable to Sentinel instances)
+	Sentinel Section = "sentinel"
+	// CLUSTER: Valkey Cluster section
+	Cluster Section = "cluster"
+	// MODULES: Modules section
+	Modules Section = "modules"
+	// KEYSPACE: Database related statistics
+	Keyspace Section = "keyspace"
+	// ERRORSTATS: Valkey error statistics
+	Errorstats Section = "errorstats"
+	// ALL: Return all sections (excluding module generated ones)
+	All Section = "all"
+	// DEFAULT: Return only the default set of sections
+	Default Section = "default"
+	// EVERYTHING: Includes all and modules
+	Everything Section = "everything"
+)
+
+// Optional arguments for `Info` for standalone client
+type InfoOptions struct {
+	// A list of [Section] values specifying which sections of information to retrieve.
+	// When no parameter is provided, [Section.Default] is assumed.
+	// Starting with server version 7.0.0 `INFO` command supports multiple sections.
+	Sections []Section
+}
+
+// Optional arguments for `Info` for cluster client
+type ClusterInfoOptions struct {
+	*InfoOptions
+	// Specifies the routing configuration for the command.
+	// The client will route the command to the nodes defined by `Route`.
+	// The command will be routed to all primary nodes, unless `Route` is provided.
+	Route *config.Route
+}
+
+func (opts *InfoOptions) toArgs() []string {
+	if opts == nil {
+		return []string{}
+	}
+	args := make([]string, 0, len(opts.Sections))
+	for _, section := range opts.Sections {
+		args = append(args, string(section))
+	}
+	return args
+}
+
+// Optional arguments to Copy(source string, destination string, option *CopyOptions)
+//
+// [valkey.io]: https://valkey.io/commands/Copy/
+type CopyOptions struct {
+	// The REPLACE option removes the destination key before copying the value to it.
+	replace bool
+	// Option allows specifying an alternative logical database index for the destination key
+	dbDestination int64
+}
+
+func NewCopyOptionsBuilder() *CopyOptions {
+	return &CopyOptions{replace: false}
+}
+
+// Custom setter methods to removes the destination key before copying the value to it.
+func (restoreOption *CopyOptions) SetReplace() *CopyOptions {
+	restoreOption.replace = true
+	return restoreOption
+}
+
+// Custom setter methods to allows specifying an alternative logical database index for the destination key.
+func (copyOption *CopyOptions) SetDBDestination(destinationDB int64) *CopyOptions {
+	copyOption.dbDestination = destinationDB
+	return copyOption
+}
+
+func (opts *CopyOptions) toArgs() ([]string, error) {
+	args := []string{}
+	var err error
+	if opts.replace {
+		args = append(args, string("REPLACE"))
+	}
+	if opts.dbDestination >= 0 {
+		args = append(args, "DB", utils.IntToString(opts.dbDestination))
+	}
+	return args, err
 }

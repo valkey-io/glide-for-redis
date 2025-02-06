@@ -4,7 +4,7 @@ use std::sync::RwLock as StdRwLock;
 mod open_telemetry;
 mod open_telemetry_exporter_file;
 
-pub use open_telemetry::{GlideOpenTelemetry, GlideSpan};
+pub use open_telemetry::*;
 pub use open_telemetry_exporter_file::SpanExporterFile;
 
 #[derive(Default, Serialize)]

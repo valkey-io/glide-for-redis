@@ -4,6 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "valkey-glide"
+description = "An open source Valkey client library that supports Valkey and Redis open source 6.2, 7.0, 7.2 and 8.0."
 requires-python = ">=3.9"
 dependencies = [
     # Note: If you add a dependency here, make sure to also add it to requirements.txt

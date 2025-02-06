@@ -185,20 +185,17 @@ jobs:
             options: ${{ join(' -q ', matrix.host.CONTAINER_OPTIONS) }} # adding `-q` to bypass empty options
         steps:
             - name: Install git
+              if: ${{ matrix.host.TARGET == 'x86_64-unknown-linux-musl' }}
               run: |
-                  if [[ ${{ contains(matrix.host.TARGET, 'musl') }} == true ]]; then
-                     apk update
-                     apk add --no-cache git tar
-                  elif [[ ${{ contains(matrix.host.IMAGE, 'amazonlinux') }} == true ]]; then
-                     yum update
-                     yum install -y git tar
-                  fi
-                  echo IMAGE=amazonlinux:latest | sed -r 's/:/-/g' >> $GITHUB_ENV
-            # Replace `:` in the variable otherwise it can't be used in `upload-artifact`
-            - uses: actions/checkout@v4
+                  apk update
+                  apk add --no-cache git tar
+
+            - name: Checkout code
+              if: ${{ matrix.host.TARGET == 'x86_64-unknown-linux-musl' }}
+              uses: actions/checkout@v4
 
             - name: Setup musl on Linux
-              if: ${{ contains(matrix.host.TARGET, 'musl') }}
+              if: ${{ matrix.host.TARGET == 'x86_64-unknown-linux-musl' }}
               uses: ./.github/workflows/setup-musl-on-linux
               with:
                   workspace: $GITHUB_WORKSPACE
@@ -206,6 +203,7 @@ jobs:
                   npm-auth-token: ${{ secrets.NPM_AUTH_TOKEN }}
 
             - name: Setup Node
+              if: ${{ matrix.host.TARGET == 'x86_64-unknown-linux-musl' }}
               uses: actions/setup-node@v4
               env:
                   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
@@ -213,6 +211,7 @@ jobs:
                   node-version: ${{ matrix.node }}
 
             - name: Build Node wrapper
+              if: ${{ matrix.host.TARGET == 'x86_64-unknown-linux-musl' }}
               uses: ./.github/workflows/build-node-wrapper
               with:
                   os: ${{ matrix.host.OS }}
@@ -223,15 +222,21 @@ jobs:
                   arch: ${{ matrix.host.ARCH }}
 
             - name: test
+              if: ${{ matrix.host.TARGET == 'x86_64-unknown-linux-musl' }}
               run: npm test
               working-directory: ./node
 
+            - name: Sanitize IMAGE variable
+              if: ${{ matrix.host.TARGET == 'x86_64-unknown-linux-musl' }}
+              # Replace `:` in the variable otherwise it can't be used in `upload-artifact`
+              run: echo "SANITIZED_IMAGE=${{ matrix.host.IMAGE }}" | sed -r 's/:/-/g' >> $GITHUB_ENV
+
             - name: Upload test reports
-              if: always()
+              if: ${{ matrix.host.TARGET == 'x86_64-unknown-linux-musl' }}
               continue-on-error: true
               uses: actions/upload-artifact@v4
               with:
-                  name: test-report-node-${{ matrix.node }}-${{ matrix.engine.type }}-${{ matrix.engine.version }}-${{ env.IMAGE }}-${{ matrix.host.ARCH }}
+                  name: test-report-node-${{ matrix.node }}-${{ matrix.engine.type }}-${{ matrix.engine.version }}-${{ env.SANITIZED_IMAGE }}-${{ matrix.host.ARCH }}
                   path: |
                       node/test-report*.html
                       utils/clusters/**

@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -28,6 +29,9 @@ public final class SetOptions {
      * existence. If value isn't set because of the condition, command will return <code>null</code>.
      */
     private final ConditionalSet conditionalSet;
+
+    /** Value to compare when {@link ConditionalSet#ONLY_IF_EQUAL} is set. */
+    private final String comparisonValue;
 
     /**
      * Set command to return the old string stored at <code>key</code>, or <code>null</code> if <code>
@@ -49,9 +53,69 @@ public final class SetOptions {
          * Only set the key if it does not already exist. Equivalent to <code>NX</code> in the Valkey
          * API.
          */
-        ONLY_IF_DOES_NOT_EXIST("NX");
+        ONLY_IF_DOES_NOT_EXIST("NX"),
+        /**
+         * Only set the key if the current value of key equals the {@link SetOptions#comparisonValue}.
+         * Equivalent to <code>IFEQ comparison-value</code> in the Valkey API.
+         */
+        ONLY_IF_EQUAL("IFEQ");
 
         private final String valkeyApi;
+    }
+
+    /**
+     * Builder class for {@link SetOptions}.
+     *
+     * <p>Provides methods to set conditions under which a value should be set.
+     *
+     * <p>Note: Calling any of these methods will override the existing values of {@code
+     * conditionalSet} and {@code comparisonValue}, if they are already set.
+     */
+    public static class SetOptionsBuilder {
+        /**
+         * Sets the condition to {@link ConditionalSet#ONLY_IF_EXISTS} for setting the value.
+         *
+         * <p>This method overrides any previously set {@code conditionalSet} and {@code
+         * comparisonValue}.
+         *
+         * @return This builder instance
+         */
+        public SetOptionsBuilder conditionalSetOnlyIfExists() {
+            this.conditionalSet = ConditionalSet.ONLY_IF_EXISTS;
+            this.comparisonValue = null;
+            return this;
+        }
+
+        /**
+         * Sets the condition to {@link ConditionalSet#ONLY_IF_DOES_NOT_EXIST} for setting the value.
+         *
+         * <p>This method overrides any previously set {@code conditionalSet} and {@code
+         * comparisonValue}.
+         *
+         * @return This builder instance
+         */
+        public SetOptionsBuilder conditionalSetOnlyIfNotExist() {
+            this.conditionalSet = ConditionalSet.ONLY_IF_DOES_NOT_EXIST;
+            this.comparisonValue = null;
+            return this;
+        }
+
+        /**
+         * Sets the condition to {@link ConditionalSet#ONLY_IF_EQUAL} for setting the value. The key
+         * will be set if the provided comparison value matches the existing value.
+         *
+         * <p>This method overrides any previously set {@code conditionalSet} and {@code
+         * comparisonValue}.
+         *
+         * @since Valkey 8.1 and above.
+         * @param value the value to compare
+         * @return this builder instance
+         */
+        public SetOptionsBuilder conditionalSetOnlyIfEqualTo(@NonNull String value) {
+            this.conditionalSet = ConditionalSet.ONLY_IF_EQUAL;
+            this.comparisonValue = value;
+            return this;
+        }
     }
 
     /** Configuration of value lifetime. */
@@ -151,6 +215,9 @@ public final class SetOptions {
         List<String> optionArgs = new ArrayList<>();
         if (conditionalSet != null) {
             optionArgs.add(conditionalSet.valkeyApi);
+            if (conditionalSet == ConditionalSet.ONLY_IF_EQUAL) {
+                optionArgs.add(comparisonValue);
+            }
         }
 
         if (returnOldValue) {

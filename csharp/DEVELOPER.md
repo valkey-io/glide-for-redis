@@ -143,3 +143,7 @@ After pulling new changes, ensure that you update the submodules by running the 
 ```bash
 git submodule update
 ```
+
+6. Test framework and style
+
+Test package used in code xUnit v3. Testing code styles defined in .editorcofing (see dotnet_diagnostic.xUnit.. rules). Rules enforced by https://github.com/xunit/xunit.analyzers referenced by the main xunit.v3 NuGet package out of the box. If you choose to reference xunit.v3.core instead, you can reference xunit.analyzers explicitly. For additional info, please, refer to https://xunit.net and https://github.com/xunit/xunit

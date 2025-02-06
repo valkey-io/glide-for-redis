@@ -23,8 +23,6 @@ import lombok.SneakyThrows;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 @Timeout(10) // seconds
 public class StandaloneClientTests {
@@ -238,45 +236,6 @@ public class StandaloneClientTests {
 
             // But using something else password returns OK
             assertEquals(OK, testClient.updateConnectionPassword(notThePwd, true).get());
-        } finally {
-            adminClient.configSet(Map.of("requirepass", "")).get();
-            adminClient.close();
-        }
-    }
-
-    @SneakyThrows
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    public void update_connection_password_connection_lost_before_password_update(
-            boolean immediateAuth) {
-        GlideClient adminClient = GlideClient.createClient(commonClientConfig().build()).get();
-        var pwd = UUID.randomUUID().toString();
-
-        try (var testClient = GlideClient.createClient(commonClientConfig().build()).get()) {
-            // validate that we can use the client
-            assertNotNull(testClient.info().get());
-
-            // set the password and forcefully drop connection for the testClient
-            assertEquals("OK", adminClient.configSet(Map.of("requirepass", pwd)).get());
-            adminClient.customCommand(new String[] {"CLIENT", "KILL", "TYPE", "NORMAL"}).get();
-
-            /*
-             * Some explanation for the curious mind:
-             * Our library is abstracting a connection or connections, with a lot of mechanism around it, making it behave like what we call a "client".
-             * When using standalone mode, the client is a single connection, so on disconnection the first thing it planned to do is to reconnect.
-             *
-             * There's no reason to get other commands and to take care of them since to serve commands we need to be connected.
-             *
-             * Hence, the client will try to reconnect and will not listen try to take care of new tasks, but will let them wait in line,
-             * so the update connection password will not be able to reach the connection and will return an error.
-             * For future versions, standalone will be considered as a different animal then it is now, since standalone is not necessarily one node.
-             * It can be replicated and have a lot of nodes, and to be what we like to call "one shard cluster".
-             * So, in the future, we will have many existing connection and request can be managed also when one connection is locked,
-             */
-            var exception =
-                    assertThrows(
-                            ExecutionException.class,
-                            () -> testClient.updateConnectionPassword(pwd, immediateAuth).get());
         } finally {
             adminClient.configSet(Map.of("requirepass", "")).get();
             adminClient.close();

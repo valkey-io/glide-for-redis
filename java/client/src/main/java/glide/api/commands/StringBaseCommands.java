@@ -215,12 +215,19 @@ public interface StringBaseCommands {
      * @param options The Set options.
      * @return If the value is successfully set, return <code>"OK"</code>. If value isn't set because
      *     of {@link ConditionalSet#ONLY_IF_EXISTS} or {@link ConditionalSet#ONLY_IF_DOES_NOT_EXIST}
-     *     conditions, return <code>null</code>. If {@link SetOptionsBuilder#returnOldValue(boolean)}
-     *     is set, return the old value as a <code>String</code>.
+     *     or {@link ConditionalSet#ONLY_IF_EQUAL} conditions, return <code>null</code>. If {@link
+     *     SetOptionsBuilder#returnOldValue(boolean)} is set, return the old value as a <code>String
+     *     </code>.
      * @example
      *     <pre>{@code
-     * SetOptions options = SetOptions.builder().conditionalSet(ONLY_IF_EXISTS).expiry(Seconds(5L)).build();
+     * SetOptions options = SetOptions.builder().conditionalSetOnlyIfExists().expiry(Seconds(5L)).build();
      * String value = client.set("key", "value", options).get();
+     * assert value.equals("OK");
+     * }</pre>
+     *     <pre>{@code
+     * client.set("key", "value").get();
+     * SetOptions options = SetOptions.builder().conditionalSetIfEqualTo("value").build();
+     * String value = client.set("key", "newValue", options).get();
      * assert value.equals("OK");
      * }</pre>
      */
@@ -235,8 +242,9 @@ public interface StringBaseCommands {
      * @param options The Set options.
      * @return If the value is successfully set, return <code>"OK"</code>. If value isn't set because
      *     of {@link ConditionalSet#ONLY_IF_EXISTS} or {@link ConditionalSet#ONLY_IF_DOES_NOT_EXIST}
-     *     conditions, return <code>null</code>. If {@link SetOptionsBuilder#returnOldValue(boolean)}
-     *     is set, return the old value as a <code>String</code>.
+     *     or {@link ConditionalSet#ONLY_IF_EQUAL} conditions, return <code>null</code>. If {@link
+     *     SetOptionsBuilder#returnOldValue(boolean)} is set, return the old value as a <code>String
+     *     </code>.
      * @example
      *     <pre>{@code
      * SetOptions options = SetOptions.builder().conditionalSet(ONLY_IF_EXISTS).expiry(Seconds(5L)).build();

@@ -1,0 +1,10 @@
+name: Try GitHub ARM runners
+on:
+    workflow_dispatch:
+
+jobs:
+    hello-world:
+        runs-on: ubuntu-24.04-arm
+        steps:
+            - name: print Hello World
+              run: echo "Hello World from ARM"

@@ -1,25 +1,25 @@
 // Copyright Valkey GLIDE Project Contributors - SPDX Identifier: Apache-2.0
 
-package api
+package errors
 
 // #cgo LDFLAGS: -L../target/release -lglide_rs
-// #include "../lib.h"
+// #include "../../lib.h"
 import "C"
 
 // ConnectionError is a client error that occurs when there is an error while connecting or when a connection
 // disconnects.
 type ConnectionError struct {
-	msg string
+	Msg string
 }
 
-func (e *ConnectionError) Error() string { return e.msg }
+func (e *ConnectionError) Error() string { return e.Msg }
 
 // RequestError is a client error that occurs when an error is reported during a request.
 type RequestError struct {
-	msg string
+	Msg string
 }
 
-func (e *RequestError) Error() string { return e.msg }
+func (e *RequestError) Error() string { return e.Msg }
 
 // ExecAbortError is a client error that occurs when a transaction is aborted.
 type ExecAbortError struct {
@@ -44,22 +44,20 @@ func (e *DisconnectError) Error() string { return e.msg }
 
 // ClosingError is a client error that indicates that the client has closed and is no longer usable.
 type ClosingError struct {
-	msg string
+	Msg string
 }
 
-func (e *ClosingError) Error() string { return e.msg }
+func (e *ClosingError) Error() string { return e.Msg }
 
-func goError(cErrorType C.RequestErrorType, cErrorMessage *C.char) error {
-	defer C.free_error_message(cErrorMessage)
-	msg := C.GoString(cErrorMessage)
+func GoError(cErrorType uint32, errorMessage string) error {
 	switch cErrorType {
 	case C.ExecAbort:
-		return &ExecAbortError{msg}
+		return &ExecAbortError{errorMessage}
 	case C.Timeout:
-		return &TimeoutError{msg}
+		return &TimeoutError{errorMessage}
 	case C.Disconnect:
-		return &DisconnectError{msg}
+		return &DisconnectError{errorMessage}
 	default:
-		return &RequestError{msg}
+		return &RequestError{errorMessage}
 	}
 }

@@ -2,8 +2,6 @@
 
 using System.Runtime.InteropServices;
 
-using FluentAssertions;
-
 using Glide;
 
 using static Tests.Integration.IntegrationTestBase;
@@ -13,12 +11,8 @@ public class GetAndSet : IClassFixture<IntegrationTestBase>
 {
     private async Task GetAndSetValues(AsyncClient client, string key, string value)
     {
-        _ = (await client.SetAsync(key, value))
-            .Should()
-            .Be("OK");
-        _ = (await client.GetAsync(key))
-            .Should()
-            .Be(value);
+        Assert.Equal("OK", await client.SetAsync(key, value));
+        Assert.Equal(value, await client.GetAsync(key));
     }
 
     private async Task GetAndSetRandomValues(AsyncClient client)
@@ -48,9 +42,7 @@ public class GetAndSet : IClassFixture<IntegrationTestBase>
     public async Task GetReturnsNull()
     {
         using AsyncClient client = new("localhost", TestConfiguration.STANDALONE_PORTS[0], false);
-        _ = (await client.GetAsync(Guid.NewGuid().ToString()))
-            .Should()
-            .BeNull();
+        Assert.Null(await client.GetAsync(Guid.NewGuid().ToString()));
     }
 
     [Fact]
@@ -111,9 +103,7 @@ public class GetAndSet : IClassFixture<IntegrationTestBase>
                     }
                     else
                     {
-                        _ = (await client.GetAsync(Guid.NewGuid().ToString()))
-                            .Should()
-                            .BeNull();
+                        Assert.Null(await client.GetAsync(Guid.NewGuid().ToString()));
                     }
                 }
             }));

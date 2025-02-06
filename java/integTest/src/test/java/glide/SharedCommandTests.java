@@ -1695,6 +1695,7 @@ public class SharedCommandTests {
         assertArrayEquals(new String[] {"value2", "value3"}, client.lpopCount(key, 2).get());
         assertArrayEquals(new String[] {}, client.lrange("non_existing_key", 0, -1).get());
         assertNull(client.lpop("non_existing_key").get());
+        assertNull(client.lpopCount("non_existing_key", 2).get());
     }
 
     @SneakyThrows
@@ -1714,6 +1715,7 @@ public class SharedCommandTests {
                 new GlideString[] {gs("value2"), gs("value3")}, client.lpopCount(key, 2).get());
         assertArrayEquals(new GlideString[] {}, client.lrange(gs("non_existing_key"), 0, -1).get());
         assertNull(client.lpop(gs("non_existing_key")).get());
+        assertNull(client.lpopCount(gs("non_existing_key"), 2).get());
     }
 
     @SneakyThrows

@@ -105,6 +105,8 @@ mod cluster_async {
     use futures_time::{future::FutureExt, task::sleep};
     use once_cell::sync::Lazy;
     use std::ops::Add;
+    use std::str::FromStr;
+    use telemetrylib::*;
 
     use redis::{
         aio::{ConnectionLike, MultiplexedConnection},
@@ -204,6 +206,80 @@ mod cluster_async {
             Ok::<_, RedisError>(())
         })
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_async_open_telemetry_config() {
+        let glide_ot_config = GlideOpenTelemetryConfigBuilder::default()
+            .with_flush_interval(std::time::Duration::from_millis(400))
+            .with_trace_exporter(
+                GlideOpenTelemetryTraceExporter::from_str("http://valid-url.com").unwrap(),
+            )
+            .build();
+        let result = std::panic::catch_unwind(|| {
+            GlideOpenTelemetry::initialise(glide_ot_config.clone());
+        });
+        assert!(result.is_err(), "Expected a panic but no panic occurred");
+
+        // Check the panic message
+        if let Err(err) = result {
+            let panic_msg = err
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| err.downcast_ref::<&str>().copied())
+                .unwrap_or("Unknown panic message");
+
+            assert!(
+                panic_msg.contains("not yet implemented: HTTP protocol is not implemented yet!"),
+                "Unexpected panic message: {}",
+                panic_msg
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_async_open_telemetry_invalid_config() {
+        let result = GlideOpenTelemetryTraceExporter::from_str("invalid-protocol.com");
+        assert!(result.is_err(), "Expected `from_str` to return an error");
+        assert_eq!(
+            result.unwrap_err().kind(),
+            std::io::ErrorKind::InvalidInput,
+            "Expected ErrorKind::InvalidInput"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_async_open_telemetry_interval_config() {
+        let exporter = GlideOpenTelemetryTraceExporter::from_str("http://valid-url.com").unwrap();
+        let glide_ot_config = GlideOpenTelemetryConfigBuilder::default()
+            .with_flush_interval(std::time::Duration::from_millis(400))
+            .with_trace_exporter(exporter.clone())
+            .build();
+        assert_eq!(GlideOpenTelemetry::get_span_interval(glide_ot_config), 400);
+        // check the default interval
+        let glide_ot_config = GlideOpenTelemetryConfigBuilder::default()
+            .with_trace_exporter(exporter)
+            .build();
+        assert_eq!(
+            GlideOpenTelemetry::get_span_interval(glide_ot_config.clone()),
+            5000
+        );
+
+        let cluster = TestClusterContext::new(3, 0);
+
+        let cluster_addresses: Vec<_> = cluster
+            .cluster
+            .servers
+            .iter()
+            .map(|server| server.connection_info())
+            .collect();
+        ClusterClient::builder(cluster_addresses.clone())
+            .open_telemetry_config(glide_ot_config.clone())
+            .build()
+            .unwrap()
+            .get_async_connection(None)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

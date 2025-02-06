@@ -744,7 +744,6 @@ export class BaseClient {
     private readonly pubsubFutures: [PromiseFunction, ErrorFunction][] = [];
     private pendingPushNotification: response.Response[] = [];
     private readonly inflightRequestsLimit: number;
-    private readonly clientAz: string | undefined;
     private config: BaseClientConfiguration | undefined;
 
     protected configurePubsub(

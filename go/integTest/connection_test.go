@@ -5,6 +5,7 @@ package integTest
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/valkey-io/valkey-glide/go/glide/api"
+	"github.com/valkey-io/valkey-glide/go/glide/api/errors"
 )
 
 func (suite *GlideTestSuite) TestStandaloneConnect() {
@@ -51,5 +52,5 @@ func (suite *GlideTestSuite) TestConnectWithInvalidAddress() {
 
 	assert.Nil(suite.T(), client)
 	assert.NotNil(suite.T(), err)
-	assert.IsType(suite.T(), &api.ConnectionError{}, err)
+	assert.IsType(suite.T(), &errors.ConnectionError{}, err)
 }

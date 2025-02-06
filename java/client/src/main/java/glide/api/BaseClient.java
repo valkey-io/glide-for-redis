@@ -1384,7 +1384,7 @@ public abstract class BaseClient
         return commandManager.submitNewCommand(
                 LPop,
                 new String[] {key, Long.toString(count)},
-                response -> castArray(handleArrayResponse(response), String.class));
+                response -> castArray(handleArrayOrNullResponse(response), String.class));
     }
 
     @Override
@@ -1392,7 +1392,7 @@ public abstract class BaseClient
         return commandManager.submitNewCommand(
                 LPop,
                 new GlideString[] {key, gs(Long.toString(count))},
-                response -> castArray(handleArrayResponseBinary(response), GlideString.class));
+                response -> castArray(handleArrayOrNullResponseBinary(response), GlideString.class));
     }
 
     @Override

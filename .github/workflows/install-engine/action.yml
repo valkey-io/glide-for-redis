@@ -35,31 +35,9 @@ runs:
                   ~/valkey
               key: valkey-${{ inputs.engine-version }}-${{ inputs.target }}
 
-        - name: Build Valkey for ARM
-          if: ${{ contains(inputs.target, 'aarch64-unknown') }}
-          shell: bash
-          working-directory: ~
-          run: |
-              cd ~
-              echo "Building valkey ${{ inputs.engine-version }}"
-              # check if the valkey repo is already cloned
-              if [[ ! -d valkey ]]; then
-                  git clone https://github.com/valkey-io/valkey.git
-              else
-                  # check if the branch=version is already checked out
-                  if [[ $(git branch --show-current) != ${{ inputs.engine-version }} ]]; then
-                      cd valkey
-                      make clean
-                      make distclean
-                      sudo rm -rf /usr/local/bin/redis-* /usr/local/bin/valkey-* ./valkey-* ./redis-* ./dump.rdb
-                      git fetch --all
-                      git checkout ${{ inputs.engine-version }}
-                      git pull
-                  fi
-              fi
         # if no cache hit, build the engine
         - name: Build Valkey
-          if: ${{ steps.cache-valkey.outputs.cache-hit != 'true' && !contains(inputs.target, 'aarch64-unknown') }}
+          if: ${{ steps.cache-valkey.outputs.cache-hit != 'true' }}
           shell: bash
           run: |
               echo "Building valkey ${{ inputs.engine-version }}"

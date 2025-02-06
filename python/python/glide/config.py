@@ -209,7 +209,7 @@ class BaseClientConfiguration:
 
         if read_from == ReadFrom.AZ_AFFINITY and not client_az:
             raise ValueError(
-                "client_az mus t be set when read_from is set to AZ_AFFINITY"
+                "client_az must be set when read_from is set to AZ_AFFINITY"
             )
 
     def _create_a_protobuf_conn_request(

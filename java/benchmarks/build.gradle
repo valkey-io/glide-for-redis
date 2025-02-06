@@ -7,16 +7,13 @@ plugins {
 repositories {
     // Use Maven Central for resolving dependencies.
     mavenCentral()
+    mavenLocal()
 }
 
 dependencies {
-    def releaseVersion = System.getenv("GLIDE_RELEASE_VERSION");
+    version = System.getenv("GLIDE_RELEASE_VERSION") ?: project.ext.defaultReleaseVersion
 
-    if (releaseVersion) {
-        implementation "io.valkey:valkey-glide:" + releaseVersion + ":${osdetector.classifier}"
-    } else {
-        implementation project(':client')
-    }
+    implementation "io.valkey:valkey-glide:${version}:${osdetector.classifier}"
 
     // This dependency is used internally, and not exposed to consumers on their own compile classpath.
     implementation 'com.google.guava:guava:32.1.1-jre'
@@ -28,7 +25,7 @@ dependencies {
     implementation group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
 }
 
-run.dependsOn ':client:buildRust'
+compileJava.dependsOn ':client:publishToMavenLocal'
 
 application {
     // Define the main class for the application.

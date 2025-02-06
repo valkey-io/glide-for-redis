@@ -18,6 +18,7 @@ use redis::{
 };
 pub use standalone_client::StandaloneClient;
 use std::io;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -28,6 +29,7 @@ mod reconnecting_connection;
 mod standalone_client;
 mod value_conversion;
 use redis::InfoDict;
+use telemetrylib::*;
 use tokio::sync::mpsc;
 use versions::Versioning;
 
@@ -684,6 +686,7 @@ pub enum ConnectionError {
     Standalone(standalone_client::StandaloneClientConnectionError),
     Cluster(redis::RedisError),
     Timeout,
+    IoError(std::io::Error),
 }
 
 impl std::fmt::Debug for ConnectionError {
@@ -691,6 +694,7 @@ impl std::fmt::Debug for ConnectionError {
         match self {
             Self::Standalone(arg0) => f.debug_tuple("Standalone").field(arg0).finish(),
             Self::Cluster(arg0) => f.debug_tuple("Cluster").field(arg0).finish(),
+            Self::IoError(arg0) => f.debug_tuple("IoError").field(arg0).finish(),
             Self::Timeout => write!(f, "Timeout"),
         }
     }
@@ -701,6 +705,7 @@ impl std::fmt::Display for ConnectionError {
         match self {
             ConnectionError::Standalone(err) => write!(f, "{err:?}"),
             ConnectionError::Cluster(err) => write!(f, "{err}"),
+            ConnectionError::IoError(err) => write!(f, "{err}"),
             ConnectionError::Timeout => f.write_str("connection attempt timed out"),
         }
     }
@@ -823,6 +828,22 @@ impl Client {
         let inflight_requests_allowed = Arc::new(AtomicIsize::new(
             inflight_requests_limit.try_into().unwrap(),
         ));
+
+        if let Some(endpoint_str) = &request.otel_endpoint {
+            let trace_exporter = GlideOpenTelemetryTraceExporter::from_str(endpoint_str.as_str())
+                .map_err(ConnectionError::IoError)?;
+            let config = GlideOpenTelemetryConfigBuilder::default()
+                .with_flush_interval(std::time::Duration::from_millis(
+                    request
+                        .otel_span_flush_interval_ms
+                        .unwrap_or(DEFAULT_FLUSH_SPAN_INTERVAL_MS),
+                ))
+                .with_trace_exporter(trace_exporter)
+                .build();
+
+            GlideOpenTelemetry::initialise(config);
+        };
+
         tokio::time::timeout(DEFAULT_CLIENT_CREATION_TIMEOUT, async move {
             let internal_client = if request.cluster_mode_enabled {
                 let client = create_cluster_client(request, push_sender)

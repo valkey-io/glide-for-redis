@@ -1,6 +1,7 @@
 /** Copyright Valkey GLIDE Project Contributors - SPDX Identifier: Apache-2.0 */
 package glide.connectors.resources;
 
+import glide.api.logging.Logger;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.kqueue.KQueue;
 import java.util.function.Supplier;
@@ -30,6 +31,13 @@ public class Platform {
         private final boolean isNIOAvailable;
     }
 
+    /**
+     * String which accumulates with report of checking platform capabilities. Thrown with an
+     * exception if neither epoll/kqueue available. TODO: replace with logging Note: logging into
+     * files may be unavailable in AWS lambda.
+     */
+    private static String debugInfo = "Detailed report of checking platform capabilities\n";
+
     /** Detected platform (OS + JVM) capabilities. Not supposed to be changed in runtime. */
     @Getter
     private static final Capabilities capabilities =
@@ -38,9 +46,17 @@ public class Platform {
     /** Detect <em>kqueue</em> availability. */
     private static boolean isKQueueAvailable() {
         try {
+            debugInfo += "Checking KQUEUE...\n";
             Class.forName("io.netty.channel.kqueue.KQueue");
-            return KQueue.isAvailable();
+            debugInfo += "KQUEUE class found\n";
+            var res = KQueue.isAvailable();
+            debugInfo += "KQUEUE is" + (res ? " " : " not") + " available\n";
+            if (!res) {
+                debugInfo += "Reason: " + KQueue.unavailabilityCause() + "\n";
+            }
+            return res;
         } catch (ClassNotFoundException e) {
+            debugInfo += "Exception checking KQUEUE:\n" + e + "\n";
             return false;
         }
     }
@@ -48,22 +64,39 @@ public class Platform {
     /** Detect <em>epoll</em> availability. */
     private static boolean isEPollAvailable() {
         try {
+            debugInfo += "Checking EPOLL...\n";
             Class.forName("io.netty.channel.epoll.Epoll");
-            return Epoll.isAvailable();
+            debugInfo += "EPOLL class found\n";
+            var res = Epoll.isAvailable();
+            debugInfo += "EPOLL is" + (res ? " " : " not") + " available\n";
+            if (!res) {
+                debugInfo += "Reason: " + Epoll.unavailabilityCause() + "\n";
+            }
+            return res;
         } catch (ClassNotFoundException e) {
+            debugInfo += "Exception checking EPOLL\n" + e + "\n";
             return false;
         }
     }
 
     public static Supplier<ThreadPoolResource> getThreadPoolResourceSupplier() {
-        if (Platform.getCapabilities().isKQueueAvailable()) {
+        if (capabilities.isKQueueAvailable()) {
             return KQueuePoolResource::new;
         }
 
-        if (Platform.getCapabilities().isEPollAvailable()) {
+        if (capabilities.isEPollAvailable()) {
             return EpollResource::new;
         }
+
         // TODO support IO-Uring and NIO
-        throw new RuntimeException("Current platform supports no known thread pool resources");
+        String errorMessage =
+                String.format(
+                        "Cannot load Netty native components for the current os version and arch: %s %s %s.\n",
+                        System.getProperty("os.name"),
+                        System.getProperty("os.version"),
+                        System.getProperty("os.arch"));
+
+        throw new RuntimeException(
+                errorMessage + (Logger.getLoggerLevel() == Logger.Level.DEBUG ? debugInfo : ""));
     }
 }
