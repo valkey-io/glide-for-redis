@@ -16,14 +16,14 @@ Software Dependencies
 
 If your Nodejs version is below the supported version specified in the client's [documentation](https://github.com/valkey-io/valkey-glide/blob/main/node/README.md#nodejs-supported-version), you can upgrade it using [NVM](https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script).
 
--   npm
--   git
--   GCC
--   pkg-config
--   protoc (protobuf compiler)
--   openssl
--   openssl-dev
--   rustup
+- npm
+- git
+- GCC
+- pkg-config
+- protoc (protobuf compiler)
+- openssl
+- openssl-dev
+- rustup
 
 **Dependencies installation for Ubuntu**
 
@@ -54,6 +54,27 @@ brew update
 brew install nodejs git gcc pkgconfig protobuf openssl
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source "$HOME/.cargo/env"
+```
+
+**Valkey Server and CLI**
+See the [Valkey installation guide](https://valkey.io/topics/installation/) to install the Valkey server and CLI.
+Some distributions has a package manager for Valkey. You can install it using the following command, base on your distribution:
+
+```bash
+# With yum (CentOS, Fedora, RHEL, AL2023)
+sudo yum install valkey
+
+# With apt (Debian, Ubuntu, Mint)
+sudo apt-get install valkey
+
+# With zypper (OpenSUSE)
+sudo zypper install valkey
+
+# Using package manager (Arch Linux)
+sudo pacman -S valkey
+
+# With brew (MacOS)
+brew install valkey
 ```
 
 #### Building and installation steps
@@ -107,16 +128,16 @@ Before starting this step, make sure you've installed all software requirments.
 5. Integrating the built GLIDE package into your project:
    Add the package to your project using the folder path with the command `npm install <path to GLIDE>/node`.
 
--   For a fast build, execute `npm run build`. This will perform a full, unoptimized build, which is suitable for developing tests. Keep in mind that performance is significantly affected in an unoptimized build, so it's required to build with the `build:release` or `build:benchmark` option when measuring performance.
--   If your modifications are limited to the TypeScript code, run `npm run build-external` to build the external package without rebuilding the internal package.
--   If your modifications are limited to the Rust code, execute `npm run build-internal` to build the internal package and generate TypeScript code.
--   To generate Node's protobuf files, execute `npm run build-protobuf`. Keep in mind that protobuf files are generated as part of full builds (e.g., `build`, `build:release`, etc.).
+- For a fast build, execute `npm run build`. This will perform a full, unoptimized build, which is suitable for developing tests. Keep in mind that performance is significantly affected in an unoptimized build, so it's required to build with the `build:release` or `build:benchmark` option when measuring performance.
+- If your modifications are limited to the TypeScript code, run `npm run build-external` to build the external package without rebuilding the internal package.
+- If your modifications are limited to the Rust code, execute `npm run build-internal` to build the internal package and generate TypeScript code.
+- To generate Node's protobuf files, execute `npm run build-protobuf`. Keep in mind that protobuf files are generated as part of full builds (e.g., `build`, `build:release`, etc.).
 
 > Note: Once building completed, you'll find the compiled JavaScript code in the `node/build-ts` folder.
 
 ### Troubleshooting
 
--   If the build fails after running `npx tsc` because `glide-rs` isn't found, check if your npm version is in the range 9.0.0-9.4.1, and if so, upgrade it. 9.4.2 contains a fix to a change introduced in 9.0.0 that is required in order to build the library.
+- If the build fails after running `npx tsc` because `glide-rs` isn't found, check if your npm version is in the range 9.0.0-9.4.1, and if so, upgrade it. 9.4.2 contains a fix to a change introduced in 9.0.0 that is required in order to build the library.
 
 ### Test
 
@@ -186,14 +207,6 @@ It has command history and bash-like search (`Ctrl+R`).
 
 Shell hangs on exit (`Ctrl+D`) if you don't close the clients. Use `Ctrl+C` to kill it and/or close clients before exit.
 
-### Submodules
-
-After pulling new changes, ensure that you update the submodules by running the following command:
-
-```bash
-git submodule update
-```
-
 ### Linters
 
 Development on the Node wrapper may involve changes in either the TypeScript or Rust code. Each language has distinct linter tests that must be passed before committing changes.
@@ -202,13 +215,13 @@ Development on the Node wrapper may involve changes in either the TypeScript or 
 
 **TypeScript:**
 
--   ESLint
--   Prettier
+- ESLint
+- Prettier
 
 **Rust:**
 
--   clippy
--   fmt
+- clippy
+- fmt
 
 #### Running the linters
 
@@ -231,8 +244,8 @@ Development on the Node wrapper may involve changes in either the TypeScript or 
 
 ### Recommended extensions for VS Code
 
--   [Prettier - Code formatter](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) - JavaScript / TypeScript formatter.
--   [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) - linter.
--   [Jest Runner](https://marketplace.visualstudio.com/items?itemName=firsttris.vscode-jest-runner) - in-editor test runner.
--   [Jest Test Explorer](https://marketplace.visualstudio.com/items?itemName=kavod-io.vscode-jest-test-adapter) - adapter to the VSCode testing UI.
--   [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) - Rust language support for VSCode.
+- [Prettier - Code formatter](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) - JavaScript / TypeScript formatter.
+- [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) - linter.
+- [Jest Runner](https://marketplace.visualstudio.com/items?itemName=firsttris.vscode-jest-runner) - in-editor test runner.
+- [Jest Test Explorer](https://marketplace.visualstudio.com/items?itemName=kavod-io.vscode-jest-test-adapter) - adapter to the VSCode testing UI.
+- [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) - Rust language support for VSCode.

@@ -181,6 +181,7 @@ anyhow = "1"
 sscanf = "0.4.1"
 serial_test = "2"
 versions = "6.3"
+which = "7.0.1"
 
 [[test]]
 name = "test_async"

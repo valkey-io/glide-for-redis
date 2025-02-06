@@ -1,6 +1,6 @@
 # Developer Guide
 
-This document describes how to set up your development environment to build and test the GLIDE for Redis C# wrapper.
+This document describes how to set up your development environment to build and test the Valkey GLIDE C# wrapper.
 
 ### Development Overview
 
@@ -11,7 +11,7 @@ The C# client contains the following parts:
 1. Rust part of the C# client located in `lib/src`; it communicates with [GLIDE core rust library](../glide-core/README.md).
 2. C# part of the client located in `lib`; it translates Rust async API into .Net async API.
 3. Integration tests for the C# client located in `tests` directory.
-4. A dedicated benchmarking tool designed to evaluate and compare the performance of GLIDE for Redis and other .Net clients. It is located in `<repo root>/benchmarks/csharp`.
+4. A dedicated benchmarking tool designed to evaluate and compare the performance of Valkey GLIDE and other .Net clients. It is located in `<repo root>/benchmarks/csharp`.
 
 TODO: examples, UT, design docs
 
@@ -22,7 +22,7 @@ Software Dependencies:
 - .Net SDK 6 or later
 - git
 - rustup
-- redis
+- valkey
 
 Please also install the following packages to build [GLIDE core rust library](../glide-core/README.md):
 
@@ -53,9 +53,10 @@ For example, on Linux you can copy it to `/usr/bin`:
 sudo cp protoc /usr/bin/
 ```
 
-**Redis installation**
+**Valkey installation**
 
-To install `redis-server` and `redis-cli` on your host, follow the [Redis Installation Guide](https://redis.io/docs/install/install-redis/).
+See the [Valkey installation guide](https://valkey.io/topics/installation/) to install the Valkey server and CLI.
+
 
 **Dependencies installation for Ubuntu**
 
@@ -77,7 +78,7 @@ source "$HOME/.cargo/env"
 
 #### Building and installation steps
 
-Before starting this step, make sure you've installed all software requirments.
+Before starting this step, make sure you've installed all software requirements.
 
 1. Clone the repository
     ```bash
@@ -101,8 +102,7 @@ dotnet test
 
 4. Run benchmark
 
-    1. Ensure that you have installed `redis-server` and `redis-cli` on your host. You can find the Redis installation guide at the following link: [Redis Installation Guide](https://redis.io/docs/install/install-redis/install-redis-on-linux/).
-
+    1. Ensure that you have installed `valkey-server` and `valkey-cli` on your host. You can find the valkey installation guide above.
     2. Execute the following command from the root project folder:
 
     ```bash
@@ -134,14 +134,6 @@ Rust linter:
 ```bash
 cargo clippy --all-features --all-targets -- -D warnings
 cargo fmt --all -- --check
-```
-
-### Submodules
-
-After pulling new changes, ensure that you update the submodules by running the following command:
-
-```bash
-git submodule update
 ```
 
 6. Test framework and style

@@ -8,11 +8,6 @@ excludes:
           reason: "BUILD_TOOL_OF"
           comment: "Template file for CD"
 
-resolutions:
-    issues:
-        - message: "NPM failed to resolve dependencies for path 'hybrid-node-tests/commonjs-test/package.json': FileNotFoundException: .*valkey-glide/package.json.*"
-          reason: "BUILD_TOOL_ISSUE"
-          comment: "The 'hybrid-node-tests' are not built, so there is no 'package.json' in the expected location. The 'valkey-glide' package has already been scanned for licenses, so there's no need to scan it again."
-        - message: "NPM failed to resolve dependencies for path 'hybrid-node-tests/ecmascript-test/package.json': FileNotFoundException: .*valkey-glide/package.json.*"
-          reason: "BUILD_TOOL_ISSUE"
-          comment: "The 'hybrid-node-tests' are not built, so there is no 'package.json' in the expected location. The 'valkey-glide' package has already been scanned for licenses, so there's no need to scan it again."
+        - pattern: "hybrid-node-tests/**"
+          reason: "TEST_OF"
+          comment: "Test files for hybrid node tests"

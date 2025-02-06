@@ -124,7 +124,8 @@ maturin develop --release --strip
 # Running tests
 ---
 
-Ensure that you have installed `redis-server` or `valkey-server` along with `redis-cli` or `valkey-cli` on your host. You can find the Redis installation guide at the following link: [Redis Installation Guide](https://redis.io/docs/install/install-redis/install-redis-on-linux/). You can get Valkey from the following link: [Valkey Download](https://valkey.io/download/).
+Ensure you have installed `valkey-server` and `valkey-cli` on your host (or `redis-server` and `redis-cli`). 
+See the [Valkey installation guide](https://valkey.io/topics/installation/) to install the Valkey server and CLI.
 
 From a terminal, change directory to the GLIDE source folder and type:
 

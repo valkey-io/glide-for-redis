@@ -334,7 +334,7 @@ describe("GlideClusterClient", () => {
                     .configGet(["timeout", "cluster-node-timeout"]);
                 const result = await client.exec(transaction);
                 const convertedResult = [
-                    result[0],
+                    result ? result[0] : null,
                     convertGlideRecordToRecord(result[1]),
                 ];
                 expect(convertedResult).toEqual([
@@ -1802,7 +1802,12 @@ describe("GlideClusterClient", () => {
                         decoder: Decoder.Bytes,
                         route: route,
                     });
-                    const data = result?.[0] as Buffer;
+
+                    if (!result) {
+                        throw new Error("Transaction failed: result is null");
+                    }
+
+                    const data = result[0] as Buffer;
 
                     // Verify functionRestore
                     transaction = new ClusterTransaction()

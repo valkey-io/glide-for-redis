@@ -4,31 +4,24 @@
 
 import { afterAll, afterEach, beforeAll, describe } from "@jest/globals";
 import { AsyncClient } from "glide-rs";
-import RedisServer from "redis-server";
 import { runCommonTests } from "./SharedTests";
-import { flushallOnPort } from "./TestUtilities";
+import { flushallOnPort, startServer } from "./TestUtilities";
+import { ChildProcess } from "child_process";
 /* eslint-disable @typescript-eslint/no-require-imports */
 const FreePort = require("find-free-port");
 
 const PORT_NUMBER = 4000;
 
 describe("AsyncClient", () => {
-    let server: RedisServer;
+    let serverProcess: ChildProcess;
     let port: number;
+
     beforeAll(async () => {
         port = await FreePort(PORT_NUMBER).then(
             ([free_port]: number[]) => free_port,
         );
-        server = await new Promise((resolve, reject) => {
-            const server = new RedisServer(port);
-            server.open(async (err: Error | null) => {
-                if (err) {
-                    reject(err);
-                }
-
-                resolve(server);
-            });
-        });
+        const server = await startServer(port);
+        serverProcess = server.process;
     });
 
     afterEach(async () => {
@@ -36,12 +29,14 @@ describe("AsyncClient", () => {
     });
 
     afterAll(async () => {
-        await server.close();
+        if (serverProcess) {
+            serverProcess.kill();
+        }
     });
 
     runCommonTests({
         init: async () => {
-            const client = await AsyncClient.CreateConnection(
+            const client = AsyncClient.CreateConnection(
                 "redis://localhost:" + port,
             );
 
