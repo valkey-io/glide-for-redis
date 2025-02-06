@@ -366,3 +366,48 @@ func (client *GlideClusterClient) EchoWithOptions(echoOptions options.ClusterEch
 	}
 	return createClusterSingleValue[string](data), nil
 }
+
+// Gets the current connection id.
+// The command will be routed a random node, unless `Route` in `routeOptions` is provided.
+//
+// Parameters:
+//
+//	route - Specifies the routing configuration for the command. The client will route the
+//	        command to the nodes defined by route.
+//
+// Return value:
+//
+//	The id of the client.
+//
+// Example:
+//
+//	route := config.Route(config.RandomRoute)
+//	opts = options.RouteOption{Route: route}
+//	response, err = client.ClientIdWithOptions(opts)
+//	if err != nil {
+//	  // handle error
+//	}
+//	for node, data := range response {
+//		fmt.Printf("%s node returned %s\n", node, data)
+//	}
+//
+// [valkey.io]: https://valkey.io/commands/client-id/
+func (client *GlideClusterClient) ClientIdWithOptions(opts options.RouteOption) (ClusterValue[int64], error) {
+	response, err := client.executeCommandWithRoute(C.ClientId, []string{}, opts.Route)
+	if err != nil {
+		return createEmptyClusterValue[int64](), err
+	}
+	if opts.Route != nil &&
+		(opts.Route).IsMultiNode() {
+		data, err := handleStringIntMapResponse(response)
+		if err != nil {
+			return createEmptyClusterValue[int64](), err
+		}
+		return createClusterMultiValue[int64](data), nil
+	}
+	data, err := handleIntResponse(response)
+	if err != nil {
+		return createEmptyClusterValue[int64](), err
+	}
+	return createClusterSingleValue[int64](data), nil
+}

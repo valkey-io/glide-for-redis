@@ -1160,3 +1160,30 @@ func handleTimeClusterResponse(response *C.struct_CommandResponse) (ClusterValue
 	}
 	return createClusterSingleValue(data), nil
 }
+
+func handleStringIntMapResponse(response *C.struct_CommandResponse) (map[string]int64, error) {
+	defer C.free_command_response(response)
+
+	typeErr := checkResponseType(response, C.Map, false)
+	if typeErr != nil {
+		return nil, typeErr
+	}
+
+	data, err := parseMap(response)
+	if err != nil {
+		return nil, err
+	}
+	aMap := data.(map[string]interface{})
+
+	converted, err := mapConverter[int64]{
+		nil, false,
+	}.convert(aMap)
+	if err != nil {
+		return nil, err
+	}
+	result, ok := converted.(map[string]int64)
+	if !ok {
+		return nil, &errors.RequestError{Msg: fmt.Sprintf("unexpected type of map: %T", converted)}
+	}
+	return result, nil
+}
