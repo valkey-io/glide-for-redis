@@ -16114,7 +16114,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ----
 
-Package: once_cell:1.20.2
+Package: once_cell:1.20.3
 
 The following copyrights and licenses were found in the source code of this package:
 
@@ -39398,7 +39398,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ----
 
-Package: zerocopy:0.8.16
+Package: zerocopy:0.8.17
 
 The following copyrights and licenses were found in the source code of this package:
 
@@ -39902,7 +39902,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ----
 
-Package: zerocopy-derive:0.8.16
+Package: zerocopy-derive:0.8.17
 
 The following copyrights and licenses were found in the source code of this package:
 
