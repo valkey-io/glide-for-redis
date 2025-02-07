@@ -10,3 +10,6 @@ lib.h
 benchmarks/results/**
 benchmarks/gobenchmarks.json
 benchmarks/benchmarks
+
+# compiled static library file
+*.a

@@ -2,7 +2,7 @@
 
 package api
 
-import "github.com/valkey-io/valkey-glide/go/glide/api/config"
+import "github.com/valkey-io/valkey-glide/go/api/config"
 
 // GenericClusterCommands supports commands for the "Generic Commands" group for cluster client.
 //

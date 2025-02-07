@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/valkey-io/valkey-glide/go/glide/api"
+	"github.com/valkey-io/valkey-glide/go/api"
 )
 
 // TODO: Update the file based on the template used in other clients.

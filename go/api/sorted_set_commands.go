@@ -3,7 +3,7 @@
 package api
 
 import (
-	"github.com/valkey-io/valkey-glide/go/glide/api/options"
+	"github.com/valkey-io/valkey-glide/go/api/options"
 )
 
 // SortedSetCommands supports commands and transactions for the "Sorted Set Commands" group for standalone and cluster clients.

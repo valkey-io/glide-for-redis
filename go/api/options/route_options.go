@@ -2,7 +2,7 @@
 
 package options
 
-import "github.com/valkey-io/valkey-glide/go/glide/api/config"
+import "github.com/valkey-io/valkey-glide/go/api/config"
 
 // An extension to command option types with Routes
 type RouteOption struct {

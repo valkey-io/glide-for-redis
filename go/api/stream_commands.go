@@ -2,7 +2,7 @@
 
 package api
 
-import "github.com/valkey-io/valkey-glide/go/glide/api/options"
+import "github.com/valkey-io/valkey-glide/go/api/options"
 
 // Supports commands and transactions for the "Stream" group of commands for standalone and cluster clients.
 //

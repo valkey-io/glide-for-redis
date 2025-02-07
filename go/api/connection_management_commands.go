@@ -2,7 +2,7 @@
 
 package api
 
-import "github.com/valkey-io/valkey-glide/go/glide/api/options"
+import "github.com/valkey-io/valkey-glide/go/api/options"
 
 // Supports commands and transactions for the "Connection Management" group of commands for standalone client.
 //

@@ -3,7 +3,7 @@
 package main
 
 import (
-	"github.com/valkey-io/valkey-glide/go/glide/api"
+	"github.com/valkey-io/valkey-glide/go/api"
 )
 
 type glideBenchmarkClient struct {

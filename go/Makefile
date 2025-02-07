@@ -46,11 +46,17 @@ clean:
 
 build-glide-client:
 	cargo build --release
-	cbindgen --config cbindgen.toml --crate glide-rs --output lib.h
+	cbindgen --config cbindgen.toml --crate glide-rs --output lib.h --lang c
+	if [ "$$(uname)" = "Darwin" ]; then \
+		strip -x target/release/libglide_rs.a; \
+	else \
+		strip --strip-unneeded target/release/libglide_rs.a; \
+	fi
+		
 
 build-glide-client-debug:
 	cargo build
-	cbindgen --config cbindgen.toml --crate glide-rs --output lib.h
+	cbindgen --config cbindgen.toml --crate glide-rs --output lib.h --lang c
 
 generate-protobuf:
 	rm -rf protobuf
@@ -81,9 +87,9 @@ format:
 unit-test:
 	mkdir -p reports
 	set -o pipefail; \
-	LD_LIBRARY_PATH=$(shell find . -name libglide_rs.so|grep -w release|tail -1|xargs dirname|xargs readlink -f):${LD_LIBRARY_PATH} \
+	LD_LIBRARY_PATH=$(shell find . -name libglide_rs.a|grep -w release|tail -1|xargs dirname|xargs readlink -f):${LD_LIBRARY_PATH} \
 	go test -v -race ./... -skip TestGlideTestSuite $(if $(test-filter), -testify.m $(test-filter)) \
-	| tee >(go tool test2json -t -p github.com/valkey-io/valkey-glide/go/glide/utils | go-test-report -o reports/unit-tests.html -t unit-test > /dev/null)
+	| tee >(go tool test2json -t -p github.com/valkey-io/valkey-glide/go/utils | go-test-report -o reports/unit-tests.html -t unit-test > /dev/null)
 
 # integration tests - run subtask with skipping modules tests
 integ-test: export TEST_FILTER = -skip TestGlideTestSuite/TestModule $(if $(test-filter), -testify.m $(test-filter))
@@ -96,12 +102,12 @@ modules-test: __it
 __it:
 	mkdir -p reports
 	set -o pipefail; \
-	LD_LIBRARY_PATH=$(shell find . -name libglide_rs.so|grep -w release|tail -1|xargs dirname|xargs readlink -f):${LD_LIBRARY_PATH} \
+	LD_LIBRARY_PATH=$(shell find . -name libglide_rs.a|grep -w release|tail -1|xargs dirname|xargs readlink -f):${LD_LIBRARY_PATH} \
 	go test -v -race ./integTest/... \
 	$(TEST_FILTER) \
 	$(if $(filter true, $(tls)), --tls,) \
 	$(if $(standalone-endpoints), --standalone-endpoints=$(standalone-endpoints)) \
 	$(if $(cluster-endpoints), --cluster-endpoints=$(cluster-endpoints)) \
-	| tee >(go tool test2json -t -p github.com/valkey-io/valkey-glide/go/glide/integTest | go-test-report -o reports/integ-tests.html -t integ-test > /dev/null)
+	| tee >(go tool test2json -t -p github.com/valkey-io/valkey-glide/go/integTest | go-test-report -o reports/integ-tests.html -t integ-test > /dev/null)
 # code above ^ is similar to `go test .... -json | go-test-report ....`, but it also prints plain text output to stdout
 # `go test` prints plain text, tee duplicates it to stdout and to `test2json` which is coupled with `go-test-report` to generate the report

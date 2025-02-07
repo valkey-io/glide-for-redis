@@ -5,7 +5,7 @@ package options
 import (
 	"errors"
 
-	"github.com/valkey-io/valkey-glide/go/glide/utils"
+	"github.com/valkey-io/valkey-glide/go/utils"
 )
 
 // Optional arguments to `ZAdd` in [SortedSetCommands]

@@ -3,7 +3,7 @@
 package options
 
 import (
-	"github.com/valkey-io/valkey-glide/go/glide/utils"
+	"github.com/valkey-io/valkey-glide/go/utils"
 )
 
 // Optional arguments for `ZMPop` and `BZMPop` in [SortedSetCommands]

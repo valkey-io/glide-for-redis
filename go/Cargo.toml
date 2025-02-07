@@ -6,7 +6,7 @@ license = "Apache-2.0"
 authors = ["Valkey GLIDE Maintainers"]
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["staticlib"]
 
 [dependencies]
 redis = { path = "../glide-core/redis-rs/redis", features = ["aio", "tokio-comp", "connection-manager", "tokio-rustls-comp"] }

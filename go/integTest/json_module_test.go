@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/valkey-io/valkey-glide/go/glide/api"
+	"github.com/valkey-io/valkey-glide/go/api"
 )
 
 func (suite *GlideTestSuite) TestModuleVerifyJsonLoaded() {

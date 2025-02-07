@@ -3,7 +3,7 @@
 package options
 
 import (
-	"github.com/valkey-io/valkey-glide/go/glide/api/config"
+	"github.com/valkey-io/valkey-glide/go/api/config"
 )
 
 // Optional arguments for `Ping` for standalone client
